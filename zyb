@@ -29,7 +29,7 @@ if isLocalPlayerWhitelisted then
         Text = "玩家:"..localPlayer.Name.."，检测完毕白名单玩家，稍后会加载脚本",
         Duration = 7,
     })
-loadstring(game:HttpGet("https://raw.githubusercontent.com/kismile236/rjrym/refs/heads/main/%E8%87%AA%E7%94%A8%E5%8A%A0%E5%AF%86"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/kismiletest/-/refs/heads/main/zyy"))()
 else
     localPlayer:Kick("你个死爹烂妈的没在白名单里")
 end
