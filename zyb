@@ -15,6 +15,7 @@ local Whitelisted = {
     ["dgfd7666"] = true,
     ["Timmy112406"] = true,
     ["Suedrr4"] = true,
+    ["ziyao_1237"] = true,
  }
 
 local function IsWhitelisted(player)
