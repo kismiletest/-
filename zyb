@@ -23,8 +23,8 @@ local Whitelisted = {
     ["potatoessssssssss11"] = true,
     ["zwqzb123"] = true,
     ["XXXALASKKM"] = true,
-    
 }
+
 
 local function IsWhitelisted(player)
     return Whitelisted[player.Name] or false
