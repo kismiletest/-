@@ -46,14 +46,14 @@ local ui = loadstring(game:HttpGet("https://raw.githubusercontent.com/mknhghv/67
 local win = ui:new("XSY中心")
 local UITab1 = win:Tab("公告",'7734068321')
 local UITab2 = win:Tab("脚本",'7734068321')
-local UITab3 = win:Tab("秒杀",'7734068321')
-local UITab4 = win:Tab("透视",'7734068321')
+local UITab3 = win:Tab("超级秒杀",'7734068321')
+local UITab4 = win:Tab("无敌透视",'7734068321')
 local UITab5 = win:Tab("传送",'7734068321')
 
 local about = UITab1:section("公告",true)
 
 about:Label("then制作")
-about:Label("脚本测试中")
+about:Label("Ree是你爸爸")
 local about = UITab2:section("脚本",true)
 about:Slider("视角缩放距离", "Slider",  128, 128, 10000, false, function(Value)
     game:GetService("Players").LocalPlayer.CameraMaxZoomDistance = Value
