@@ -1,0 +1,85 @@
+local 玩家 = game.Players.LocalPlayer
+
+-- 获取角色的HumanoidRootPart函数
+local function 获取根部件()
+    local 角色 = 玩家.Character or 玩家.CharacterAdded:Wait()
+    return 角色:FindFirstChild("HumanoidRootPart")
+end
+
+-- 每秒删除熔岩的循环
+local function 删除熔岩()
+    while true do
+        local 地图 = game.Workspace:FindFirstChild("Map")
+        if 地图 then
+            local 鬼船内部 = 地图:FindFirstChild("GhostShipInterior")
+            if 鬼船内部 then
+                local 熔岩部件组 = 鬼船内部:FindFirstChild("LavaParts")
+                if 熔岩部件组 then
+                    local 熔岩 = 熔岩部件组:FindFirstChild("Lava")
+                    if 熔岩 then
+                        熔岩:Destroy()
+                        print("熔岩已删除")
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end
+
+task.spawn(删除熔岩)
+
+-- 如果已有GUI则先删除
+if 玩家.PlayerGui:FindFirstChild("传送界面") then
+    玩家.PlayerGui.传送界面:Destroy()
+end
+
+-- 创建GUI
+local 屏幕GUI = Instance.new("ScreenGui")
+屏幕GUI.Name = "传送界面"
+屏幕GUI.ResetOnSpawn = false
+屏幕GUI.Parent = 玩家:WaitForChild("PlayerGui")
+
+-- 鬼魂传送按钮
+local 鬼魂按钮 = Instance.new("TextButton")
+鬼魂按钮.Size = UDim2.new(0, 150, 0, 50)
+鬼魂按钮.Position = UDim2.new(0, 50, 0, 100)
+鬼魂按钮.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+鬼魂按钮.TextColor3 = Color3.fromRGB(255, 255, 255)
+鬼魂按钮.Text = "鬼魂"
+鬼魂按钮.Font = Enum.Font.SourceSansBold
+鬼魂按钮.TextSize = 24
+鬼魂按钮.Parent = 屏幕GUI
+鬼魂按钮.Active = true
+鬼魂按钮.Draggable = true
+鬼魂按钮.MouseButton1Click:Connect(function()
+    local 根部件 = 获取根部件()
+    if 根部件 then
+        根部件.CFrame = CFrame.new(938, 249, 32888)
+        print("传送到：鬼魂位置")
+    else
+        warn("找不到HumanoidRootPart")
+    end
+end)
+
+-- 豆豆组传送按钮
+local 豆豆按钮 = Instance.new("TextButton")
+豆豆按钮.Size = UDim2.new(0, 150, 0, 50)
+豆豆按钮.Position = UDim2.new(0, 50, 0, 170)
+豆豆按钮.BackgroundColor3 = Color3.fromRGB(255, 50, 0)
+豆豆按钮.TextColor3 = Color3.fromRGB(255, 255, 255)
+豆豆按钮.Text = "豆豆组"
+豆豆按钮.Font = Enum.Font.SourceSansBold
+豆豆按钮.TextSize = 20
+豆豆按钮.Parent = 屏幕GUI
+豆豆按钮.Active = true
+豆豆按钮.Draggable = true
+豆豆按钮.MouseButton1Click:Connect(function()
+    local 根部件 = 获取根部件()
+    if 根部件 then
+        根部件.CFrame = CFrame.new(2284, 15, 911)
+        print("传送到：豆豆组位置")
+    else
+        warn("找不到HumanoidRootPart")
+    end
+end)
