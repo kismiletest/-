@@ -317,3 +317,102 @@ UserInputService.InputChanged:Connect(function(input)
         主框架.Position = UDim2.new(0, 鼠标位置.X - 偏移.X, 0, 鼠标位置.Y - 偏移.Y)
     end
 end)
+--// Roblox GUI 模板 - 折叠/展开功能格子
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- 创建 ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoTemplateGUI"
+ScreenGui.Parent = PlayerGui
+
+-- 主框
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+-- 标题
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.Text = "功能格子（折叠/展开）"
+Title.Parent = MainFrame
+
+-- 折叠按钮
+local CollapseBtn = Instance.new("TextButton")
+CollapseBtn.Size = UDim2.new(0, 30, 0, 30)
+CollapseBtn.Position = UDim2.new(1, -30, 0, 0)
+CollapseBtn.Text = "-"
+CollapseBtn.Font = Enum.Font.SourceSansBold
+CollapseBtn.TextSize = 20
+CollapseBtn.TextColor3 = Color3.fromRGB(255,255,255)
+CollapseBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+CollapseBtn.Parent = MainFrame
+
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -30)
+ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+ContentFrame.BackgroundColor3 = Color3.fromRGB(45,45,45)
+ContentFrame.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0,5)
+UIListLayout.Parent = ContentFrame
+
+-- 折叠逻辑
+local collapsed = false
+CollapseBtn.MouseButton1Click:Connect(function()
+    collapsed = not collapsed
+    if collapsed then
+        ContentFrame.Visible = false
+        CollapseBtn.Text = "+"
+    else
+        ContentFrame.Visible = true
+        CollapseBtn.Text = "-"
+    end
+end)
+
+-- 创建开关函数模板
+local function CreateToggle(name)
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(1, -10, 0, 30)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleBtn.Font = Enum.Font.SourceSans
+    ToggleBtn.TextSize = 16
+    ToggleBtn.Text = name .. ": 关闭"
+    ToggleBtn.Parent = ContentFrame
+
+    local toggled = false
+    ToggleBtn.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        if toggled then
+            ToggleBtn.Text = name .. ": 开启"
+            -- 这里可以放你的 RemoteEvent 调用逻辑
+            -- 示例:
+            -- spawn(function()
+            --     while toggled do
+            --         game:GetService("ReplicatedStorage").YourRemoteEvent:FireServer(args)
+            --         wait(1)
+            --     end
+            -- end)
+        else
+            ToggleBtn.Text = name .. ": 关闭"
+        end
+    end)
+end
+
+-- 添加开关
+CreateToggle("自动接任务")
+CreateToggle("自动刷海上事件")
+CreateToggle("自动刷材料")
+CreateToggle("自动攻击怪物")
+CreateToggle("自动解任务到二海")
+CreateToggle("自动解任务到三海")
