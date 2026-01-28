@@ -83,3 +83,129 @@ local 豆豆按钮 = Instance.new("TextButton")
         warn("找不到HumanoidRootPart")
     end
 end)
+--// Roblox 中文 GUI 框架模板
+--// 创建 ScreenGui
+local 玩家 = game.Players.LocalPlayer
+local 玩家Gui = 玩家:WaitForChild("PlayerGui")
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "自动功能界面"
+ScreenGui.Parent = 玩家Gui
+
+--// 主框架
+local 主框架 = Instance.new("Frame")
+主框架.Size = UDim2.new(0, 300, 0, 400)
+主框架.Position = UDim2.new(0.5, -150, 0.5, -200)
+主框架.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+主框架.BorderSizePixel = 0
+主框架.Parent = ScreenGui
+
+--// 标题栏
+local 标题栏 = Instance.new("TextLabel")
+标题栏.Size = UDim2.new(1, 0, 0, 40)
+标题栏.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+标题栏.Text = "自动功能界面"
+标题栏.TextColor3 = Color3.new(1,1,1)
+标题栏.Font = Enum.Font.SourceSansBold
+标题栏.TextSize = 20
+标题栏.Parent = 主框架
+
+--// 折叠按钮
+local 折叠按钮 = Instance.new("TextButton")
+折叠按钮.Size = UDim2.new(0, 40, 0, 40)
+折叠按钮.Position = UDim2.new(1, -40, 0, 0)
+折叠按钮.Text = "—"
+折叠按钮.Font = Enum.Font.SourceSansBold
+折叠按钮.TextSize = 20
+折叠按钮.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+折叠按钮.TextColor3 = Color3.new(1,1,1)
+折叠按钮.Parent = 主框架
+
+local 展开 = true
+折叠按钮.MouseButton1Click:Connect(function()
+    展开 = not 展开
+    if 展开 then
+        主框架.Size = UDim2.new(0, 300, 0, 400)
+        折叠按钮.Text = "—"
+        内容框.Visible = true
+    else
+        主框架.Size = UDim2.new(0, 300, 0, 40)
+        折叠按钮.Text = "+"
+        内容框.Visible = false
+    end
+end)
+
+--// 内容框
+local 内容框 = Instance.new("Frame")
+内容框.Size = UDim2.new(1, 0, 1, -40)
+内容框.Position = UDim2.new(0, 0, 0, 40)
+内容框.BackgroundTransparency = 1
+内容框.Parent = 主框架
+
+--// 创建按钮函数
+local function 添加按钮(按钮名, 回调)
+    local 按钮 = Instance.new("TextButton")
+    按钮.Size = UDim2.new(1, -20, 0, 35)
+    按钮.Position = UDim2.new(0, 10, 0, (#内容框:GetChildren())*40)
+    按钮.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    按钮.TextColor3 = Color3.new(1,1,1)
+    按钮.Text = 按钮名
+    按钮.Font = Enum.Font.SourceSans
+    按钮.TextSize = 18
+    按钮.Parent = 内容框
+
+    按钮.MouseButton1Click:Connect(function()
+        pcall(回调)
+    end)
+end
+
+--// 创建开关按钮函数
+local function 添加开关(名称, 初始状态, 回调)
+    local 状态 = 初始状态
+    local 框 = Instance.new("TextButton")
+    框.Size = UDim2.new(1, -20, 0, 35)
+    框.Position = UDim2.new(0, 10, 0, (#内容框:GetChildren())*40)
+    框.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    框.TextColor3 = Color3.new(1,1,1)
+    框.Font = Enum.Font.SourceSans
+    框.TextSize = 18
+    框.Text = 名称 .. ": " .. (状态 and "开启" or "关闭")
+    框.Parent = 内容框
+
+    框.MouseButton1Click:Connect(function()
+        状态 = not 状态
+        框.Text = 名称 .. ": " .. (状态 and "开启" or "关闭")
+        pcall(function() 回调(状态) end)
+    end)
+end
+
+--// 示例按钮/开关
+添加按钮("传送到安全点", function()
+    if 玩家.Character and 玩家.Character:FindFirstChild("HumanoidRootPart") then
+        玩家.Character.HumanoidRootPart.CFrame = CFrame.new(0, 50, 0) -- 替换成游戏安全点
+    end
+end)
+
+添加开关("自动刷怪", false, function(开关状态)
+    if 开关状态 then
+        print("自动刷怪已开启") -- 这里可以绑定游戏 RemoteEvent
+    else
+        print("自动刷怪已关闭")
+    end
+end)
+
+添加开关("自动接任务", false, function(开关状态)
+    print("自动接任务: ", 开关状态)
+end)
+
+添加开关("自动刷海上事件", false, function(开关状态)
+    print("自动刷海上事件: ", 开关状态)
+end)
+
+添加开关("自动刷材料", false, function(开关状态)
+    print("自动刷材料: ", 开关状态)
+end)
+
+添加开关("自动解任务", false, function(开关状态)
+    print("自动解任务: ", 开关状态)
+end)
