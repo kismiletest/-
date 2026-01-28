@@ -1,0 +1,71 @@
+--========== 自动刷格子（可折叠版） =========--
+local AutoFrame = Instance.new("Frame")
+AutoFrame.Size = UDim2.new(0, 400, 0, 500)
+AutoFrame.Position = UDim2.new(0, 10, 0, 150)
+AutoFrame.BackgroundColor3 = Color3.fromRGB(45,45,45)
+AutoFrame.BorderSizePixel = 0
+AutoFrame.Parent = MainFrame
+
+-- 折叠开关
+local isCollapsed = false
+
+local AutoTitle = Instance.new("TextButton")
+AutoTitle.Size = UDim2.new(1,0,0,40)
+AutoTitle.Position = UDim2.new(0,0,0,0)
+AutoTitle.BackgroundColor3 = Color3.fromRGB(70,70,70)
+AutoTitle.TextColor3 = Color3.fromRGB(255,255,255)
+AutoTitle.Font = Enum.Font.SourceSansBold
+AutoTitle.TextSize = 20
+AutoTitle.Text = "自动刷功能 ▼"  -- ▼ 表示展开，▶ 表示折叠
+AutoTitle.Parent = AutoFrame
+
+-- 创建自动刷功能按钮
+local AutoButtons = {}
+local function createAutoButton(name, y)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 380, 0, 35)
+    btn.Position = UDim2.new(0, 10, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Text = name.." : OFF"
+    btn.Parent = AutoFrame
+
+    btn.MouseButton1Click:Connect(function()
+        AutoSystem[name] = not AutoSystem[name]
+        btn.Text = name.." : "..(AutoSystem[name] and "ON" or "OFF")
+    end)
+    table.insert(AutoButtons, btn)
+end
+
+-- 自动刷材料
+local materials = {
+    "AutoIron","AutoGhostFire","AutoBone","AutoVampireFang","AutoMagma"
+}
+for i,name in ipairs(materials) do
+    createAutoButton(name, 40 + (i-1)*40)
+end
+
+-- 自动刷海上事件/Boss
+local seaEvents = {
+    "AutoSeaEvent","AutoSharkKing","AutoSmallShark","AutoElectricFish","AutoSeaBeast","AutoAttackShip"
+}
+for i,name in ipairs(seaEvents) do
+    createAutoButton(name, 240 + (i-1)*40)
+end
+
+-- 自动解任务
+local quests = {
+    "AutoQuest2ndSea","AutoQuest3rdSea"
+}
+for i,name in ipairs(quests) do
+    createAutoButton(name, 500 + (i-1)*40)
+end
+
+--========== 折叠/展开功能 =========--
+AutoTitle.MouseButton1Click:Connect(function()
+    isCollapsed = not isCollapsed
+    for _, btn in pairs(AutoButtons) do
+        btn.Visible = not isCollapsed
+    end
+    AutoTitle.Text = "自动刷功能 "..(isCollapsed and "▶" or "▼")
+end)
