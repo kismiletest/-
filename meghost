@@ -1,0 +1,144 @@
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+--// Character
+local function getChar()
+    return player.Character or player.CharacterAdded:Wait()
+end
+
+--// ===== 設定區 =====
+-- Cursed Ship Fatal Area（自行改）
+local TP_CFrame = CFrame.new(923.5, 125.3, 32845.7)
+
+-- Anti Death 設定
+local AntiDeath = true
+local SafeCFrame = CFrame.new(0, 400, 0) -- 安全空中
+local MinHealth = 20
+-- ===================
+
+--// GUI
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.Name = "CursedShipTP"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 170)
+frame.Position = UDim2.new(0.5, -110, 0.4, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.Active = true
+frame.Draggable = true
+
+-- Title
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "Cursed Ship TP"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+-- Minimize Button
+local miniBtn = Instance.new("TextButton", frame)
+miniBtn.Size = UDim2.new(0,30,0,30)
+miniBtn.Position = UDim2.new(1,-35,0,0)
+miniBtn.Text = "_"
+miniBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+miniBtn.TextColor3 = Color3.new(1,1,1)
+miniBtn.Font = Enum.Font.GothamBold
+
+-- TP Button
+local tpBtn = Instance.new("TextButton", frame)
+tpBtn.Size = UDim2.new(0,180,0,40)
+tpBtn.Position = UDim2.new(0,20,0,45)
+tpBtn.Text = "TP : OFF"
+tpBtn.BackgroundColor3 = Color3.fromRGB(170,0,0)
+tpBtn.TextColor3 = Color3.new(1,1,1)
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.TextSize = 14
+
+-- Anti Death Label
+local adLabel = Instance.new("TextLabel", frame)
+adLabel.Size = UDim2.new(0,180,0,30)
+adLabel.Position = UDim2.new(0,20,0,95)
+adLabel.Text = "Anti Death : ON"
+adLabel.BackgroundColor3 = Color3.fromRGB(0,120,170)
+adLabel.TextColor3 = Color3.new(1,1,1)
+adLabel.Font = Enum.Font.GothamBold
+adLabel.TextSize = 13
+
+--// 狀態
+local teleporting = false
+local minimized = false
+local tpConnection
+
+--// TP Loop
+local function startTP()
+    tpConnection = RunService.Heartbeat:Connect(function()
+        local char = getChar()
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = TP_CFrame
+        end
+    end)
+end
+
+local function stopTP()
+    if tpConnection then
+        tpConnection:Disconnect()
+        tpConnection = nil
+    end
+end
+
+--// TP Button Logic
+tpBtn.MouseButton1Click:Connect(function()
+    teleporting = not teleporting
+    if teleporting then
+        tpBtn.Text = "TP : ON"
+        tpBtn.BackgroundColor3 = Color3.fromRGB(0,170,0)
+        startTP()
+    else
+        tpBtn.Text = "TP : OFF"
+        tpBtn.BackgroundColor3 = Color3.fromRGB(170,0,0)
+        stopTP()
+    end
+end)
+
+--// Minimize Logic
+miniBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    for _,v in pairs(frame:GetChildren()) do
+        if v ~= title and v ~= miniBtn then
+            v.Visible = not minimized
+        end
+    end
+    frame.Size = minimized and UDim2.new(0,220,0,30) or UDim2.new(0,220,0,170)
+end)
+
+--// ===== Anti Death 主程式 =====
+task.spawn(function()
+    while AntiDeath do
+        local char = getChar()
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+
+        if hum and hrp then
+            -- 鎖血
+            hum.MaxHealth = math.huge
+            hum.Health = math.huge
+
+            -- 血量過低瞬移
+            if hum.Health <= MinHealth then
+                hrp.CFrame = SafeCFrame
+                hum.Health = hum.MaxHealth
+            end
+
+            -- 防死亡
+            if hum:GetState() == Enum.HumanoidStateType.Dead then
+                hum:ChangeState(Enum.HumanoidStateType.Physics)
+                hrp.CFrame = SafeCFrame
+            end
+        end
+        task.wait(0.2)
+    end
+end)
