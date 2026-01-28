@@ -1,0 +1,66 @@
+--================ 设置区 =================--
+local AIM_ENABLED = true
+local AIM_SMOOTHNESS = 0.12       -- 0.1~0.18 越小越猛
+local AIM_DISTANCE = 2000         -- 锁人距离
+local TARGET_HEAD = true          -- true=锁头 / false=锁身体
+
+--================ 服务 =================--
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+--================ 工具函数 =================--
+local function isAlive(char)
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health > 0
+end
+
+local function getAimPart(char)
+    if TARGET_HEAD and char:FindFirstChild("Head") then
+        return char.Head
+    end
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+--================ 获取最近玩家 =================--
+local function getClosestPlayer()
+    local closest, shortest = nil, AIM_DISTANCE
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and isAlive(plr.Character) then
+            local part = getAimPart(plr.Character)
+            if part then
+                local dist = (part.Position - Camera.CFrame.Position).Magnitude
+                if dist < shortest then
+                    shortest = dist
+                    closest = part
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+--================ 自瞄核心 =================--
+RunService.RenderStepped:Connect(function()
+    if not AIM_ENABLED then return end
+
+    local target = getClosestPlayer()
+    if target then
+        local camPos = Camera.CFrame.Position
+        local aimCFrame = CFrame.new(camPos, target.Position)
+        Camera.CFrame = Camera.CFrame:Lerp(aimCFrame, AIM_SMOOTHNESS)
+    end
+end)
+
+--================ Q键开关 =================--
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.Q then
+        AIM_ENABLED = not AIM_ENABLED
+        warn("🎯 玩家自瞄:", AIM_ENABLED and "开启" or "关闭")
+    end
+end)
