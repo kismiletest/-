@@ -139,3 +139,86 @@ task.spawn(function()
         task.wait(0.2)
     end
 end)
+--================ 基础服务 ================--
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+--================ 设置区 ================--
+
+-- 你的安全点（鬼船后面岩浆 Y=18）
+local SafeCFrame = CFrame.new(950, 18, 33080)
+
+-- 虚空位置（拉人用）
+local VoidCFrame = CFrame.new(950, -500, 33080)
+
+-- 秒杀检测距离
+local KillDistance = 1200
+
+-- 掉到多低自动拉回
+local MinY = -200
+
+-- 是否秒杀玩家
+local KillPlayers = true
+
+--================ 工具函数 ================--
+local function getChar(plr)
+    return plr.Character
+end
+
+local function getHRP(char)
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+--================ 初始：把自己送到虚空点（用于拉人） ================--
+task.spawn(function()
+    task.wait(0.5)
+    local hrp = getHRP(getChar(LocalPlayer))
+    if hrp then
+        hrp.CFrame = VoidCFrame
+    end
+end)
+
+--================ 虚空秒杀玩家 ================--
+RunService.Heartbeat:Connect(function()
+    if not KillPlayers then return end
+
+    local myChar = getChar(LocalPlayer)
+    local myHRP = getHRP(myChar)
+    if not myHRP then return end
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local char = getChar(plr)
+            local hrp = getHRP(char)
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+            if hrp and hum and hum.Health > 0 then
+                local dist = (hrp.Position - myHRP.Position).Magnitude
+                if dist <= KillDistance then
+                    -- 拉进虚空（持续）
+                    hrp.CFrame = myHRP.CFrame * CFrame.new(0, -60, 0)
+                end
+            end
+        end
+    end
+end)
+
+--================ 自动回安全点（防自己死亡） ================--
+
+-- 掉虚空自动回
+RunService.Heartbeat:Connect(function()
+    local hrp = getHRP(getChar(LocalPlayer))
+    if hrp and hrp.Position.Y < MinY then
+        hrp.CFrame = SafeCFrame
+    end
+end)
+
+-- 复活自动回
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local hrp = char:WaitForChild("HumanoidRootPart", 5)
+    if hrp then
+        task.wait(0.3)
+        hrp.CFrame = SafeCFrame
+    end
+end)
