@@ -1,0 +1,207 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- =============================
+-- 变量
+-- =============================
+local AutoAttack = false
+local AttackDistance = 20
+_ENV.rz_AbilityLoop = false
+
+-- =============================
+-- HumanoidRootPart
+-- =============================
+local function getHumanoidRootPart()
+    local character = player.Character or player.CharacterAdded:Wait()
+    return character:FindFirstChild("HumanoidRootPart")
+end
+
+-- =============================
+-- 鬼船 Lava 自动删除
+-- =============================
+task.spawn(function()
+    while true do
+        local map = workspace:FindFirstChild("Map")
+        if map then
+            local ghostShipInterior = map:FindFirstChild("GhostShipInterior")
+            if ghostShipInterior then
+                local lavaParts = ghostShipInterior:FindFirstChild("LavaParts")
+                if lavaParts then
+                    local lava = lavaParts:FindFirstChild("Lava")
+                    if lava then
+                        lava:Destroy()
+                        warn("🔥 Lava 已删除")
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- =============================
+-- 清理旧 GUI
+-- =============================
+if player.PlayerGui:FindFirstChild("AutoAttackGUI") then
+    player.PlayerGui.AutoAttackGUI:Destroy()
+end
+
+-- =============================
+-- GUI
+-- =============================
+local gui = Instance.new("ScreenGui")
+gui.Name = "AutoAttackGUI"
+gui.ResetOnSpawn = false
+gui.Parent = player.PlayerGui
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 280, 0, 300)
+main.Position = UDim2.new(0.5, -140, 0.5, -150)
+main.BackgroundColor3 = Color3.fromRGB(30,30,30)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+
+-- 标题
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(45,45,45)
+title.Text = "Ghost Ship Hub"
+title.TextColor3 = Color3.new(1,1,1)
+title.TextSize = 18
+title.Parent = main
+
+-- 关闭
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -30, 0, 0)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255,80,80)
+closeBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+closeBtn.Parent = main
+closeBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- 缩小
+local miniBtn = Instance.new("TextButton")
+miniBtn.Size = UDim2.new(0, 30, 0, 30)
+miniBtn.Position = UDim2.new(1, -60, 0, 0)
+miniBtn.Text = "-"
+miniBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+miniBtn.TextColor3 = Color3.new(1,1,1)
+miniBtn.Parent = main
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -20, 1, -40)
+content.Position = UDim2.new(0, 10, 0, 35)
+content.BackgroundTransparency = 1
+content.Parent = main
+
+local minimized = false
+miniBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    content.Visible = not minimized
+    miniBtn.Text = minimized and "+" or "-"
+    main.Size = minimized and UDim2.new(0,280,0,30) or UDim2.new(0,280,0,300)
+end)
+
+-- =============================
+-- 自动攻击
+-- =============================
+local attackBtn = Instance.new("TextButton")
+attackBtn.Size = UDim2.new(1,0,0,32)
+attackBtn.Text = "自动攻击：关闭"
+attackBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+attackBtn.TextColor3 = Color3.new(1,1,1)
+attackBtn.Parent = content
+
+attackBtn.MouseButton1Click:Connect(function()
+    AutoAttack = not AutoAttack
+    attackBtn.Text = AutoAttack and "自动攻击：开启" or "自动攻击：关闭"
+end)
+
+local distText = Instance.new("TextLabel")
+distText.Size = UDim2.new(1,0,0,22)
+distText.Position = UDim2.new(0,0,0,38)
+distText.BackgroundTransparency = 1
+distText.Text = "攻击距离: "..AttackDistance
+distText.TextColor3 = Color3.new(1,1,1)
+distText.TextSize = 14
+distText.Parent = content
+
+-- =============================
+-- v3 能力（你的源码）
+-- =============================
+local v3Btn = Instance.new("TextButton")
+v3Btn.Size = UDim2.new(1,0,0,32)
+v3Btn.Position = UDim2.new(0,0,0,65)
+v3Btn.BackgroundColor3 = Color3.fromRGB(90,60,120)
+v3Btn.TextColor3 = Color3.new(1,1,1)
+v3Btn.Text = "v3能力：关闭"
+v3Btn.Parent = content
+
+v3Btn.MouseButton1Click:Connect(function()
+    _ENV.rz_AbilityLoop = not _ENV.rz_AbilityLoop
+    v3Btn.Text = _ENV.rz_AbilityLoop and "v3能力：开启" or "v3能力：关闭"
+
+    if _ENV.rz_AbilityLoop then
+        task.spawn(function()
+            while _ENV.rz_AbilityLoop do
+                task.wait(0.1)
+                pcall(function()
+                    game:GetService("ReplicatedStorage")
+                        .Remotes
+                        .CommE
+                        :FireServer("ActivateAbility")
+                end)
+            end
+        end)
+    end
+end)
+
+-- =============================
+-- 传送
+-- =============================
+local ghostBtn = Instance.new("TextButton")
+ghostBtn.Size = UDim2.new(1,0,0,32)
+ghostBtn.Position = UDim2.new(0,0,0,105)
+ghostBtn.Text = "传送：ゆうれい"
+ghostBtn.BackgroundColor3 = Color3.fromRGB(0,170,255)
+ghostBtn.TextColor3 = Color3.new(1,1,1)
+ghostBtn.Parent = content
+
+ghostBtn.MouseButton1Click:Connect(function()
+    local hrp = getHumanoidRootPart()
+    if hrp then
+        hrp.CFrame = CFrame.new(938, 249, 32888)
+    end
+end)
+
+local beanBtn = Instance.new("TextButton")
+beanBtn.Size = UDim2.new(1,0,0,32)
+beanBtn.Position = UDim2.new(0,0,0,145)
+beanBtn.Text = "传送：まめつぶぐみ"
+beanBtn.BackgroundColor3 = Color3.fromRGB(255,50,0)
+beanBtn.TextColor3 = Color3.new(1,1,1)
+beanBtn.Parent = content
+
+beanBtn.MouseButton1Click:Connect(function()
+    local hrp = getHumanoidRootPart()
+    if hrp then
+        hrp.CFrame = CFrame.new(2284, 15, 911)
+    end
+end)
+
+-- =============================
+-- 自动攻击循环（模板）
+-- =============================
+task.spawn(function()
+    while task.wait(0.3) do
+        if AutoAttack then
+            print("⚔ 自动攻击中 | 距离:", AttackDistance)
+        end
+    end
+end)
