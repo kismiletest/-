@@ -209,3 +209,111 @@ end)
 添加开关("自动解任务", false, function(开关状态)
     print("自动解任务: ", 开关状态)
 end)
+-- 本地玩家
+local 玩家 = game.Players.LocalPlayer
+local 玩家Gui = 玩家:WaitForChild("PlayerGui")
+
+-- 创建主GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "自动刷东西GUI"
+ScreenGui.Parent = 玩家Gui
+
+-- 主框架
+local 主框架 = Instance.new("Frame")
+主框架.Size = UDim2.new(0, 300, 0, 400)
+主框架.Position = UDim2.new(0.5, -150, 0.5, -200)
+主框架.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+主框架.BorderSizePixel = 0
+主框架.Parent = ScreenGui
+
+-- 可折叠按钮
+local 折叠按钮 = Instance.new("TextButton")
+折叠按钮.Size = UDim2.new(1, 0, 0, 30)
+折叠按钮.Position = UDim2.new(0, 0, 0, 0)
+折叠按钮.Text = "自动刷功能 [展开]"
+折叠按钮.BackgroundColor3 = Color3.fromRGB(70,70,70)
+折叠按钮.Parent = 主框架
+
+-- 内容框架
+local 内容框架 = Instance.new("Frame")
+内容框架.Size = UDim2.new(1, -20, 1, -40)
+内容框架.Position = UDim2.new(0, 10, 0, 40)
+内容框架.BackgroundTransparency = 1
+内容框架.Parent = 主框架
+
+-- 折叠/展开逻辑
+local 展开 = true
+折叠按钮.MouseButton1Click:Connect(function()
+    展开 = not 展开
+    if 展开 then
+        内容框架.Visible = true
+        折叠按钮.Text = "自动刷功能 [展开]"
+    else
+        内容框架.Visible = false
+        折叠按钮.Text = "自动刷功能 [折叠]"
+    end
+end)
+
+-- 功能按钮列表
+local 功能列表 = {
+    "自动升级",
+    "自动接任务",
+    "自动刷海上事件",
+    "自动刷材料",
+    "自动解任务去二海",
+    "自动解任务去三海",
+    "自动攻击怪",
+    "自动刷废铁",
+    "自动刷鬼火",
+    "自动刷骨头",
+    "自动刷吸血鬼牙齿",
+    "自动刷岩浆块",
+    "自动打鲨鱼王",
+    "自动打小鲨鱼",
+    "自动打电鱼",
+    "自动打海兽",
+    "自动打船"
+}
+
+local yOffset = 0
+for _, 名称 in ipairs(功能列表) do
+    local 按钮 = Instance.new("TextButton")
+    按钮.Size = UDim2.new(1, 0, 0, 30)
+    按钮.Position = UDim2.new(0, 0, 0, yOffset)
+    按钮.Text = 名称
+    按钮.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    按钮.Parent = 内容框架
+
+    -- 点击事件
+    按钮.MouseButton1Click:Connect(function()
+        print(名称 .. " 已点击！(此处可添加实际逻辑)")
+    end)
+    yOffset = yOffset + 35
+end
+
+-- 可拖动主框架
+local UserInputService = game:GetService("UserInputService")
+local 鼠标按下 = false
+local 偏移 = Vector2.new(0,0)
+
+主框架.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        鼠标按下 = true
+        local 鼠标位置 = UserInputService:GetMouseLocation()
+        local 框架位置 = 主框架.Position
+        偏移 = 鼠标位置 - Vector2.new(框架位置.X.Offset, 框架位置.Y.Offset)
+    end
+end)
+
+主框架.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        鼠标按下 = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if 鼠标按下 and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local 鼠标位置 = UserInputService:GetMouseLocation()
+        主框架.Position = UDim2.new(0, 鼠标位置.X - 偏移.X, 0, 鼠标位置.Y - 偏移.Y)
+    end
+end)
