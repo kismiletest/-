@@ -1,0 +1,206 @@
+-- 人挤人中心 - 最終精簡可執行版
+-- 時間：2026/01/29
+-- 只保留 UI + 基本功能 + 傳送 + 飛行 + 優化
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+-- 載入 WindUI（使用 raw 穩定連結）
+local WindUI = ue))loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/main.lua", tr()
+WindUI:SetTheme("Light")
+
+WindUI:Notify({
+    Duration = 5,
+    Content = "載入中...",
+    Title = "人挤人腳本"
+})
+
+task.wait(1)
+
+-- 建立主視窗
+local window = WindUI:CreateWindow({
+    Folder = "WindUI",
+    ScrollBarEnabled = true,
+    Title = "人挤人中心",
+    Transparent = false,
+    Theme = "Light",
+    Author = "kismile",
+    Icon = "rbxassetid://6031280882",
+    Size = UDim2.fromOffset(580, 460),
+})
+
+window:SetToggleKey(Enum.KeyCode.G)
+
+-- 分頁
+local tab_announce = window:Section({Title = "公告区", Opened = true}):Tab({Title = "公告", Icon = "info"})
+local tab_main    = window:Section({Title = "大佛功能区", Opened = true}):Tab({Title = "功能1", Icon = "settings"})
+local tab_tp      = window:Section({Title = "传送", Opened = true}):Tab({Title = "传送", Icon = "map-pin"})
+
+-- 公告內容
+tab_announce:Paragraph({
+    Color = "Red",
+    Title = "人挤人中心",
+    Desc = "then 製作\n腳本測試中\n請勿濫用"
+})
+
+tab_announce:Divider()
+
+tab_announce:Paragraph({
+    Color = "Green",
+    Title = "快捷鍵說明",
+    Desc = "G : 開關介面"
+})
+
+-- 功能1 - 基本設定
+tab_main:Slider({
+    Title = "視角縮放距離",
+    Min = 128,
+    Max = 10000000000,
+    Default = 128,
+    Callback = function(value)
+        LocalPlayer.CameraMaxZoomDistance = value
+        WindUI:Notify({Duration = 2, Content = "已設為: " .. value, Title = "視角縮放"})
+    end
+})
+
+tab_main:Divider()
+
+tab_main:Input({
+    Title = "速度",
+    Placeholder = "輸入速度值 (建議 16~200)",
+    Value = "16",
+    Callback = function(value)
+        local num = tonumber(value)
+        if num and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = num
+            WindUI:Notify({Duration = 2, Content = "速度設為: " .. num, Title = "速度"})
+        end
+    end
+})
+
+-- 加速開關
+local fastConn
+tab_main:Toggle({
+    Title = "加速開關",
+    Value = false,
+    Callback = function(state)
+        if state then
+            if fastConn then fastConn:Disconnect() end
+            fastConn = RunService.Heartbeat:Connect(function()
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    LocalPlayer.Character.Humanoid.WalkSpeed = 100
+                end
+            end)
+            WindUI:Notify({Duration = 2, Content = "加速已開啟", Title = "加速"})
+        else
+            if fastConn then fastConn:Disconnect() end
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                LocalPlayer.Character.Humanoid.WalkSpeed = 16
+            end
+            WindUI:Notify({Duration = 2, Content = "加速已關閉", Title = "加速"})
+        end
+    end
+})
+
+-- 飛行
+tab_main:Button({
+    Title = "飛行",
+    Icon = "wind",
+    Callback = function()
+        WindUI:Notify({Duration = 3, Content = "正在載入飛行腳本...", Title = "飛行"})
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ttker951-dot/y1/refs/heads/main/fly", true))()
+    end
+})
+
+-- 減畫質
+tab_main:Button({
+    Title = "減畫質",
+    Icon = "monitor",
+    Callback = function()
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+                v.Enabled = false
+            end
+        end
+        WindUI:Notify({Duration = 2, Content = "已降低部分特效", Title = "減畫質"})
+    end
+})
+
+-- 移除岩漿
+tab_main:Button({
+    Title = "移除岩漿",
+    Icon = "flame",
+    Callback = function()
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if v.Name == "Lava" or v.Name == "Magma" then
+                v:Destroy()
+            end
+        end
+        WindUI:Notify({Duration = 2, Content = "已嘗試移除岩漿", Title = "移除岩漿"})
+    end
+})
+
+-- 移除霧
+tab_main:Button({
+    Title = "移除霧",
+    Icon = "cloud-off",
+    Callback = function()
+        Lighting.FogEnd = 100000
+        if Lighting:FindFirstChild("LightingLayers") then
+            Lighting.LightingLayers:Destroy()
+        end
+        if Lighting:FindFirstChild("Sky") then
+            Lighting.Sky:Destroy()
+        end
+        WindUI:Notify({Duration = 2, Content = "已移除霧與天空特效", Title = "移除霧"})
+    end
+})
+
+-- 傳送功能
+local places = {
+    ["鬼船外"]     = CFrame.new(922.78, 123.96, 32842.4),
+    ["豪宅"]       = CFrame.new(2286.93, 15.06, 910.51),
+    ["鬼船里"]     = CFrame.new(-6501.06, 83.11, -123.52),
+    ["天鵝的房間"] = CFrame.new(-287.37, 305.81, 592.98),
+    ["司法岛"]     = CFrame.new(-5096.48, 316.43, -3177.91),
+    ["海上城堡"]   = CFrame.new(-12463.6, 376.26, -7566.08),
+    ["九头蛇"]     = CFrame.new(-5027.03, 316.43, -3206.07),
+    ["海龟豪宅"]   = CFrame.new(-5060.41, 316.43, -3192.3),
+}
+
+local playerList = {}
+for _, p in ipairs(Players:GetPlayers()) do
+    table.insert(playerList, p.Name)
+end
+
+local selectedPlayer = ""
+tab_tp:Dropdown({
+    Title = "选着锁定玩家",
+    Values = playerList,
+    Callback = function(value)
+        selectedPlayer = value
+    end
+})
+
+tab_tp:Button({
+    Title = "刷新玩家列表",
+    Callback = function()
+        playerList = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            table.insert(playerList, p.Name)
+        end
+        WindUI:Notify({Duration = 2, Content = "玩家列表已刷新", Title = "刷新"})
+    end
+})
+
+tab_tp:Toggle({
+    Title = "直接锁定至玩家",
+    Value = false,
+    Callback = function(state)
+        if state and selectedPlayer ~= "" then
+            local target = Players:FindFirstChild(selectedPlayer)
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
