@@ -1,0 +1,147 @@
+-- Services
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- 等待角色
+local function getHRP()
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart")
+end
+
+-- TP 坐标
+local COFFEE_TP = CFrame.new(-384, 74, 359)
+local CURSED_TP = CFrame.new(941, 252, 32900)
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "XSY_Hub_GUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 280, 0, 300)
+frame.Position = UDim2.new(0.5, -140, 0.5, -150)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+-- 标题
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -40, 0, 40)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "XSY-hub"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
+
+-- 最小化按钮
+local miniBtn = Instance.new("TextButton")
+miniBtn.Size = UDim2.new(0, 40, 0, 40)
+miniBtn.Position = UDim2.new(1, -40, 0, 0)
+miniBtn.Text = "-"
+miniBtn.Font = Enum.Font.GothamBold
+miniBtn.TextSize = 20
+miniBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+miniBtn.TextColor3 = Color3.new(1,1,1)
+miniBtn.Parent = frame
+
+-- Coffee Shop 按钮
+local coffeeBtn = Instance.new("TextButton")
+coffeeBtn.Size = UDim2.new(0.85, 0, 0, 40)
+coffeeBtn.Position = UDim2.new(0.075, 0, 0.2, 0)
+coffeeBtn.Text = "TP Coffee Shop"
+coffeeBtn.Font = Enum.Font.Gotham
+coffeeBtn.TextSize = 14
+coffeeBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+coffeeBtn.TextColor3 = Color3.new(1,1,1)
+coffeeBtn.Parent = frame
+
+-- Cursed Ship 按钮
+local cursedBtn = Instance.new("TextButton")
+cursedBtn.Size = UDim2.new(0.85, 0, 0, 40)
+cursedBtn.Position = UDim2.new(0.075, 0, 0.35, 0)
+cursedBtn.Text = "TP Cursed Ship"
+cursedBtn.Font = Enum.Font.Gotham
+cursedBtn.TextSize = 14
+cursedBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+cursedBtn.TextColor3 = Color3.new(1,1,1)
+cursedBtn.Parent = frame
+
+-- AbilityLoop 输入
+local abilityLabel = Instance.new("TextLabel")
+abilityLabel.Size = UDim2.new(0.85, 0, 0, 20)
+abilityLabel.Position = UDim2.new(0.075, 0, 0.55, 0)
+abilityLabel.BackgroundTransparency = 1
+abilityLabel.Text = "v3 AbilityLoop: false"
+abilityLabel.TextColor3 = Color3.new(1,1,1)
+abilityLabel.Font = Enum.Font.Gotham
+abilityLabel.TextSize = 14
+abilityLabel.TextXAlignment = Enum.TextXAlignment.Left
+abilityLabel.Parent = frame
+
+local abilityInput = Instance.new("TextBox")
+abilityInput.Size = UDim2.new(0.85, 0, 0, 30)
+abilityInput.Position = UDim2.new(0.075, 0, 0.6, 0)
+abilityInput.PlaceholderText = "输入 true/false 开启或关闭"
+abilityInput.Text = ""
+abilityInput.Font = Enum.Font.Gotham
+abilityInput.TextSize = 14
+abilityInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+abilityInput.TextColor3 = Color3.new(1,1,1)
+abilityInput.Parent = frame
+
+-- AbilityLoop 变量
+_ENV.rz_AbilityLoop = false
+
+abilityInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local text = abilityInput.Text:lower()
+        local isOpen = text == "true" or text == "1" or text == "on"
+        _ENV.rz_AbilityLoop = isOpen
+        abilityLabel.Text = "v3 AbilityLoop: " .. tostring(isOpen)
+        if isOpen then
+            task.wait()
+            task.spawn(function()
+                while _ENV.rz_AbilityLoop do
+                    task.wait(0.1)
+                    -- 调用 ActivateAbility
+                    if game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") then
+                        local remotes = game:GetService("ReplicatedStorage").Remotes
+                        if remotes:FindFirstChild("CommE") then
+                            remotes.CommE:FireServer("ActivateAbility")
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- 点击传送事件
+coffeeBtn.MouseButton1Click:Connect(function()
+    local hrp = getHRP()
+    hrp.CFrame = COFFEE_TP
+end)
+
+cursedBtn.MouseButton1Click:Connect(function()
+    local hrp = getHRP()
+    hrp.CFrame = CURSED_TP
+end)
+
+-- 最小化 GUI
+local minimized = false
+miniBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    for _, v in ipairs(frame:GetChildren()) do
+        if v ~= miniBtn then
+            v.Visible = not minimized
+        end
+    end
+    frame.Size = minimized
+        and UDim2.new(0, 280, 0, 40)
+        or  UDim2.new(0, 280, 0, 300)
+end)
