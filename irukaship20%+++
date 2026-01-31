@@ -128,3 +128,20 @@ end
 
 -- 调用
 makeLavaImmune()
+local function preventLavaFall()
+    local char = getCharacter()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local humanoid = char:WaitForChild("Humanoid")
+
+    game:GetService("RunService").Heartbeat:Connect(function()
+        for _, part in ipairs(hrp:GetTouchingParts()) do
+            if part.Name:lower():find("lava") then
+                -- 漂浮效果
+                hrp.Velocity = Vector3.new(0, 10, 0)
+                humanoid.Health = humanoid.MaxHealth
+            end
+        end
+    end)
+end
+
+preventLavaFall()
