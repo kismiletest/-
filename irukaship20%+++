@@ -95,3 +95,36 @@ miniBtn.MouseButton1Click:Connect(function()
         and UDim2.new(0, 280, 0, 40)
         or  UDim2.new(0, 280, 0, 220)
 end)
+-- Services
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- 等待角色
+local function getCharacter()
+    return player.Character or player.CharacterAdded:Wait()
+end
+
+-- 设置免伤
+local function makeLavaImmune()
+    local char = getCharacter()
+    local humanoid = char:WaitForChild("Humanoid")
+
+    -- 监听 Humanoid 受伤事件
+    humanoid.HealthChanged:Connect(function()
+        if humanoid.Health < humanoid.MaxHealth then
+            -- 检查角色是否在岩浆区域
+            local hrp = char:WaitForChild("HumanoidRootPart")
+            local touchingParts = hrp:GetTouchingParts()
+            for _, part in ipairs(touchingParts) do
+                if part.Name:lower():find("lava") then
+                    -- 岩浆伤害 → 立即恢复
+                    humanoid.Health = humanoid.MaxHealth
+                    break
+                end
+            end
+        end
+    end)
+end
+
+-- 调用
+makeLavaImmune()
