@@ -14,7 +14,7 @@ local CURSED_TP = CFrame.new(941, 252, 32900)
 
 -- GUI
 local gui = Instance.new("ScreenGui")
-gui.Name = "StableTP_GUI"
+gui.Name = "XSY_Hub_GUI"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
@@ -26,15 +26,15 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = gui
 
--- 标题
+-- 标题（显示你的名字 XSY-hub）
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -40, 0, 40)
 title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "TP GUI (Stable)"
+title.Text = "XSY-hub"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
-title.TextSize = 16
+title.TextSize = 18
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = frame
 
@@ -95,53 +95,3 @@ miniBtn.MouseButton1Click:Connect(function()
         and UDim2.new(0, 280, 0, 40)
         or  UDim2.new(0, 280, 0, 220)
 end)
--- Services
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-
--- 等待角色
-local function getCharacter()
-    return player.Character or player.CharacterAdded:Wait()
-end
-
--- 设置免伤
-local function makeLavaImmune()
-    local char = getCharacter()
-    local humanoid = char:WaitForChild("Humanoid")
-
-    -- 监听 Humanoid 受伤事件
-    humanoid.HealthChanged:Connect(function()
-        if humanoid.Health < humanoid.MaxHealth then
-            -- 检查角色是否在岩浆区域
-            local hrp = char:WaitForChild("HumanoidRootPart")
-            local touchingParts = hrp:GetTouchingParts()
-            for _, part in ipairs(touchingParts) do
-                if part.Name:lower():find("lava") then
-                    -- 岩浆伤害 → 立即恢复
-                    humanoid.Health = humanoid.MaxHealth
-                    break
-                end
-            end
-        end
-    end)
-end
-
--- 调用
-makeLavaImmune()
-local function preventLavaFall()
-    local char = getCharacter()
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    local humanoid = char:WaitForChild("Humanoid")
-
-    game:GetService("RunService").Heartbeat:Connect(function()
-        for _, part in ipairs(hrp:GetTouchingParts()) do
-            if part.Name:lower():find("lava") then
-                -- 漂浮效果
-                hrp.Velocity = Vector3.new(0, 10, 0)
-                humanoid.Health = humanoid.MaxHealth
-            end
-        end
-    end)
-end
-
-preventLavaFall()
