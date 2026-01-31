@@ -23,7 +23,7 @@ end
 
 local WindUI = (loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")))();
 local Window = WindUI:CreateWindow({
-    Title = "Dick中心",
+    Title = "XSY中心",
     Author = "Blox Fruit",
     Folder = "BY　KISMILE",
     Size = UDim2.fromOffset(550, 300),
