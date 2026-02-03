@@ -1,21 +1,76 @@
--- 给所有 NPC 添加高亮（合法）
-for _, npc in pairs(workspace:GetChildren()) do
-    if npc:IsA("Model") and npc:FindFirstChild("Humanoid") then
-        
-        -- 防止重复添加
-        if npc:FindFirstChild("NPC_XRAY") then
-            continue
-        end
-        
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "NPC_XRAY"
-        highlight.Adornee = npc
-        highlight.FillColor = Color3.fromRGB(255, 0, 0)
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.FillTransparency = 0.5
-        highlight.OutlineTransparency = 0
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        
-        highlight.Parent = npc
-    end
+-- ===== 服务 =====
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- ===== GUI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "NPC_ESP_GUI"
+screenGui.Parent = playerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 100)
+frame.Position = UDim2.new(0, 20, 0, 200)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.Parent = screenGui
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, -20, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0, 30)
+toggleBtn.Text = "ESP : OFF"
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+toggleBtn.Parent = frame
+
+-- ===== ESP 逻辑 =====
+local espEnabled = false
+local espFolder = Instance.new("Folder")
+espFolder.Name = "ESP_FOLDER"
+espFolder.Parent = workspace
+
+-- 创建 ESP
+local function createESP(npc)
+	if npc:FindFirstChild("ESP_HIGHLIGHT") then return end
+
+	local h = Instance.new("Highlight")
+	h.Name = "ESP_HIGHLIGHT"
+	h.Adornee = npc
+	h.FillColor = Color3.fromRGB(255, 0, 0)
+	h.OutlineColor = Color3.fromRGB(255, 255, 255)
+	h.FillTransparency = 0.5
+	h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	h.Parent = npc
 end
+
+-- 移除 ESP
+local function removeAllESP()
+	for _, obj in pairs(workspace:GetDescendants()) do
+		if obj:IsA("Highlight") and obj.Name == "ESP_HIGHLIGHT" then
+			obj:Destroy()
+		end
+	end
+end
+
+-- 扫描 NPC
+local function scanNPC()
+	for _, model in pairs(workspace:GetChildren()) do
+		if model:IsA("Model") and model:FindFirstChild("Humanoid") then
+			createESP(model)
+		end
+	end
+end
+
+-- ===== 按钮逻辑 =====
+toggleBtn.MouseButton1Click:Connect(function()
+	espEnabled = not espEnabled
+
+	if espEnabled then
+		toggleBtn.Text = "ESP : ON"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 200, 60)
+		scanNPC()
+	else
+		toggleBtn.Text = "ESP : OFF"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		removeAllESP()
+	end
+end)
