@@ -1,0 +1,21 @@
+-- 给所有 NPC 添加高亮（合法）
+for _, npc in pairs(workspace:GetChildren()) do
+    if npc:IsA("Model") and npc:FindFirstChild("Humanoid") then
+        
+        -- 防止重复添加
+        if npc:FindFirstChild("NPC_XRAY") then
+            continue
+        end
+        
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "NPC_XRAY"
+        highlight.Adornee = npc
+        highlight.FillColor = Color3.fromRGB(255, 0, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        
+        highlight.Parent = npc
+    end
+end
