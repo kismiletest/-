@@ -1,0 +1,68 @@
+-- ===== Services =====
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- ===== GUI =====
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 200, 0, 100)
+frame.Position = UDim2.new(0, 20, 0, 200)
+frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.new(1, -20, 0, 40)
+btn.Position = UDim2.new(0, 10, 0, 30)
+btn.Text = "AUTO AIM : OFF"
+btn.TextColor3 = Color3.new(1,1,1)
+btn.BackgroundColor3 = Color3.fromRGB(200,60,60)
+
+-- ===== Logic =====
+local enabled = false
+
+-- 一番近いNPCを探す
+local function getClosestNPC()
+	local closest
+	local dist = math.huge
+
+	for _, m in pairs(workspace:GetChildren()) do
+		if m:IsA("Model") and m:FindFirstChild("Humanoid") and m:FindFirstChild("HumanoidRootPart") then
+			local d = (camera.CFrame.Position - m.HumanoidRootPart.Position).Magnitude
+			if d < dist then
+				dist = d
+				closest = m
+			end
+		end
+	end
+
+	return closest
+end
+
+-- カメラ制御
+RunService.RenderStepped:Connect(function()
+	if not enabled then return end
+
+	local npc = getClosestNPC()
+	if npc then
+		camera.CFrame = CFrame.new(
+			camera.CFrame.Position,
+			npc.HumanoidRootPart.Position
+		)
+	end
+end)
+
+-- ボタン
+btn.MouseButton1Click:Connect(function()
+	enabled = not enabled
+
+	if enabled then
+		btn.Text = "AUTO AIM : ON"
+		btn.BackgroundColor3 = Color3.fromRGB(60,200,60)
+	else
+		btn.Text = "AUTO AIM : OFF"
+		btn.BackgroundColor3 = Color3.fromRGB(200,60,60)
+	end
+end)
