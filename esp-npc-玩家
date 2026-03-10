@@ -1,0 +1,61 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local function createESP(model)
+
+	if not model:FindFirstChild("Humanoid") then return end
+	if Players:GetPlayerFromCharacter(model) then return end
+	if not model:FindFirstChild("HumanoidRootPart") then return end
+	if model:FindFirstChild("DevESP") then return end
+
+	-- 透视
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "DevESP"
+	highlight.FillColor = Color3.fromRGB(255,0,0)
+	highlight.FillTransparency = 0.5
+	highlight.OutlineColor = Color3.fromRGB(255,255,255)
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = model
+
+	-- 距离UI
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.new(0,140,0,40)
+	gui.StudsOffset = Vector3.new(0,4,0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 999999
+	gui.Parent = model.HumanoidRootPart
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1,0,1,0)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = Color3.new(1,1,1)
+	label.TextStrokeTransparency = 0
+	label.Font = Enum.Font.SourceSansBold
+	label.TextScaled = true
+	label.Parent = gui
+
+	-- 更新距离
+	task.spawn(function()
+		while model.Parent do
+			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				local dist = (model.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+				label.Text = model.Name.." ["..math.floor(dist).."m]"
+			end
+			task.wait(0.2)
+		end
+	end)
+end
+
+-- 扫描所有模型
+for _,v in pairs(workspace:GetDescendants()) do
+	if v:IsA("Model") then
+		createESP(v)
+	end
+end
+
+-- 新NPC出现自动ESP
+workspace.DescendantAdded:Connect(function(obj)
+	if obj:IsA("Model") then
+		createESP(obj)
+	end
+end)
