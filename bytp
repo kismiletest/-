@@ -1,0 +1,737 @@
+-- ts file was generated at discord.gg/25ms
+
+local fenv = getfenv()
+local _call3 = game:GetService('Players')
+local _call5 = game:GetService('UserInputService')
+
+game:GetService('TweenService')
+game:GetService('TeleportService')
+
+local _call13 = game:GetService('HttpService')
+local _LocalPlayer14 = _call3.LocalPlayer
+
+_LocalPlayer14.Character:WaitForChild('HumanoidRootPart')
+
+fenv.StartTeleport = function(_18, _18_2, _18_3)
+    game:GetService('StarterGui'):SetCore('SendNotification', {
+        Icon = 'rbxassetid://4483345998',
+        Text = '\u{8bf7}\u{5148}\u{9009}\u{62e9}\u{76ee}\u{6807}\u{73a9}\u{5bb6}',
+        Title = '\u{9519}\u{8bef}',
+        Duration = 2,
+    })
+end
+fenv.StopTeleport = function() end
+
+task.wait(1)
+
+local _call25 = Instance.new('ScreenGui')
+
+_call25.Name = 'FastTeleportUI_' .. _call13:GenerateGUID(false)
+_call25.Parent = game:GetService('CoreGui')
+_call25.IgnoreGuiInset = true
+_call25.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local _call34 = Instance.new('Frame')
+
+_call34.Size = UDim2.new(0, 250, 0, 300)
+_call34.Position = UDim2.new(0.5, -125, 0.5, -150)
+_call34.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+_call34.BorderSizePixel = 0
+_call34.ClipsDescendants = true
+_call34.Parent = _call25
+
+local _call42 = Instance.new('Frame')
+
+_call42.Size = UDim2.new(0, 250, 0, 40)
+_call42.Position = UDim2.new(0, 0, 0, 0)
+_call42.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+_call42.BorderSizePixel = 0
+_call42.Visible = false
+_call42.Parent = _call34
+
+local _call50 = Instance.new('UICorner')
+
+_call50.CornerRadius = UDim.new(0, 8)
+_call50.Parent = _call34
+
+local _call54 = Instance.new('UICorner')
+
+_call54.CornerRadius = UDim.new(0, 8)
+_call54.Parent = _call42
+
+local _call58 = Instance.new('Frame')
+
+_call58.Size = UDim2.new(1, 0, 0, 40)
+_call58.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+_call58.BorderSizePixel = 0
+_call58.Parent = _call34
+
+local _call64 = Instance.new('UICorner')
+
+_call64.CornerRadius = UDim.new(0, 8)
+_call64.Parent = _call58
+
+local _call68 = Instance.new('TextLabel')
+
+_call68.Size = UDim2.new(1, -120, 0, 22)
+_call68.Position = UDim2.new(0, 10, 0, 0)
+_call68.BackgroundTransparency = 1
+_call68.Text = 'Bypasstp'
+_call68.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call68.Font = Enum.Font.GothamBold
+_call68.TextSize = 16
+_call68.TextXAlignment = Enum.TextXAlignment.Left
+_call68.Parent = _call58
+
+local _call80 = Instance.new('TextLabel')
+
+_call80.Size = UDim2.new(1, -120, 0, 18)
+_call80.Position = UDim2.new(0, 10, 0, 22)
+_call80.BackgroundTransparency = 1
+_call80.Text = 'by 98krgqg'
+_call80.TextColor3 = Color3.fromRGB(180, 180, 180)
+_call80.Font = Enum.Font.Gotham
+_call80.TextSize = 10
+_call80.TextXAlignment = Enum.TextXAlignment.Left
+_call80.Parent = _call58
+
+local _call92 = Instance.new('TextButton')
+
+_call92.Size = UDim2.new(0, 30, 0, 30)
+_call92.Position = UDim2.new(1, -35, 0, 5)
+_call92.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+_call92.Text = '\u{2212}'
+_call92.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call92.Font = Enum.Font.GothamBold
+_call92.TextSize = 18
+_call92.Parent = _call58
+
+local _call104 = Instance.new('UICorner')
+
+_call104.CornerRadius = UDim.new(0, 15)
+_call104.Parent = _call92
+
+local _call108 = Instance.new('TextLabel')
+
+_call108.Size = UDim2.new(1, -80, 0, 22)
+_call108.Position = UDim2.new(0, 10, 0, 0)
+_call108.BackgroundTransparency = 1
+_call108.Text = 'Bypasstp'
+_call108.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call108.Font = Enum.Font.GothamBold
+_call108.TextSize = 16
+_call108.TextXAlignment = Enum.TextXAlignment.Left
+_call108.Parent = _call42
+
+local _call120 = Instance.new('TextLabel')
+
+_call120.Size = UDim2.new(1, -80, 0, 18)
+_call120.Position = UDim2.new(0, 10, 0, 22)
+_call120.BackgroundTransparency = 1
+_call120.Text = 'by 1.en'
+_call120.TextColor3 = Color3.fromRGB(180, 180, 180)
+_call120.Font = Enum.Font.Gotham
+_call120.TextSize = 10
+_call120.TextXAlignment = Enum.TextXAlignment.Left
+_call120.Parent = _call42
+
+local _call132 = Instance.new('TextButton')
+
+_call132.Size = UDim2.new(0, 30, 0, 30)
+_call132.Position = UDim2.new(1, -35, 0, 5)
+_call132.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+_call132.Text = '+'
+_call132.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call132.Font = Enum.Font.GothamBold
+_call132.TextSize = 18
+_call132.Parent = _call42
+
+local _call144 = Instance.new('UICorner')
+
+_call144.CornerRadius = UDim.new(0, 15)
+_call144.Parent = _call132
+
+local _call148 = Instance.new('TextButton')
+
+_call148.Size = UDim2.new(0, 25, 0, 25)
+_call148.Position = UDim2.new(1, -65, 0, 7)
+_call148.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+_call148.Text = '\u{d7}'
+_call148.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call148.Font = Enum.Font.GothamBold
+_call148.TextSize = 16
+_call148.Parent = _call58
+
+local _call160 = Instance.new('UICorner')
+
+_call160.CornerRadius = UDim.new(0, 12)
+_call160.Parent = _call148
+
+local _call164 = Instance.new('Frame')
+
+_call164.Size = UDim2.new(1, -20, 0, 35)
+_call164.Position = UDim2.new(0, 10, 0, 45)
+_call164.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+_call164.BorderSizePixel = 0
+_call164.Parent = _call34
+
+local _call172 = Instance.new('UICorner')
+
+_call172.CornerRadius = UDim.new(0, 6)
+_call172.Parent = _call164
+
+local _call176 = Instance.new('TextBox')
+
+_call176.Size = UDim2.new(1, -40, 1, 0)
+_call176.Position = UDim2.new(0, 8, 0, 0)
+_call176.BackgroundTransparency = 1
+_call176.Text = '\u{641c}\u{7d22}\u{73a9}\u{5bb6}...'
+_call176.PlaceholderText = '\u{8f93}\u{5165}\u{540d}\u{79f0}'
+_call176.TextColor3 = Color3.fromRGB(200, 200, 200)
+_call176.Font = Enum.Font.Gotham
+_call176.TextSize = 12
+_call176.TextXAlignment = Enum.TextXAlignment.Left
+_call176.ClearTextOnFocus = false
+_call176.Parent = _call164
+
+local _call188 = Instance.new('ImageLabel')
+
+_call188.Size = UDim2.new(0, 16, 0, 16)
+_call188.Position = UDim2.new(1, -25, 0.5, -8)
+_call188.BackgroundTransparency = 1
+_call188.Image = 'rbxassetid://3926305904'
+_call188.ImageRectOffset = Vector2.new(964, 324)
+_call188.ImageRectSize = Vector2.new(36, 36)
+_call188.ImageColor3 = Color3.fromRGB(150, 150, 150)
+_call188.Parent = _call164
+
+local _call200 = Instance.new('ScrollingFrame')
+
+_call200.Size = UDim2.new(1, -20, 0, 140)
+_call200.Position = UDim2.new(0, 10, 0, 85)
+_call200.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+_call200.BorderSizePixel = 0
+_call200.ScrollBarThickness = 3
+_call200.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+_call200.CanvasSize = UDim2.new(0, 0, 0, 0)
+_call200.AutomaticCanvasSize = Enum.AutomaticSize.Y
+_call200.Parent = _call34
+
+local _call214 = Instance.new('UIListLayout')
+
+_call214.Padding = UDim.new(0, 4)
+_call214.Parent = _call200
+
+local _call218 = Instance.new('Frame')
+
+_call218.Size = UDim2.new(1, -20, 0, 80)
+_call218.Position = UDim2.new(0, 10, 1, -90)
+_call218.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+_call218.BorderSizePixel = 0
+_call218.Parent = _call34
+
+local _call226 = Instance.new('UICorner')
+
+_call226.CornerRadius = UDim.new(0, 8)
+_call226.Parent = _call218
+
+local _call230 = Instance.new('TextLabel')
+
+_call230.Size = UDim2.new(1, -15, 0, 20)
+_call230.Position = UDim2.new(0, 8, 0, 8)
+_call230.BackgroundTransparency = 1
+_call230.Text = '\u{72b6}\u{6001}: \u{5f85}\u{673a}'
+_call230.TextColor3 = Color3.fromRGB(200, 200, 100)
+_call230.Font = Enum.Font.Gotham
+_call230.TextSize = 12
+_call230.TextXAlignment = Enum.TextXAlignment.Left
+_call230.Name = 'StatusLabel'
+_call230.Parent = _call218
+
+local _call242 = Instance.new('TextLabel')
+
+_call242.Size = UDim2.new(1, -15, 0, 18)
+_call242.Position = UDim2.new(0, 8, 0, 28)
+_call242.BackgroundTransparency = 1
+_call242.Text = '\u{76ee}\u{6807}: \u{65e0}'
+_call242.TextColor3 = Color3.fromRGB(170, 170, 255)
+_call242.Font = Enum.Font.Gotham
+_call242.TextSize = 11
+_call242.TextXAlignment = Enum.TextXAlignment.Left
+_call242.Name = 'TargetLabel'
+_call242.Parent = _call218
+
+local _call254 = Instance.new('TextLabel')
+
+_call254.Size = UDim2.new(1, -15, 0, 18)
+_call254.Position = UDim2.new(0, 8, 0, 46)
+_call254.BackgroundTransparency = 1
+_call254.Text = '\u{8ddd}\u{79bb}: -'
+_call254.TextColor3 = Color3.fromRGB(150, 255, 150)
+_call254.Font = Enum.Font.Gotham
+_call254.TextSize = 11
+_call254.TextXAlignment = Enum.TextXAlignment.Left
+_call254.Name = 'DistanceLabel'
+_call254.Parent = _call218
+
+local _call266 = Instance.new('TextButton')
+
+_call266.Size = UDim2.new(0.47, 0, 0, 30)
+_call266.Position = UDim2.new(0, 8, 1, -38)
+_call266.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+_call266.Text = '\u{25b6} \u{5f00}\u{59cb}'
+_call266.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call266.Font = Enum.Font.GothamBold
+_call266.TextSize = 12
+_call266.Parent = _call218
+
+local _call278 = Instance.new('TextButton')
+
+_call278.Size = UDim2.new(0.47, 0, 0, 30)
+_call278.Position = UDim2.new(0.53, 8, 1, -38)
+_call278.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+_call278.Text = '\u{25a0} \u{505c}\u{6b62}'
+_call278.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call278.Font = Enum.Font.GothamBold
+_call278.TextSize = 12
+_call278.Parent = _call218
+
+local _call290 = Instance.new('UICorner')
+
+_call290.CornerRadius = UDim.new(0, 5)
+_call290.Parent = _call266
+
+local _call294 = Instance.new('UICorner')
+
+_call294.CornerRadius = UDim.new(0, 5)
+_call294.Parent = _call278
+
+Vector2.new(0, 0)
+UDim2.new(0, 0, 0, 0)
+_call5.InputBegan:Connect(function(_304, _304_2, _304_3, _304_4) end)
+_call5.InputChanged:Connect(function(_308, _308_2, _308_3, _308_4, _308_5, _308_6) end)
+_call5.InputEnded:Connect(function(_312, _312_2) end)
+_call92.MouseButton1Click:Connect(function(_316, _316_2, _316_3, _316_4)
+    _call58.Visible = false
+    _call164.Visible = false
+    _call200.Visible = false
+    _call218.Visible = false
+    _call42.Visible = true
+    _call34.Size = UDim2.new(0, 250, 0, 40)
+    _call92.Text = '+'
+end)
+_call132.MouseButton1Click:Connect(function(_322, _322_2, _322_3, _322_4)
+    _call42.Visible = false
+    _call58.Visible = true
+    _call164.Visible = true
+    _call200.Visible = true
+    _call218.Visible = true
+    _call34.Size = UDim2.new(0, 250, 0, 300)
+    _call92.Text = '\u{2212}'
+end)
+_call148.MouseButton1Click:Connect(function(_328, _328_2, _328_3)
+    _call25:Destroy()
+end)
+_call266.MouseButton1Click:Connect(function(_334, _334_2, _334_3)
+    game:GetService('StarterGui'):SetCore('SendNotification', {
+        Icon = 'rbxassetid://4483345998',
+        Text = '\u{8bf7}\u{5148}\u{9009}\u{62e9}\u{76ee}\u{6807}\u{73a9}\u{5bb6}',
+        Title = '\u{9519}\u{8bef}',
+        Duration = 2,
+    })
+end)
+_call278.MouseButton1Click:Connect(function(_342) end)
+_call176.FocusLost:Connect(function(_346, _346_2)
+    error('line 3: attempt to call a nil value')
+end)
+_call176:GetPropertyChangedSignal('Text'):Connect(function(_351, _351_2)
+    error('line 3: attempt to call a nil value')
+end)
+
+for _354, _354_2 in ipairs(_call200:GetChildren())do
+    _354_2:IsA('Frame')
+    _354_2:Destroy()
+end
+for _362, _362_2 in ipairs(_call3:GetPlayers())do
+    local _ = _362_2 == _LocalPlayer14
+    local _ = _362_2.Character
+end
+
+local _366 = string.lower(_362_2.Name)
+local _367, _367_2, _367_3 = string.lower(_call176.Text)
+
+string.find(_366, _367, _367_2, _367_3)
+
+local _call370 = Instance.new('Frame')
+
+_call370.Size = UDim2.new(1, 0, 0, 40)
+_call370.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+_call370.BorderSizePixel = 0
+_call370.Name = _362_2.Name
+_call370.Parent = _call200
+
+local _call377 = Instance.new('UICorner')
+
+_call377.CornerRadius = UDim.new(0, 5)
+_call377.Parent = _call370
+
+local _call381 = Instance.new('TextLabel')
+
+_call381.Size = UDim2.new(1, -50, 0, 20)
+_call381.Position = UDim2.new(0, 8, 0, 4)
+_call381.BackgroundTransparency = 1
+_call381.Text = _362_2.Name
+_call381.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call381.Font = Enum.Font.GothamBold
+_call381.TextSize = 14
+_call381.TextXAlignment = Enum.TextXAlignment.Left
+_call381.Parent = _call370
+
+local _call394 = Instance.new('TextLabel')
+
+_call394.Size = UDim2.new(1, -50, 0, 16)
+_call394.Position = UDim2.new(0, 8, 0, 24)
+_call394.BackgroundTransparency = 1
+_call394.Text = '@' .. _362_2.DisplayName
+_call394.TextColor3 = Color3.fromRGB(180, 180, 180)
+_call394.Font = Enum.Font.Gotham
+_call394.TextSize = 10
+_call394.TextXAlignment = Enum.TextXAlignment.Left
+_call394.Parent = _call370
+
+local _call408 = Instance.new('TextButton')
+
+_call408.Size = UDim2.new(0, 35, 0, 30)
+_call408.Position = UDim2.new(1, -43, 0.5, -15)
+_call408.BackgroundColor3 = Color3.fromRGB(70, 70, 180)
+_call408.Text = '\u{9009}'
+_call408.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call408.Font = Enum.Font.Gotham
+_call408.TextSize = 11
+_call408.Parent = _call370
+
+local _call420 = Instance.new('UICorner')
+
+_call420.CornerRadius = UDim.new(0, 5)
+_call420.Parent = _call408
+
+local _call424 = Instance.new('Frame')
+
+_call424.Size = UDim2.new(1, 0, 0, 2)
+_call424.Position = UDim2.new(0, 0, 1, -2)
+_call424.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+_call424.BorderSizePixel = 0
+_call424.Visible = false
+_call424.Name = 'SelectedIndicator'
+_call424.Parent = _call370
+
+_call408.MouseButton1Click:Connect(function(_434, _434_2)
+    for _437, _437_2 in ipairs(_call200:GetChildren())do
+        _437_2:IsA('Frame')
+        _437_2:Destroy()
+    end
+
+    local _ = _call176.Text
+
+    for _445, _445_2 in ipairs(_call3:GetPlayers())do
+        local _ = _445_2 == _LocalPlayer14
+        local _ = _445_2.Character
+    end
+
+    error('internal 557: <25ms: infinitelooperror>')
+end)
+
+_call230.Text = '\u{72b6}\u{6001}: \u{5f85}\u{673a}'
+_call230.TextColor3 = Color3.fromRGB(200, 200, 100)
+_call242.Text = '\u{76ee}\u{6807}: ' .. _362_2.Name
+
+local _ = _LocalPlayer14.Character
+local _ = _362_2.Character
+local _Character455 = _LocalPlayer14.Character
+local _465 = string.format('%.1f', (_Character455:FindFirstChild('HumanoidRootPart').Position - _362_2.Character:FindFirstChild('HumanoidRootPart').Position).Magnitude)
+
+_call254.Text = '\u{8ddd}\u{79bb}: ' .. _465 .. ' \u{7c73}'
+
+for _470, _470_2 in ipairs(_call200:GetChildren())do
+    _470_2:IsA('Frame')
+
+    local _call474 = _470_2:FindFirstChild('SelectedIndicator')
+    local _ = _470_2.Name == _362_2.Name
+
+    _call474.Visible = false
+end
+
+game:GetService('RunService').Heartbeat:Connect(function(_481) end)
+_call3.PlayerAdded:Connect(function(_485, _485_2) end)
+_call3.PlayerRemoving:Connect(function(_489, _489_2, _489_3, _489_4, _489_5, _489_6) end)
+game:GetService('StarterGui'):SetCore('SendNotification', {
+    Icon = 'rbxassetid://4483345998',
+    Text = '\u{529f}\u{80fd}\u{8bf4}\u{660e}:\n1. \u{4ece}\u{5217}\u{8868}\u{9009}\u{62e9}\u{73a9}\u{5bb6}\n2. \u{70b9}\u{51fb}\u{5f00}\u{59cb}/\u{505c}\u{6b62}\u{4f20}\u{9001}\n3. \u{70b9}\u{51fb}\u{2212}/+/\u{d7}\u{6536}\u{8d77}/\u{5c55}\u{5f00}/\u{5173}\u{95ed}\n4. \u{62d6}\u{52a8}\u{6807}\u{9898}\u{680f}/\u{5c0f}\u{9762}\u{677f}\u{53ef}\u{79fb}\u{52a8}UI\n5. \u{652f}\u{6301}\u{624b}\u{673a}\u{89e6}\u{6478}\u{62d6}\u{52a8}\nby 98krgqg | \u{4f20}\u{9001}\u{95f4}\u{9694}: 0.02\u{79d2}',
+    Title = '\u{5feb}\u{901f}\u{4f20}\u{9001}\u{811a}\u{672c}\u{5df2}\u{52a0}\u{8f7d}',
+    Duration = 6,
+})
+_LocalPlayer14.CharacterAdded:Connect(function(_497, _497_2) end)
+task.wait(1)
+
+for _500, _500_2 in ipairs(_call200:GetChildren())do
+    _500_2:IsA('Frame')
+    _500_2:Destroy()
+end
+for _508, _508_2 in ipairs(_call3:GetPlayers())do
+    local _ = _508_2 == _LocalPlayer14
+    local _ = _508_2.Character
+end
+
+local _512 = string.lower(_508_2.Name)
+local _513, _513_2, _513_3 = string.lower(_call176.Text)
+
+string.find(_512, _513, _513_2, _513_3)
+
+local _call516 = Instance.new('Frame')
+
+_call516.Size = UDim2.new(1, 0, 0, 40)
+_call516.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+_call516.BorderSizePixel = 0
+_call516.Name = _508_2.Name
+_call516.Parent = _call200
+
+local _call523 = Instance.new('UICorner')
+
+_call523.CornerRadius = UDim.new(0, 5)
+_call523.Parent = _call516
+
+local _call527 = Instance.new('TextLabel')
+
+_call527.Size = UDim2.new(1, -50, 0, 20)
+_call527.Position = UDim2.new(0, 8, 0, 4)
+_call527.BackgroundTransparency = 1
+_call527.Text = _508_2.Name
+_call527.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call527.Font = Enum.Font.GothamBold
+_call527.TextSize = 14
+_call527.TextXAlignment = Enum.TextXAlignment.Left
+_call527.Parent = _call516
+
+local _call540 = Instance.new('TextLabel')
+
+_call540.Size = UDim2.new(1, -50, 0, 16)
+_call540.Position = UDim2.new(0, 8, 0, 24)
+_call540.BackgroundTransparency = 1
+_call540.Text = '@' .. _508_2.DisplayName
+_call540.TextColor3 = Color3.fromRGB(180, 180, 180)
+_call540.Font = Enum.Font.Gotham
+_call540.TextSize = 10
+_call540.TextXAlignment = Enum.TextXAlignment.Left
+_call540.Parent = _call516
+
+local _call554 = Instance.new('TextButton')
+
+_call554.Size = UDim2.new(0, 35, 0, 30)
+_call554.Position = UDim2.new(1, -43, 0.5, -15)
+_call554.BackgroundColor3 = Color3.fromRGB(70, 70, 180)
+_call554.Text = '\u{9009}'
+_call554.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call554.Font = Enum.Font.Gotham
+_call554.TextSize = 11
+_call554.Parent = _call516
+
+local _call566 = Instance.new('UICorner')
+
+_call566.CornerRadius = UDim.new(0, 5)
+_call566.Parent = _call554
+
+local _call570 = Instance.new('Frame')
+
+_call570.Size = UDim2.new(1, 0, 0, 2)
+_call570.Position = UDim2.new(0, 0, 1, -2)
+_call570.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+_call570.BorderSizePixel = 0
+
+local _ = _508_2 == _362_2
+
+_call570.Visible = false
+_call570.Name = 'SelectedIndicator'
+_call570.Parent = _call516
+
+_call554.MouseButton1Click:Connect(function(_581, _581_2) end)
+task.wait(1)
+
+for _584, _584_2 in ipairs(_call200:GetChildren())do
+    _584_2:IsA('Frame')
+    _584_2:Destroy()
+end
+for _592, _592_2 in ipairs(_call3:GetPlayers())do
+    local _ = _592_2 == _LocalPlayer14
+    local _ = _592_2.Character
+end
+
+local _596 = string.lower(_592_2.Name)
+local _597, _597_2, _597_3 = string.lower(_call176.Text)
+
+string.find(_596, _597, _597_2, _597_3)
+
+local _call600 = Instance.new('Frame')
+
+_call600.Size = UDim2.new(1, 0, 0, 40)
+_call600.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+_call600.BorderSizePixel = 0
+_call600.Name = _592_2.Name
+_call600.Parent = _call200
+
+local _call607 = Instance.new('UICorner')
+
+_call607.CornerRadius = UDim.new(0, 5)
+_call607.Parent = _call600
+
+local _call611 = Instance.new('TextLabel')
+
+_call611.Size = UDim2.new(1, -50, 0, 20)
+_call611.Position = UDim2.new(0, 8, 0, 4)
+_call611.BackgroundTransparency = 1
+_call611.Text = _592_2.Name
+_call611.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call611.Font = Enum.Font.GothamBold
+_call611.TextSize = 14
+_call611.TextXAlignment = Enum.TextXAlignment.Left
+_call611.Parent = _call600
+
+local _call624 = Instance.new('TextLabel')
+
+_call624.Size = UDim2.new(1, -50, 0, 16)
+_call624.Position = UDim2.new(0, 8, 0, 24)
+_call624.BackgroundTransparency = 1
+_call624.Text = '@' .. _592_2.DisplayName
+_call624.TextColor3 = Color3.fromRGB(180, 180, 180)
+_call624.Font = Enum.Font.Gotham
+_call624.TextSize = 10
+_call624.TextXAlignment = Enum.TextXAlignment.Left
+_call624.Parent = _call600
+
+local _call638 = Instance.new('TextButton')
+
+_call638.Size = UDim2.new(0, 35, 0, 30)
+_call638.Position = UDim2.new(1, -43, 0.5, -15)
+_call638.BackgroundColor3 = Color3.fromRGB(70, 70, 180)
+_call638.Text = '\u{9009}'
+_call638.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call638.Font = Enum.Font.Gotham
+_call638.TextSize = 11
+_call638.Parent = _call600
+
+local _call650 = Instance.new('UICorner')
+
+_call650.CornerRadius = UDim.new(0, 5)
+_call650.Parent = _call638
+
+local _call654 = Instance.new('Frame')
+
+_call654.Size = UDim2.new(1, 0, 0, 2)
+_call654.Position = UDim2.new(0, 0, 1, -2)
+_call654.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+_call654.BorderSizePixel = 0
+
+local _ = _592_2 == _362_2
+
+_call654.Visible = false
+_call654.Name = 'SelectedIndicator'
+_call654.Parent = _call600
+
+_call638.MouseButton1Click:Connect(function(_665, _665_2) end)
+task.wait(1)
+
+for _668, _668_2 in ipairs(_call200:GetChildren())do
+    _668_2:IsA('Frame')
+    _668_2:Destroy()
+end
+for _676, _676_2 in ipairs(_call3:GetPlayers())do
+    local _ = _676_2 == _LocalPlayer14
+    local _ = _676_2.Character
+end
+
+local _680 = string.lower(_676_2.Name)
+local _681, _681_2, _681_3 = string.lower(_call176.Text)
+
+string.find(_680, _681, _681_2, _681_3)
+
+local _call684 = Instance.new('Frame')
+
+_call684.Size = UDim2.new(1, 0, 0, 40)
+_call684.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+_call684.BorderSizePixel = 0
+_call684.Name = _676_2.Name
+_call684.Parent = _call200
+
+local _call691 = Instance.new('UICorner')
+
+_call691.CornerRadius = UDim.new(0, 5)
+_call691.Parent = _call684
+
+local _call695 = Instance.new('TextLabel')
+
+_call695.Size = UDim2.new(1, -50, 0, 20)
+_call695.Position = UDim2.new(0, 8, 0, 4)
+_call695.BackgroundTransparency = 1
+_call695.Text = _676_2.Name
+_call695.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call695.Font = Enum.Font.GothamBold
+_call695.TextSize = 14
+_call695.TextXAlignment = Enum.TextXAlignment.Left
+_call695.Parent = _call684
+
+local _call708 = Instance.new('TextLabel')
+
+_call708.Size = UDim2.new(1, -50, 0, 16)
+_call708.Position = UDim2.new(0, 8, 0, 24)
+_call708.BackgroundTransparency = 1
+_call708.Text = '@' .. _676_2.DisplayName
+_call708.TextColor3 = Color3.fromRGB(180, 180, 180)
+_call708.Font = Enum.Font.Gotham
+_call708.TextSize = 10
+_call708.TextXAlignment = Enum.TextXAlignment.Left
+_call708.Parent = _call684
+
+local _call722 = Instance.new('TextButton')
+
+_call722.Size = UDim2.new(0, 35, 0, 30)
+_call722.Position = UDim2.new(1, -43, 0.5, -15)
+_call722.BackgroundColor3 = Color3.fromRGB(70, 70, 180)
+_call722.Text = '\u{9009}'
+_call722.TextColor3 = Color3.fromRGB(255, 255, 255)
+_call722.Font = Enum.Font.Gotham
+_call722.TextSize = 11
+_call722.Parent = _call684
+
+local _call734 = Instance.new('UICorner')
+
+_call734.CornerRadius = UDim.new(0, 5)
+_call734.Parent = _call722
+
+local _call738 = Instance.new('Frame')
+
+_call738.Size = UDim2.new(1, 0, 0, 2)
+_call738.Position = UDim2.new(0, 0, 1, -2)
+_call738.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+_call738.BorderSizePixel = 0
+
+local _ = _676_2 == _362_2
+
+_call738.Visible = false
+_call738.Name = 'SelectedIndicator'
+_call738.Parent = _call684
+
+_call722.MouseButton1Click:Connect(function(_749, _749_2) end)
+task.wait(1)
+
+for _752, _752_2 in ipairs(_call200:GetChildren())do
+    _752_2:IsA('Frame')
+    _752_2:Destroy()
+end
+
+local _ = _call176.Text
+
+for _760, _760_2 in ipairs(_call3:GetPlayers())do
+    local _ = _760_2 == _LocalPlayer14
+    local _ = _760_2.Character
+end
+
+error('internal 557: <25ms: infinitelooperror>')
