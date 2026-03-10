@@ -1,0 +1,102 @@
+-------------------------------------------------
+-- ESP 创建函数
+-------------------------------------------------
+
+local function createESP(model,color)
+
+	if not model:FindFirstChild("HumanoidRootPart") then return end
+	if model:FindFirstChild("ESPHighlight") then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ESPHighlight"
+	highlight.FillColor = color
+	highlight.FillTransparency = 0.5
+	highlight.OutlineColor = Color3.new(1,1,1)
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = model
+
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.new(0,120,0,40)
+	gui.StudsOffset = Vector3.new(0,3,0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 999999
+	gui.Parent = model.HumanoidRootPart
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1,0,1,0)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0
+	label.Font = Enum.Font.SourceSansBold
+	label.TextScaled = true
+	label.Parent = gui
+
+	task.spawn(function()
+
+		while model.Parent do
+
+			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+
+				local dist = (model.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+				label.Text = model.Name.." ["..math.floor(dist).."m]"
+
+			end
+
+			task.wait(0.2)
+
+		end
+
+	end)
+
+end
+
+-------------------------------------------------
+-- 玩家ESP
+-------------------------------------------------
+
+local function createPlayerESP(p)
+
+	if not playerESP then return end
+	if p == player then return end
+	if not p.Character then return end
+
+	createESP(p.Character,Color3.fromRGB(0,255,0))
+
+end
+
+for _,p in pairs(Players:GetPlayers()) do
+	createPlayerESP(p)
+end
+
+Players.PlayerAdded:Connect(function(p)
+	p.CharacterAdded:Connect(function()
+		task.wait(1)
+		createPlayerESP(p)
+	end)
+end)
+
+-------------------------------------------------
+-- 怪物ESP
+-------------------------------------------------
+
+local function createMonsterESP(model)
+
+	if not monsterESP then return end
+	if not model:FindFirstChild("Humanoid") then return end
+	if Players:GetPlayerFromCharacter(model) then return end
+
+	createESP(model,Color3.fromRGB(255,0,0))
+
+end
+
+for _,v in pairs(workspace:GetDescendants()) do
+	if v:IsA("Model") then
+		createMonsterESP(v)
+	end
+end
+
+workspace.DescendantAdded:Connect(function(obj)
+	if obj:IsA("Model") then
+		createMonsterESP(obj)
+	end
+end)
