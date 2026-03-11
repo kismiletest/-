@@ -1,0 +1,255 @@
+-- 1.en Hub Stable
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+------------------------------------------------
+-- GUI
+------------------------------------------------
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "1enHub"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+
+local open = Instance.new("TextButton")
+open.Size = UDim2.new(0,120,0,35)
+open.Position = UDim2.new(0,10,0.5,-20)
+open.Text = "1.en Hub"
+open.BackgroundColor3 = Color3.fromRGB(35,35,35)
+open.TextColor3 = Color3.new(1,1,1)
+open.Parent = gui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0,420,0,340)
+frame.Position = UDim2.new(0.5,-210,0.5,-170)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.Visible = false
+frame.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,40)
+title.Text = "1.en Hub"
+title.BackgroundColor3 = Color3.fromRGB(20,20,20)
+title.TextColor3 = Color3.new(1,1,1)
+title.TextScaled = true
+title.Parent = frame
+
+------------------------------------------------
+-- 打开关闭
+------------------------------------------------
+
+open.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+end)
+
+------------------------------------------------
+-- 拖动GUI
+------------------------------------------------
+
+local dragging = false
+local dragStart
+local startPos
+
+title.InputBegan:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+	end
+
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+
+		local delta = input.Position - dragStart
+
+		frame.Position =
+			UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
+
+	end
+
+end)
+
+------------------------------------------------
+-- 按钮区域
+------------------------------------------------
+
+local container = Instance.new("Frame")
+container.Size = UDim2.new(1,0,1,-40)
+container.Position = UDim2.new(0,0,0,40)
+container.BackgroundTransparency = 1
+container.Parent = frame
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0,6)
+layout.Parent = container
+
+------------------------------------------------
+-- Toggle创建
+------------------------------------------------
+
+local function createToggle(name,callback)
+
+	local enabled = false
+
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0,230,0,40)
+	button.Text = name.." : OFF"
+	button.BackgroundColor3 = Color3.fromRGB(45,45,45)
+	button.TextColor3 = Color3.new(1,1,1)
+	button.Parent = container
+
+	button.MouseButton1Click:Connect(function()
+
+		enabled = not enabled
+
+		if enabled then
+			button.Text = name.." : ON"
+			button.BackgroundColor3 = Color3.fromRGB(60,180,60)
+		else
+			button.Text = name.." : OFF"
+			button.BackgroundColor3 = Color3.fromRGB(45,45,45)
+		end
+
+		callback(enabled)
+
+	end)
+
+end
+
+------------------------------------------------
+-- ESP函数
+------------------------------------------------
+
+local function createESP(obj,color)
+
+	if obj:FindFirstChild("Highlight") then return end
+
+	local h = Instance.new("Highlight")
+	h.FillColor = color
+	h.OutlineColor = Color3.new(1,1,1)
+	h.FillTransparency = 0.4
+	h.Parent = obj
+
+end
+
+------------------------------------------------
+-- Player ESP
+------------------------------------------------
+
+createToggle("Player ESP",function(state)
+
+	if not state then return end
+
+	for _,p in pairs(Players:GetPlayers()) do
+		if p ~= player and p.Character then
+			createESP(p.Character,Color3.fromRGB(255,0,0))
+		end
+	end
+
+	Players.PlayerAdded:Connect(function(p)
+		p.CharacterAdded:Connect(function(char)
+			createESP(char,Color3.fromRGB(255,0,0))
+		end)
+	end)
+
+end)
+
+------------------------------------------------
+-- Enemy ESP
+------------------------------------------------
+
+createToggle("Enemy ESP",function(state)
+
+	task.spawn(function()
+
+		while state do
+
+			for _,v in pairs(workspace:GetDescendants()) do
+
+				if v:FindFirstChild("Humanoid")
+				and v ~= player.Character then
+
+					createESP(v,Color3.fromRGB(255,120,0))
+
+				end
+
+			end
+
+			task.wait(3)
+
+		end
+
+	end)
+
+end)
+
+------------------------------------------------
+-- Chest ESP
+------------------------------------------------
+
+createToggle("Chest ESP",function(state)
+
+	task.spawn(function()
+
+		while state do
+
+			for _,v in pairs(workspace:GetDescendants()) do
+
+				if v.Name:lower():find("chest") then
+					createESP(v,Color3.fromRGB(255,255,0))
+				end
+
+			end
+
+			task.wait(5)
+
+		end
+
+	end)
+
+end)
+
+------------------------------------------------
+-- Fruit ESP
+------------------------------------------------
+
+createToggle("Fruit ESP",function(state)
+
+	task.spawn(function()
+
+		while state do
+
+			for _,v in pairs(workspace:GetDescendants()) do
+
+				if v.Name:lower():find("fruit") then
+					createESP(v,Color3.fromRGB(0,255,0))
+				end
+
+			end
+
+			task.wait(5)
+
+		end
+
+	end)
+
+end)
