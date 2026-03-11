@@ -1,0 +1,250 @@
+-- 1.en Hub Stable Full Script
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+------------------------------------------------
+-- GUI 创建
+------------------------------------------------
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "1enHub"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+
+-- 打开按钮
+
+local open = Instance.new("TextButton")
+open.Size = UDim2.new(0,120,0,35)
+open.Position = UDim2.new(0,10,0.5,-20)
+open.Text = "Open 1.en Hub"
+open.BackgroundColor3 = Color3.fromRGB(30,30,30)
+open.TextColor3 = Color3.new(1,1,1)
+open.Parent = gui
+
+-- 主窗口
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0,420,0,350)
+frame.Position = UDim2.new(0.5,-210,0.5,-175)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.Visible = false
+frame.Parent = gui
+
+-- 标题
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,40)
+title.Text = "1.en Hub"
+title.TextScaled = true
+title.BackgroundColor3 = Color3.fromRGB(20,20,20)
+title.TextColor3 = Color3.new(1,1,1)
+title.Parent = frame
+
+------------------------------------------------
+-- 打开关闭
+------------------------------------------------
+
+open.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+end)
+
+------------------------------------------------
+-- 拖动系统
+------------------------------------------------
+
+local dragging = false
+local dragStart
+local startPos
+
+title.InputBegan:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+	end
+
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+
+		local delta = input.Position - dragStart
+
+		frame.Position =
+			UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
+
+	end
+
+end)
+
+------------------------------------------------
+-- 按钮区域
+------------------------------------------------
+
+local container = Instance.new("Frame")
+container.Size = UDim2.new(1,0,1,-40)
+container.Position = UDim2.new(0,0,0,40)
+container.BackgroundTransparency = 1
+container.Parent = frame
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0,6)
+layout.Parent = container
+
+------------------------------------------------
+-- Toggle 系统
+------------------------------------------------
+
+local function createToggle(name,callback)
+
+	local enabled = false
+
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0,220,0,40)
+	button.Text = name.." : OFF"
+	button.BackgroundColor3 = Color3.fromRGB(45,45,45)
+	button.TextColor3 = Color3.new(1,1,1)
+	button.Parent = container
+
+	button.MouseButton1Click:Connect(function()
+
+		enabled = not enabled
+
+		if enabled then
+			button.Text = name.." : ON"
+			button.BackgroundColor3 = Color3.fromRGB(60,170,60)
+		else
+			button.Text = name.." : OFF"
+			button.BackgroundColor3 = Color3.fromRGB(45,45,45)
+		end
+
+		callback(enabled)
+
+	end)
+
+end
+
+------------------------------------------------
+-- Player ESP
+------------------------------------------------
+
+createToggle("Player ESP",function(state)
+
+	if not state then return end
+
+	for _,p in pairs(Players:GetPlayers()) do
+
+		if p ~= player and p.Character then
+
+			if not p.Character:FindFirstChild("Highlight") then
+
+				local h = Instance.new("Highlight")
+				h.FillColor = Color3.fromRGB(255,0,0)
+				h.Parent = p.Character
+
+			end
+
+		end
+
+	end
+
+end)
+
+------------------------------------------------
+-- Chest Scanner
+------------------------------------------------
+
+createToggle("Chest Scanner",function(state)
+
+	task.spawn(function()
+
+		while state do
+
+			for _,v in pairs(workspace:GetDescendants()) do
+
+				if v.Name:lower():find("chest") then
+					print("Chest Found:",v:GetFullName())
+				end
+
+			end
+
+			task.wait(5)
+
+		end
+
+	end)
+
+end)
+
+------------------------------------------------
+-- Fruit Scanner
+------------------------------------------------
+
+createToggle("Fruit Scanner",function(state)
+
+	task.spawn(function()
+
+		while state do
+
+			for _,v in pairs(workspace:GetDescendants()) do
+
+				if v.Name:lower():find("fruit") then
+					print("Fruit Found:",v:GetFullName())
+				end
+
+			end
+
+			task.wait(5)
+
+		end
+
+	end)
+
+end)
+
+------------------------------------------------
+-- Enemy Scanner
+------------------------------------------------
+
+createToggle("Enemy Scanner",function(state)
+
+	task.spawn(function()
+
+		while state do
+
+			for _,v in pairs(workspace:GetDescendants()) do
+
+				if v:FindFirstChild("Humanoid")
+				and v ~= player.Character then
+
+					print("Enemy:",v.Name)
+
+				end
+
+			end
+
+			task.wait(5)
+
+		end
+
+	end)
+
+end)
