@@ -1,0 +1,28 @@
+-- 配置
+getgenv().Hide_UI = true
+getgenv().BlackScreen = false
+
+_G.KaitunConfig = {
+    ["Actions Allowed"] = {
+        ["Awakening Fruit"] = true,
+        ["Soul Guitar"] = true,
+        ["Upgrade Weapons"] = true,
+        ["Buy accessories"] = true
+    },
+
+    ["Fruit Snipping"] = true,
+    ["Fruit Eating"] = false,
+
+    ["Fruit Choosen"] = {
+        ["Dough-Dough"] = true,
+        ["Leopard-Leopard"] = true,
+        ["Dragon-Dragon"] = true,
+        ["Kitsune-Kitsune"] = true
+    },
+
+    ["Tween Speed"] = 350,
+    ["Player Nearing Hop"] = true
+}
+
+-- 加载主脚本
+loadstring(game:HttpGet("https://raw.githubusercontent.com/memaybeohub/NewPage/main/Kaitun.lua"))()
