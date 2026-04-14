@@ -41,5 +41,5 @@ if isLocalPlayerWhitelisted then
     })
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kismiletest/-/refs/heads/main/xsyyyy"))()
 else
-    localPlayer:Kick("你这个死爹烂妈没白名单")
+    localPlayer:Kick("你爸爸妈妈全家死光了😂")
 end
