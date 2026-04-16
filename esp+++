@@ -1,0 +1,141 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections.Generic;
+
+public class ESP_Complete : MonoBehaviour
+{
+    public Camera cam;
+
+    class ESP
+    {
+        public Transform target;
+        public GameObject ui;
+        public Text nameText;
+        public Text distText;
+        public Image box;
+        public bool isPlayer;
+    }
+
+    List<ESP> list = new List<ESP>();
+
+    void Start()
+    {
+        // 自动创建Canvas
+        GameObject canvasObj = new GameObject("ESP_Canvas");
+        Canvas canvas = canvasObj.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvasObj.AddComponent<CanvasScaler>();
+        canvasObj.AddComponent<GraphicRaycaster>();
+
+        // 找目标
+        foreach (var e in GameObject.FindGameObjectsWithTag("Enemy"))
+            AddTarget(e, false, canvas.transform);
+
+        foreach (var p in GameObject.FindGameObjectsWithTag("Player"))
+            AddTarget(p, true, canvas.transform);
+    }
+
+    void AddTarget(GameObject obj, bool isPlayer, Transform parent)
+    {
+        // ==== 创建UI ====
+        GameObject ui = new GameObject("ESP_UI");
+        ui.transform.SetParent(parent);
+
+        RectTransform rt = ui.AddComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(100, 50);
+
+        // 名字
+        GameObject nameObj = new GameObject("Name");
+        nameObj.transform.SetParent(ui.transform);
+        Text nameText = nameObj.AddComponent<Text>();
+        nameText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        nameText.alignment = TextAnchor.MiddleCenter;
+        nameText.color = Color.white;
+        nameText.rectTransform.anchoredPosition = new Vector2(0, 15);
+
+        // 距离
+        GameObject distObj = new GameObject("Dist");
+        distObj.transform.SetParent(ui.transform);
+        Text distText = distObj.AddComponent<Text>();
+        distText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        distText.alignment = TextAnchor.MiddleCenter;
+        distText.color = Color.yellow;
+        distText.rectTransform.anchoredPosition = new Vector2(0, -15);
+
+        // 方框
+        GameObject boxObj = new GameObject("Box");
+        boxObj.transform.SetParent(ui.transform);
+        Image box = boxObj.AddComponent<Image>();
+        box.color = isPlayer ? Color.green : Color.red;
+        RectTransform brt = box.GetComponent<RectTransform>();
+        brt.sizeDelta = new Vector2(60, 80);
+
+        // 数据
+        ESP d = new ESP();
+        d.target = obj.transform;
+        d.ui = ui;
+        d.nameText = nameText;
+        d.distText = distText;
+        d.box = box;
+        d.isPlayer = isPlayer;
+
+        if (!isPlayer)
+            nameText.enabled = false;
+
+        list.Add(d);
+
+        ApplyXRay(obj, isPlayer);
+    }
+
+    void ApplyXRay(GameObject obj, bool isPlayer)
+    {
+        Renderer r = obj.GetComponentInChildren<Renderer>();
+        if (!r) return;
+
+        Material mat = new Material(Shader.Find("Unlit/Color"));
+
+        mat.color = isPlayer
+            ? new Color(0, 1, 0, 0.3f)
+            : new Color(1, 0, 0, 0.3f);
+
+        mat.SetInt("_ZWrite", 0);
+        mat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+
+        var mats = new List<Material>(r.materials);
+        mats.Add(mat);
+        r.materials = mats.ToArray();
+    }
+
+    void Update()
+    {
+        foreach (var d in list)
+        {
+            if (!d.target) continue;
+
+            Vector3 pos = d.target.position + Vector3.up * 2f;
+            Vector3 screen = cam.WorldToScreenPoint(pos);
+
+            if (screen.z <= 0)
+            {
+                d.ui.SetActive(false);
+                continue;
+            }
+
+            d.ui.SetActive(true);
+            d.ui.transform.position = screen;
+
+            float dist = Vector3.Distance(cam.transform.position, d.target.position);
+            d.distText.text = dist.ToString("F1") + "m";
+
+            if (d.isPlayer)
+            {
+                d.nameText.text = d.target.name;
+                d.box.color = Color.green;
+            }
+            else
+            {
+                d.box.color = Color.red;
+            }
+        }
+    }
+}
