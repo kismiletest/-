@@ -1,14 +1,145 @@
-local function scanAllMonsters()
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
-	for _,obj in pairs(workspace:GetDescendants()) do
-		createMonsterESP(obj)
+------------------------------------------------
+-- 创建UI
+------------------------------------------------
+
+local function createBillboard(root, color)
+
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.new(0,200,0,50)
+	gui.StudsOffset = Vector3.new(0,2,0)
+	gui.AlwaysOnTop = false -- ❗不穿墙
+	gui.Parent = root
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1,0,1,0)
+	label.BackgroundTransparency = 1
+	label.TextScaled = true
+	label.Font = Enum.Font.SourceSansBold
+	label.TextColor3 = color
+	label.Parent = gui
+
+	return label
+end
+
+------------------------------------------------
+-- 玩家标记
+------------------------------------------------
+
+local function addPlayerTag(target)
+
+	if target == player then return end
+
+	local function apply(char)
+
+		local root = char:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+
+		if root:FindFirstChild("Tag") then return end
+
+		local label = createBillboard(root, Color3.fromRGB(0,255,0))
+		label.Name = "Tag"
+
+		task.spawn(function()
+			while char.Parent do
+
+				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+
+					local dist =
+						(root.Position -
+						player.Character.HumanoidRootPart.Position).Magnitude
+
+					label.Text =
+						target.Name ..
+						"\n" .. math.floor(dist) .. "m"
+
+				end
+
+				task.wait(0.2)
+			end
+		end)
+
 	end
 
-	workspace.DescendantAdded:Connect(function(obj)
-		task.wait(0.2)
-		createMonsterESP(obj)
+	if target.Character then
+		apply(target.Character)
+	end
+
+	target.CharacterAdded:Connect(function(char)
+		task.wait(1)
+		apply(char)
 	end)
 
 end
 
-scanAllMonsters()
+------------------------------------------------
+-- 怪物标记（NPC）
+------------------------------------------------
+
+local function addMonsterTag(monster)
+
+	if not monster:IsA("Model") then return end
+
+	-- 排除玩家
+	if Players:GetPlayerFromCharacter(monster) then return end
+
+	local humanoid = monster:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	local root =
+		monster:FindFirstChild("HumanoidRootPart")
+		or monster:FindFirstChild("Torso")
+		or monster.PrimaryPart
+
+	if not root then return end
+
+	if root:FindFirstChild("Tag") then return end
+
+	local label = createBillboard(root, Color3.fromRGB(255,0,0))
+	label.Name = "Tag"
+
+	task.spawn(function()
+		while monster.Parent do
+
+			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+
+				local dist =
+					(root.Position -
+					player.Character.HumanoidRootPart.Position).Magnitude
+
+				label.Text =
+					monster.Name ..
+					"\n" .. math.floor(dist) .. "m"
+
+			end
+
+			task.wait(0.2)
+		end
+	end)
+
+end
+
+------------------------------------------------
+-- 扫描玩家
+------------------------------------------------
+
+for _,p in pairs(Players:GetPlayers()) do
+	addPlayerTag(p)
+end
+
+Players.PlayerAdded:Connect(addPlayerTag)
+
+------------------------------------------------
+-- 扫描怪物（全地图）
+------------------------------------------------
+
+for _,obj in pairs(workspace:GetDescendants()) do
+	addMonsterTag(obj)
+end
+
+workspace.DescendantAdded:Connect(function(obj)
+	task.wait(0.3)
+	addMonsterTag(obj)
+end)
