@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
+print("ESP 启动成功")
+
 ------------------------------------------------
 -- 创建UI
 ------------------------------------------------
@@ -8,9 +10,11 @@ local player = Players.LocalPlayer
 local function createBillboard(root, color)
 
 	local gui = Instance.new("BillboardGui")
+	gui.Name = "ESP_UI"
 	gui.Size = UDim2.new(0,200,0,50)
 	gui.StudsOffset = Vector3.new(0,2,0)
-	gui.AlwaysOnTop = false
+	gui.AlwaysOnTop = true -- 提高可见性
+	gui.MaxDistance = 1000
 	gui.Parent = root
 
 	local label = Instance.new("TextLabel")
@@ -26,37 +30,45 @@ local function createBillboard(root, color)
 end
 
 ------------------------------------------------
--- 玩家ESP（固定绿色）
+-- 获取Root（通用）
 ------------------------------------------------
 
-local function addPlayerTag(target)
+local function getRoot(model)
+	return model:FindFirstChild("HumanoidRootPart")
+		or model:FindFirstChild("Torso")
+		or model:FindFirstChild("UpperTorso")
+		or model.PrimaryPart
+end
 
-	if target == player then return end
+------------------------------------------------
+-- 玩家ESP
+------------------------------------------------
+
+local function addPlayerESP(p)
+
+	if p == player then return end
 
 	local function apply(char)
 
-		local root = char:FindFirstChild("HumanoidRootPart")
+		local root = getRoot(char)
 		if not root then return end
 
-		if root:FindFirstChild("Tag") then return end
+		if root:FindFirstChild("ESP_UI") then return end
 
 		local label = createBillboard(root, Color3.fromRGB(0,255,0))
-		label.Name = "Tag"
 
 		task.spawn(function()
 			while char.Parent do
 
-				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				local myChar = player.Character
+				if myChar and getRoot(myChar) then
 
 					local dist =
 						(root.Position -
-						player.Character.HumanoidRootPart.Position).Magnitude
-
-					-- 固定绿色
-					label.TextColor3 = Color3.fromRGB(0,255,0)
+						getRoot(myChar).Position).Magnitude
 
 					label.Text =
-						target.Name ..
+						p.Name ..
 						"\n" .. math.floor(dist) .. "m"
 
 				end
@@ -67,11 +79,11 @@ local function addPlayerTag(target)
 
 	end
 
-	if target.Character then
-		apply(target.Character)
+	if p.Character then
+		apply(p.Character)
 	end
 
-	target.CharacterAdded:Connect(function(char)
+	p.CharacterAdded:Connect(function(char)
 		task.wait(1)
 		apply(char)
 	end)
@@ -79,72 +91,66 @@ local function addPlayerTag(target)
 end
 
 ------------------------------------------------
--- 怪物ESP（红色）
+-- 怪物ESP（高兼容）
 ------------------------------------------------
 
-local function addMonsterTag(monster)
+local function addMonsterESP(obj)
 
-	if not monster:IsA("Model") then return end
+	if not obj:IsA("Model") then return end
 
 	-- 排除玩家
-	if Players:GetPlayerFromCharacter(monster) then return end
+	if Players:GetPlayerFromCharacter(obj) then return end
 
-	local humanoid = monster:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
-
-	local root =
-		monster:FindFirstChild("HumanoidRootPart")
-		or monster:FindFirstChild("Torso")
-		or monster:FindFirstChild("UpperTorso")
-		or monster.PrimaryPart
-
+	local root = getRoot(obj)
 	if not root then return end
 
-	if root:FindFirstChild("Tag") then return end
+	if root:FindFirstChild("ESP_UI") then return end
 
 	local label = createBillboard(root, Color3.fromRGB(255,0,0))
-	label.Name = "Tag"
 
 	task.spawn(function()
-		while monster.Parent do
+		while obj.Parent do
 
-			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local myChar = player.Character
+			if myChar and getRoot(myChar) then
 
 				local dist =
 					(root.Position -
-					player.Character.HumanoidRootPart.Position).Magnitude
+					getRoot(myChar).Position).Magnitude
 
 				label.Text =
-					monster.Name ..
+					obj.Name ..
 					"\n" .. math.floor(dist) .. "m"
 
 			end
 
-			task.wait(0.2)
+			task.wait(0.3)
 		end
 	end)
 
 end
 
 ------------------------------------------------
--- 玩家扫描
+-- 玩家加载
 ------------------------------------------------
 
 for _,p in pairs(Players:GetPlayers()) do
-	addPlayerTag(p)
+	addPlayerESP(p)
 end
 
-Players.PlayerAdded:Connect(addPlayerTag)
+Players.PlayerAdded:Connect(addPlayerESP)
 
 ------------------------------------------------
--- 怪物扫描（全地图）
+-- 怪物循环扫描（核心）
 ------------------------------------------------
 
-for _,obj in pairs(workspace:GetDescendants()) do
-	addMonsterTag(obj)
-end
+task.spawn(function()
+	while true do
 
-workspace.DescendantAdded:Connect(function(obj)
-	task.wait(0.3)
-	addMonsterTag(obj)
+		for _,obj in pairs(workspace:GetDescendants()) do
+			addMonsterESP(obj)
+		end
+
+		task.wait(2) -- 每2秒扫描一次
+	end
 end)
