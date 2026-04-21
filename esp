@@ -1,78 +1,14 @@
-------------------------------------------------
--- 怪物ESP（红色）
-------------------------------------------------
+local function scanAllMonsters()
 
-local function createMonsterESP(monster)
-
-	if not monster:IsA("Model") then return end
-	if monster:FindFirstChild("PlayerESP") then return end
-
-	local humanoid = monster:FindFirstChildOfClass("Humanoid")
-	local root = monster:FindFirstChild("HumanoidRootPart")
-
-	if not humanoid or not root then return end
-
-	-- 排除玩家角色
-	if Players:GetPlayerFromCharacter(monster) then return end
-
-	------------------------------------------------
-	-- 高亮
-	------------------------------------------------
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "PlayerESP"
-	highlight.FillColor = Color3.fromRGB(255, 0, 0) -- 红色
-	highlight.FillTransparency = 0.5
-	highlight.OutlineColor = Color3.new(1,1,1)
-	highlight.Parent = monster
-
-	local label = createBillboard(root)
-	label.TextColor3 = Color3.fromRGB(255, 0, 0)
-
-	------------------------------------------------
-	-- 更新信息
-	------------------------------------------------
-
-	task.spawn(function()
-		while monster.Parent do
-
-			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-
-				local dist =
-					(root.Position -
-					player.Character.HumanoidRootPart.Position).Magnitude
-
-				local hp = humanoid.Health
-
-				label.Text =
-					monster.Name ..
-					"\nHP: " .. math.floor(hp) ..
-					"\nDistance: " .. math.floor(dist) .. "m"
-
-			end
-
-			task.wait(0.15)
-		end
-	end)
-
-end
-
-------------------------------------------------
--- 扫描怪物
-------------------------------------------------
-
-local function scanMonsters(container)
-
-	for _,obj in pairs(container:GetChildren()) do
+	for _,obj in pairs(workspace:GetDescendants()) do
 		createMonsterESP(obj)
 	end
 
-	container.ChildAdded:Connect(function(obj)
-		task.wait(0.5)
+	workspace.DescendantAdded:Connect(function(obj)
+		task.wait(0.2)
 		createMonsterESP(obj)
 	end)
 
 end
 
--- 常见怪物容器（按你游戏实际改）
-scanMonsters(workspace)
+scanAllMonsters()
