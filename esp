@@ -10,7 +10,7 @@ local function createBillboard(root, color)
 	local gui = Instance.new("BillboardGui")
 	gui.Size = UDim2.new(0,200,0,50)
 	gui.StudsOffset = Vector3.new(0,2,0)
-	gui.AlwaysOnTop = false -- ❗不穿墙
+	gui.AlwaysOnTop = false
 	gui.Parent = root
 
 	local label = Instance.new("TextLabel")
@@ -18,6 +18,7 @@ local function createBillboard(root, color)
 	label.BackgroundTransparency = 1
 	label.TextScaled = true
 	label.Font = Enum.Font.SourceSansBold
+	label.TextStrokeTransparency = 0
 	label.TextColor3 = color
 	label.Parent = gui
 
@@ -25,7 +26,7 @@ local function createBillboard(root, color)
 end
 
 ------------------------------------------------
--- 玩家标记
+-- 玩家ESP（固定绿色）
 ------------------------------------------------
 
 local function addPlayerTag(target)
@@ -51,6 +52,9 @@ local function addPlayerTag(target)
 						(root.Position -
 						player.Character.HumanoidRootPart.Position).Magnitude
 
+					-- 固定绿色
+					label.TextColor3 = Color3.fromRGB(0,255,0)
+
 					label.Text =
 						target.Name ..
 						"\n" .. math.floor(dist) .. "m"
@@ -75,7 +79,7 @@ local function addPlayerTag(target)
 end
 
 ------------------------------------------------
--- 怪物标记（NPC）
+-- 怪物ESP（红色）
 ------------------------------------------------
 
 local function addMonsterTag(monster)
@@ -91,6 +95,7 @@ local function addMonsterTag(monster)
 	local root =
 		monster:FindFirstChild("HumanoidRootPart")
 		or monster:FindFirstChild("Torso")
+		or monster:FindFirstChild("UpperTorso")
 		or monster.PrimaryPart
 
 	if not root then return end
@@ -122,7 +127,7 @@ local function addMonsterTag(monster)
 end
 
 ------------------------------------------------
--- 扫描玩家
+-- 玩家扫描
 ------------------------------------------------
 
 for _,p in pairs(Players:GetPlayers()) do
@@ -132,7 +137,7 @@ end
 Players.PlayerAdded:Connect(addPlayerTag)
 
 ------------------------------------------------
--- 扫描怪物（全地图）
+-- 怪物扫描（全地图）
 ------------------------------------------------
 
 for _,obj in pairs(workspace:GetDescendants()) do
