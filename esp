@@ -1,145 +1,15 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local localPlayer = Players.LocalPlayer
+local p = game:GetService("Players").LocalPlayer
+local sg = Instance.new("ScreenGui", p.PlayerGui)
+sg.Name = "EmergencyFix"
 
--- 【清理旧版】
-for _, oldUI in pairs(localPlayer:WaitForChild("PlayerGui"):GetChildren()) do
-    if oldUI.Name:find("1enHub") then oldUI:Destroy() end
-end
+local b = Instance.new("TextButton", sg)
+b.Size = UDim2.new(0, 200, 0, 50)
+b.Position = UDim2.new(0.5, -100, 0, 50)
+b.Text = "如果能看到这个按钮，说明脚本能跑"
 
--- 【全局变量】
-local ESP_PLAYER_ENABLED = false
-local ESP_MOB_ENABLED = false
-local TOGGLE_KEY = Enum.KeyCode.RightControl
-local _espStorage = {}
-
-------------------------------------------------
--- 核心逻辑：极致精准过滤
-------------------------------------------------
-local function isRealMonster(model)
-    if Players:GetPlayerFromCharacter(model) then return false end -- 排除玩家
-    
-    local name = model.Name:lower()
-    local hum = model:FindFirstChildOfClass("Humanoid")
-    
-    -- 1. 名字关键词黑名单 (彻底过滤NPC)
-    local npcNames = {"shop", "merchant", "guide", "quest", "npc", "bank", "worker", "job", "owner", "teleport", "dummy", "innocent"}
-    for _, word in pairs(npcNames) do
-        if name:find(word) then return false end
-    end
-    
-    -- 2. 生命体征判断 (没有血条或最大血量为0的不是怪物)
-    if not hum or hum.MaxHealth <= 0 then 
-        return false 
-    end
-    
-    return true
-end
-
-local function createESP(model, isPlayer)
-    if not model then return end
-    if isPlayer and model == localPlayer.Character then return end -- 不显示自己
-    if not isPlayer and not isRealMonster(model) then return end -- 过滤NPC
-
-    local root = model:WaitForChild("HumanoidRootPart", 5) or model:FindFirstChild("Head")
-    if not root then return end
-
-    local uiName = isPlayer and "P_ESP" or "M_ESP"
-    if root:FindFirstChild(uiName) then return end
-
-    local gui = Instance.new("BillboardGui", root)
-    gui.Name = uiName
-    gui.Size = UDim2.new(0, 100, 0, 40)
-    gui.AlwaysOnTop = true
-    gui.MaxDistance = 999999
-    gui.ExtentsOffset = Vector3.new(0, 3, 0)
-    table.insert(_espStorage, gui)
-
-    local label = Instance.new("TextLabel", gui)
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    -- 颜色：玩家青色，怪物红色
-    label.TextColor3 = isPlayer and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 40, 40)
-    label.TextStrokeTransparency = 0.2
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-
-    task.spawn(function()
-        while model.Parent and root.Parent do
-            local active = isPlayer and ESP_PLAYER_ENABLED or ESP_MOB_ENABLED
-            label.Visible = active
-            
-            if active and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-                label.Text = string.format("%s\n%dm", model.Name, math.floor(dist))
-            end
-            task.wait(0.5)
-        end
-        if gui then gui:Destroy() end
-    end)
-end
-
-------------------------------------------------
--- UI 构造 (流光霓虹风格)
-------------------------------------------------
-local ScreenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
-ScreenGui.Name = "1enHub_V18_Pure"
-ScreenGui.ResetOnSpawn = false
-
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 220, 0, 150)
-MainFrame.Position = UDim2.new(0.5, -110, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-
--- RGB 边框
-local UIStroke = Instance.new("UIStroke", MainFrame)
-UIStroke.Thickness = 2
-task.spawn(function()
-    while RunService.RenderStepped:Wait() do
-        UIStroke.Color = Color3.fromHSV((tick() * 0.1) % 1, 0.7, 1)
-    end
+b.MouseButton1Click:Connect(function()
+    print("注入器正常，脚本逻辑可用")
+    b.Text = "运行成功！"
+    task.wait(2)
+    sg:Destroy()
 end)
-
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 45); Title.Text = "1.en HUB V18"; Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.GothamBold; Title.TextSize = 16; Title.BackgroundTransparency = 1
-
-local Layout = Instance.new("UIListLayout", MainFrame)
-Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; Layout.Padding = UDim.new(0, 10)
-
-local function createButton(txt, color)
-    local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.85, 0, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    btn.Text = txt; btn.TextColor3 = Color3.new(0.6, 0.6, 0.6)
-    btn.Font = Enum.Font.GothamSemibold; btn.TextSize = 12
-    
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Thickness = 1.5; stroke.Color = Color3.fromRGB(60, 60, 60)
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    
-    return btn, stroke
-end
-
-local PlayerBtn, PStroke = createButton("PLAYER ESP", Color3.fromRGB(0, 255, 255))
-local MobBtn, MStroke = createButton("MONSTER ONLY", Color3.fromRGB(255, 40, 40))
-
-------------------------------------------------
--- 交互与监听
-------------------------------------------------
-PlayerBtn.MouseButton1Click:Connect(function()
-    ESP_PLAYER_ENABLED = not ESP_PLAYER_ENABLED
-    PlayerBtn.TextColor3 = ESP_PLAYER_ENABLED and Color3.new(1,1,1) or Color3.new(0.6,0.6,0.6)
-    PStroke.Color = ESP_PLAYER_ENABLED and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(60,60,60)
-    if ESP_PLAYER_ENABLED then
-        for _, p in pairs(Players:GetPlayers()) do if p.Character then createESP(p.Character, true) end end
-    end
-end)
-
-MobBtn.MouseButton1Click:Connect
