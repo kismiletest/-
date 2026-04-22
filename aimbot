@@ -1,18 +1,53 @@
--- [[ 警告：范围无限制会导致极高封号风险 ]]
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local localPlayer = Players.LocalPlayer
+local mouse = localPlayer:GetMouse()
 
+-- [[ 全局配置 ]]
 local SETTINGS = {
     AimbotEnabled = true,
     ESPEnabled = true,
-    TargetPart = "Head",
-    MaxDistance = math.huge -- 无限制范围
+    TargetPart = "Head", -- 目标部位
+    MaxDistance = 999999, -- 实际上等同于无限，但比 math.huge 稳定
+    ScanDelay = 2, -- 降低扫描频率（关键：防止卡顿）
 }
 
--- 1. 静默自瞄逻辑 (Silent Aim)
+local _storage = {}
+
+------------------------------------------------
+-- 核心功能：寻找最近目标
+------------------------------------------------
+local function getClosestTarget()
+    local closestTarget = nil
+    local shortestDistance = SETTINGS.MaxDistance
+
+    -- 仅遍历玩家和可能有怪物的文件夹，不要用 GetDescendants() 遍历整个 workspace
+    for _, obj in pairs(workspace:GetChildren()) do
+        -- 判定是否为生物：有 Humanoid 且不是自己
+        if obj:IsA("Model") and obj ~= localPlayer.Character then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            local part = obj:FindFirstChild(SETTINGS.TargetPart)
+            
+            if hum and hum.Health > 0 and part then
+                local dist = (part.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if dist < shortestDistance then
+                    closestTarget = part
+                    shortestDistance = dist
+                end
+            end
+        end
+    end
+    return closestTarget
+end
+
+------------------------------------------------
+-- 功能 1：静默自瞄 (Silent Aim)
+------------------------------------------------
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, index)
-    if self == game:GetService("Players").LocalPlayer:GetMouse() and (index == "Hit" or index == "Target") then
+    if self == mouse and (index == "Hit" or index == "Target") then
         if SETTINGS.AimbotEnabled then
-            local target = getClosestTarget() -- 调用寻找目标的函数
+            local target = getClosestTarget()
             if target then
                 return (index == "Hit" and target.CFrame or target)
             end
@@ -21,5 +56,83 @@ oldIndex = hookmetamethod(game, "__index", function(self, index)
     return oldIndex(self, index)
 end)
 
--- 2. ESP 逻辑 (透视)
--- [此处插入之前写的 BillboardGui 循环代码]
+------------------------------------------------
+-- 功能 2：轻量化 ESP (透视)
+------------------------------------------------
+local function applyESP(model)
+    if not SETTINGS.ESPEnabled then return end
+    local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+    if not root or root:FindFirstChild("ESP_UI") then return end
+
+    local isPlayer = Players:GetPlayerFromCharacter(model)
+    local color = isPlayer and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "ESP_UI"
+    gui.Size = UDim2.new(0, 100, 0, 40)
+    gui.AlwaysOnTop = true
+    gui.Adornee = root
+    gui.Parent = root
+    table.insert(_storage, gui)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = color
+    label.TextScaled = true
+    label.Font = Enum.Font.SourceSansBold
+    label.Parent = gui
+
+    task.spawn(function()
+        while model.Parent and SETTINGS.ESPEnabled do
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+                label.Text = string.format("%s\n%dm", model.Name, math.floor(dist))
+            end
+            task.wait(0.5) -- 降低 UI 刷新率减轻负担
+        end
+        gui:Destroy()
+    end)
+end
+
+------------------------------------------------
+-- 功能 3：UI 控制面板 (防卡顿开关)
+------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 160, 0, 100)
+Frame.Position = UDim2.new(0.05, 0, 0.4, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+local AimBtn = Instance.new("TextButton")
+AimBtn.Size = UDim2.new(0.9, 0, 0, 35)
+AimBtn.Position = UDim2.new(0.05, 0, 0.1, 0)
+AimBtn.Text = "全图自瞄: 开启"
+AimBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+AimBtn.TextColor3 = Color3.new(1,1,1)
+AimBtn.Parent = Frame
+
+AimBtn.MouseButton1Click:Connect(function()
+    SETTINGS.AimbotEnabled = not SETTINGS.AimbotEnabled
+    AimBtn.Text = SETTINGS.AimbotEnabled and "全图自瞄: 开启" or "全图自瞄: 关闭"
+    AimBtn.BackgroundColor3 = SETTINGS.AimbotEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(120, 0, 0)
+end)
+
+------------------------------------------------
+-- 循环扫描逻辑
+------------------------------------------------
+task.spawn(function()
+    while true do
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+                applyESP(obj)
+            end
+        end
+        task.wait(SETTINGS.ScanDelay) -- 每2秒扫描一次新目标，防止 CPU 爆炸
+    end
+end)
