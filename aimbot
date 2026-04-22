@@ -3,50 +3,55 @@ local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local mouse = localPlayer:GetMouse()
 
--- [[ 全局配置 ]]
+-- [[ 配置面板 ]]
 local SETTINGS = {
-    AimbotEnabled = true,
-    ESPEnabled = true,
-    TargetPart = "Head", -- 目标部位
-    MaxDistance = 999999, -- 实际上等同于无限，但比 math.huge 稳定
-    ScanDelay = 2, -- 降低扫描频率（关键：防止卡顿）
+    SilentAim = true,
+    ESP = true,
+    TeamCheck = false, -- 是否攻击同阵营
+    TargetPart = "HumanoidRootPart", -- 锁定躯干命中率更高
+    Range = 1000 -- 索敌范围
 }
 
-local _storage = {}
+-- 存储 UI 对象以便清理
+local _espStorage = {}
 
 ------------------------------------------------
--- 核心功能：寻找最近目标
+-- 核心：获取最近的敌人（怪物或玩家）
 ------------------------------------------------
 local function getClosestTarget()
-    local closestTarget = nil
-    local shortestDistance = SETTINGS.MaxDistance
+    local target = nil
+    local dist = SETTINGS.Range
 
-    -- 仅遍历玩家和可能有怪物的文件夹，不要用 GetDescendants() 遍历整个 workspace
-    for _, obj in pairs(workspace:GetChildren()) do
-        -- 判定是否为生物：有 Humanoid 且不是自己
-        if obj:IsA("Model") and obj ~= localPlayer.Character then
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            local part = obj:FindFirstChild(SETTINGS.TargetPart)
+    -- Blox Fruits 的怪物通常在 workspace.NPCs 或直接在 workspace
+    -- 我们采用最通用的判定方式
+    for _, v in pairs(workspace:GetChildren()) do
+        if v:IsA("Model") and v ~= localPlayer.Character then
+            local hum = v:FindFirstChildOfClass("Humanoid")
+            local root = v:FindFirstChild(SETTINGS.TargetPart)
             
-            if hum and hum.Health > 0 and part then
-                local dist = (part.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-                if dist < shortestDistance then
-                    closestTarget = part
-                    shortestDistance = dist
+            if hum and hum.Health > 0 and root then
+                local magnitude = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if magnitude < dist then
+                    -- 检查是否是玩家，如果是玩家则进行阵营检查
+                    local p = Players:GetPlayerFromCharacter(v)
+                    if not p or (SETTINGS.TeamCheck or p.Team ~= localPlayer.Team) then
+                        target = root
+                        dist = magnitude
+                    end
                 end
             end
         end
     end
-    return closestTarget
+    return target
 end
 
 ------------------------------------------------
--- 功能 1：静默自瞄 (Silent Aim)
+-- 核心：静默自瞄 (劫持射击逻辑)
 ------------------------------------------------
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, index)
     if self == mouse and (index == "Hit" or index == "Target") then
-        if SETTINGS.AimbotEnabled then
+        if SETTINGS.SilentAim then
             local target = getClosestTarget()
             if target then
                 return (index == "Hit" and target.CFrame or target)
@@ -57,82 +62,90 @@ oldIndex = hookmetamethod(game, "__index", function(self, index)
 end)
 
 ------------------------------------------------
--- 功能 2：轻量化 ESP (透视)
+-- 核心：ESP 透视 (防止卡顿版)
 ------------------------------------------------
-local function applyESP(model)
-    if not SETTINGS.ESPEnabled then return end
-    local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-    if not root or root:FindFirstChild("ESP_UI") then return end
-
-    local isPlayer = Players:GetPlayerFromCharacter(model)
-    local color = isPlayer and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+local function createESP(model)
+    if not SETTINGS.ESP then return end
+    local root = model:FindFirstChild("HumanoidRootPart")
+    if not root or root:FindFirstChild("BF_ESP") then return end
 
     local gui = Instance.new("BillboardGui")
-    gui.Name = "ESP_UI"
+    gui.Name = "BF_ESP"
     gui.Size = UDim2.new(0, 100, 0, 40)
     gui.AlwaysOnTop = true
-    gui.Adornee = root
+    gui.ExtentsOffset = Vector3.new(0, 3, 0)
     gui.Parent = root
-    table.insert(_storage, gui)
 
     local label = Instance.new("TextLabel")
+    label.Parent = gui
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = color
     label.TextScaled = true
     label.Font = Enum.Font.SourceSansBold
-    label.Parent = gui
+    
+    -- 颜色判定
+    if Players:GetPlayerFromCharacter(model) then
+        label.TextColor3 = Color3.fromRGB(255, 255, 0) -- 玩家为黄色
+    else
+        label.TextColor3 = Color3.fromRGB(255, 0, 0) -- 怪物为红色
+    end
 
     task.spawn(function()
-        while model.Parent and SETTINGS.ESPEnabled do
-            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-                label.Text = string.format("%s\n%dm", model.Name, math.floor(dist))
+        while model.Parent and SETTINGS.ESP do
+            local myPos = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myPos then
+                local d = math.floor((root.Position - myPos.Position).Magnitude)
+                label.Text = model.Name .. "\n[" .. d .. "m]"
             end
-            task.wait(0.5) -- 降低 UI 刷新率减轻负担
+            task.wait(0.5)
         end
         gui:Destroy()
     end)
 end
 
 ------------------------------------------------
--- 功能 3：UI 控制面板 (防卡顿开关)
+-- 简易 UI 切换面板
 ------------------------------------------------
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+local ScreenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 150, 0, 110)
+MainFrame.Position = UDim2.new(0.1, 0, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Active = true
+MainFrame.Draggable = true
 
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 160, 0, 100)
-Frame.Position = UDim2.new(0.05, 0, 0.4, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Frame.Active = true
-Frame.Draggable = true
-Frame.Parent = ScreenGui
+local function createBtn(text, pos, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Position = pos
+    btn.Text = text
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
 
-local AimBtn = Instance.new("TextButton")
-AimBtn.Size = UDim2.new(0.9, 0, 0, 35)
-AimBtn.Position = UDim2.new(0.05, 0, 0.1, 0)
-AimBtn.Text = "全图自瞄: 开启"
-AimBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
-AimBtn.TextColor3 = Color3.new(1,1,1)
-AimBtn.Parent = Frame
+local aimBtn = createBtn("静默自瞄: 开启", UDim2.new(0.05, 0, 0.1, 0), function()
+    SETTINGS.SilentAim = not SETTINGS.SilentAim
+    ScreenGui.MainFrame.TextButton.Text = SETTINGS.SilentAim and "静默自瞄: 开启" or "静默自瞄: 关闭"
+end)
 
-AimBtn.MouseButton1Click:Connect(function()
-    SETTINGS.AimbotEnabled = not SETTINGS.AimbotEnabled
-    AimBtn.Text = SETTINGS.AimbotEnabled and "全图自瞄: 开启" or "全图自瞄: 关闭"
-    AimBtn.BackgroundColor3 = SETTINGS.AimbotEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(120, 0, 0)
+local espBtn = createBtn("透视显示: 开启", UDim2.new(0.05, 0, 0.5, 0), function()
+    SETTINGS.ESP = not SETTINGS.ESP
 end)
 
 ------------------------------------------------
--- 循环扫描逻辑
+-- 循环监听
 ------------------------------------------------
 task.spawn(function()
     while true do
-        for _, obj in pairs(workspace:GetChildren()) do
-            if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
-                applyESP(obj)
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= localPlayer.Character then
+                createESP(v)
             end
         end
-        task.wait(SETTINGS.ScanDelay) -- 每2秒扫描一次新目标，防止 CPU 爆炸
+        task.wait(2) -- 每2秒刷新一次环境，防止卡顿
     end
 end)
+
+print("Blox Fruits 辅助已加载！")
