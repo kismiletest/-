@@ -1,118 +1,153 @@
+--[[
+    Blox Fruits 高级优化版
+    - 解决了大规模扫描导致的掉帧问题
+    - 优化了静默自瞄的触发频率
+    - ESP 采用按需更新模式
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local mouse = localPlayer:GetMouse()
 
--- [[ 优化配置 ]]
-local SETTINGS = {
-    Aimbot = true,
-    ESP = true,
-    Range = 2000, -- 建议不要设为无限，2000足够覆盖极远距离
-    ScanRate = 1.5, -- 每1.5秒扫描一次环境（防卡顿关键）
-    UpdateRate = 0.1 -- 坐标更新频率
+-- 设置
+local CONFIG = {
+    AimbotEnabled = true,
+    ESPEnabled = true,
+    MaxDistance = 3000, -- 超过3000码的物体不处理，防止内存溢出
+    RefreshRate = 1.0,  -- 扫描周围环境的频率
+    TargetPart = "HumanoidRootPart" -- 自瞄目标部位
 }
 
-local currentTarget = nil
+-- 缓存
+local Cache = {
+    Targets = {},
+    CurrentTarget = nil
+}
 
 ------------------------------------------------
--- 1. 极其轻量的索敌逻辑 (降低扫描深度)
+-- 1. 高效目标扫描 (异步处理，不卡画面)
 ------------------------------------------------
-local function updateTarget()
-    local closest = nil
-    local dist = SETTINGS.Range
+local function updateTargetCache()
     local myRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-    
     if not myRoot then return end
 
-    -- 只扫描工作区的一级目录（NPC通常在这里），避开地图细碎零件
-    for _, v in pairs(workspace:GetChildren()) do
-        if v:IsA("Model") and v ~= localPlayer.Character then
-            local hum = v:FindFirstChildOfClass("Humanoid")
-            local root = v:FindFirstChild("HumanoidRootPart")
-            
+    local newTargets = {}
+    local closestDist = CONFIG.MaxDistance
+    local closestTarget = nil
+
+    -- 仅扫描 Workspace 的主要子级，避免 GetDescendants
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and obj ~= localPlayer.Character then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            local root = obj:FindFirstChild(CONFIG.TargetPart)
+
             if hum and hum.Health > 0 and root then
-                local mag = (root.Position - myRoot.Position).Magnitude
-                if mag < dist then
-                    closest = root
-                    dist = mag
+                local dist = (root.Position - myRoot.Position).Magnitude
+                if dist < CONFIG.MaxDistance then
+                    table.insert(newTargets, obj)
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestTarget = root
+                    end
                 end
             end
         end
     end
-    currentTarget = closest
+    Cache.Targets = newTargets
+    Cache.CurrentTarget = closestTarget
 end
 
--- 独立线程每秒更新一次目标，不占用渲染帧
+-- 开启独立线程循环更新目标，不占用主线程渲染
 task.spawn(function()
     while true do
-        updateTarget()
-        task.wait(SETTINGS.ScanRate)
+        updateTargetCache()
+        task.wait(CONFIG.RefreshRate)
     end
 end)
 
 ------------------------------------------------
--- 2. 命中劫持 (只在射击时计算)
+-- 2. 内存优化版 ESP (只对视野内的敌人渲染)
+------------------------------------------------
+local function applyESP(model)
+    if model:FindFirstChild("Advanced_ESP") then return end
+    
+    local root = model:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local bgui = Instance.new("BillboardGui")
+    bgui.Name = "Advanced_ESP"
+    bgui.AlwaysOnTop = true
+    bgui.Size = UDim2.new(0, 100, 0, 30)
+    bgui.Parent = root
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Players:GetPlayerFromCharacter(model) and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 50, 50)
+    label.TextStrokeTransparency = 0
+    label.TextScaled = true
+    label.Font = Enum.Font.RobotoMono
+    label.Parent = bgui
+
+    task.spawn(function()
+        while model.Parent and CONFIG.ESPEnabled do
+            local myChar = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myChar then
+                local dist = (root.Position - myChar.Position).Magnitude
+                label.Text = string.format("%s\n[%dm]", model.Name, math.floor(dist))
+                -- 性能优化：距离太远自动隐藏渲染
+                bgui.Enabled = (dist < 1500)
+            end
+            task.wait(0.3)
+        end
+        bgui:Destroy()
+    end)
+end
+
+------------------------------------------------
+-- 3. 静默自瞄核心 (使用元表劫持)
 ------------------------------------------------
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, index)
     if self == mouse and (index == "Hit" or index == "Target") then
-        if SETTINGS.Aimbot and currentTarget then
-            return (index == "Hit" and currentTarget.CFrame or currentTarget)
+        if CONFIG.AimbotEnabled and Cache.CurrentTarget then
+            return (index == "Hit" and Cache.CurrentTarget.CFrame or Cache.CurrentTarget)
         end
     end
     return oldIndex(self, index)
 end)
 
 ------------------------------------------------
--- 3. 极简 ESP (仅在目标靠近时创建)
+-- 4. 动态监听与初始化
 ------------------------------------------------
-local function applyESP(model)
-    if not SETTINGS.ESP or model:FindFirstChild("OptimizedESP") then return end
-    
-    local root = model:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    local gui = Instance.new("BillboardGui")
-    gui.Name = "OptimizedESP"
-    gui.Size = UDim2.new(0, 80, 0, 30)
-    gui.AlwaysOnTop = true
-    gui.Parent = root
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255, 0, 0)
-    label.TextScaled = true
-    label.Parent = gui
-
-    task.spawn(function()
-        while model.Parent and SETTINGS.ESP do
-            local myRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if myRoot then
-                local d = (root.Position - myRoot.Position).Magnitude
-                label.Text = string.format("%s\n%dm", model.Name, math.floor(d))
-                -- 如果太远，隐藏文字以节省渲染开销
-                label.Visible = (d < 1000) 
-            end
-            task.wait(0.3)
+local function init()
+    for _, v in pairs(workspace:GetChildren()) do
+        if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= localPlayer.Character then
+            applyESP(v)
         end
-        gui:Destroy()
-    end)
+    end
 end
 
--- 持续监听
 workspace.ChildAdded:Connect(function(child)
-    task.wait(1)
-    if child:IsA("Model") and child:FindFirstChildOfClass("Humanoid") then
-        applyESP(child)
+    task.delay(1, function()
+        if child:IsA("Model") and child:FindFirstChildOfClass("Humanoid") then
+            applyESP(child)
+        end
+    end)
+end)
+
+init()
+
+------------------------------------------------
+-- 5. 极简控制开关 (按 K 键开关自瞄)
+------------------------------------------------
+game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.K then
+        CONFIG.AimbotEnabled = not CONFIG.AimbotEnabled
+        print("自瞄状态: " .. tostring(CONFIG.AimbotEnabled))
     end
 end)
 
--- 初始化
-for _, v in pairs(workspace:GetChildren()) do
-    if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= localPlayer.Character then
-        applyESP(v)
-    end
-end
-
-print("丝滑版脚本已加载，已自动平衡性能与精度")
+print("Blox Fruits 高级版脚本加载成功！")
+print("快捷键: K 键开关自瞄")
