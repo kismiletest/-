@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local localPlayer = Players.LocalPlayer
 
 -- 清理旧版
@@ -9,191 +10,170 @@ for _, oldUI in pairs(localPlayer:WaitForChild("PlayerGui"):GetChildren()) do
 end
 
 -- 全局变量
-local ESP_ENABLED = false
-local FLYING = false
-local flySpeed = 1
+local ESP_PLAYER_ENABLED = false
+local ESP_MOB_ENABLED = false
 local TOGGLE_KEY = Enum.KeyCode.RightControl
 local _espStorage = {}
 
 ------------------------------------------------
--- 核心逻辑：飞行 (基于你提供的源代码优化)
+-- 核心逻辑：透视系统 (保持 V15 的强大过滤)
 ------------------------------------------------
-local function startFly()
-    local chr = localPlayer.Character
-    if not chr or not chr:FindFirstChild("HumanoidRootPart") then return end
-    
-    local hum = chr:FindFirstChildOfClass("Humanoid")
-    local root = chr.HumanoidRootPart
-    
-    -- 禁用自带动画防止抖动
-    if chr:FindFirstChild("Animate") then chr.Animate.Disabled = true end
-    for _, v in next, hum:GetPlayingAnimationTracks() do v:AdjustSpeed(0) end
+local function createESP(model, isPlayer)
+    if not model then return end
+    local root = model:WaitForChild("HumanoidRootPart", 5) or model:FindFirstChild("Head")
+    if not root then return end
 
-    -- 创建动力
-    local bg = Instance.new("BodyGyro", root)
-    bg.P = 9e4
-    bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bg.cframe = root.CFrame
-    
-    local bv = Instance.new("BodyVelocity", root)
-    bv.velocity = Vector3.new(0, 0.1, 0)
-    bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+    local uiName = isPlayer and "PlayerESP_UI" or "MobESP_UI"
+    if root:FindFirstChild(uiName) then return end
 
-    hum.PlatformStand = true
+    local gui = Instance.new("BillboardGui", root)
+    gui.Name = uiName
+    gui.Size = UDim2.new(0, 100, 0, 40)
+    gui.AlwaysOnTop = true
+    gui.MaxDistance = 999999
+    gui.ExtentsOffset = Vector3.new(0, 3, 0)
+    table.insert(_espStorage, gui)
+
+    local label = Instance.new("TextLabel", gui)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = isPlayer and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 100, 0)
+    label.TextStrokeTransparency = 0.5
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
 
     task.spawn(function()
-        while FLYING and chr.Parent and hum.Health > 0 do
-            local camera = workspace.CurrentCamera
-            local moveDir = Vector3.new(0,0,0)
-            
-            -- 控制逻辑 (这里简化为跟随摄像机方向)
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                moveDir = moveDir + camera.CFrame.LookVector
+        local tag = isPlayer and "ESP_PLAYER_ENABLED" or "ESP_MOB_ENABLED"
+        while getfenv()[tag] and model.Parent and root.Parent do
+            local myRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myRoot then
+                local dist = (root.Position - myRoot.Position).Magnitude
+                local name = isPlayer and (Players:GetPlayerFromCharacter(model) and Players:GetPlayerFromCharacter(model).DisplayName or model.Name) or model.Name
+                label.Text = string.format("%s\n%dm", name, math.floor(dist))
             end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                moveDir = moveDir - camera.CFrame.LookVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                moveDir = moveDir - camera.CFrame.RightVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                moveDir = moveDir + camera.CFrame.RightVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                moveDir = moveDir + Vector3.new(0, 1, 0)
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-                moveDir = moveDir - Vector3.new(0, 1, 0)
-            end
-
-            bv.velocity = moveDir * (flySpeed * 50)
-            bg.cframe = camera.CFrame
-            RunService.RenderStepped:Wait()
+            task.wait(0.5)
         end
-        
-        -- 停止飞行恢复状态
-        bg:Destroy()
-        bv:Destroy()
-        hum.PlatformStand = false
-        if chr:FindFirstChild("Animate") then chr.Animate.Disabled = false end
+        if gui then gui:Destroy() end
     end)
 end
 
 ------------------------------------------------
--- 核心逻辑：透视 (保留 V13.1)
-------------------------------------------------
-local function applyESP(player)
-    if player == localPlayer or player.UserId <= 0 then return end
-    local function createUI(character)
-        local root = character:WaitForChild("HumanoidRootPart", 10)
-        if not root then return end
-        local gui = Instance.new("BillboardGui", root)
-        gui.Name = "PlayerESP_UI"
-        gui.Size = UDim2.new(0, 100, 0, 40)
-        gui.AlwaysOnTop = true
-        gui.MaxDistance = 999999
-        table.insert(_espStorage, gui)
-        local label = Instance.new("TextLabel", gui)
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.new(0, 1, 0.5)
-        label.TextStrokeTransparency = 0
-        label.TextScaled = true
-        label.Font = Enum.Font.SourceSansBold
-        task.spawn(function()
-            while ESP_ENABLED and player.Parent and character.Parent do
-                if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local d = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-                    label.Text = string.format("%s\n%dm", player.DisplayName, math.floor(d))
-                end
-                task.wait(0.5)
-            end
-            gui:Destroy()
-        end)
-    end
-    player.CharacterAdded:Connect(createUI)
-    if player.Character then createUI(player.Character) end
-end
-
-------------------------------------------------
--- UI 构造
+-- UI 美化：闪闪发亮的面板
 ------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
-ScreenGui.Name = "1enHub_V14"
+ScreenGui.Name = "1enHub_V16_Neon"
 ScreenGui.ResetOnSpawn = false
 
+-- 主面板 (磨砂黑背景)
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 200, 0, 190) -- 调高了高度以容纳新按钮
-MainFrame.Position = UDim2.new(0.5, -100, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.Position = UDim2.new(0.5, -110, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BackgroundTransparency = 0.1
+MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame)
+
+-- 霓虹发光外框
+local UIStroke = Instance.new("UIStroke", MainFrame)
+UIStroke.Thickness = 2
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UIStroke.Color = Color3.fromRGB(0, 170, 255) -- 初始青色
+
+-- 动画：让边框颜色闪烁流转
+task.spawn(function()
+    while true do
+        local t = tick()
+        local r = math.sin(t * 2) * 0.5 + 0.5
+        local g = math.sin(t * 2 + 2) * 0.5 + 0.5
+        local b = math.sin(t * 2 + 4) * 0.5 + 0.5
+        UIStroke.Color = Color3.new(r, g, b)
+        RunService.RenderStepped:Wait()
+    end
+end)
+
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+-- 标题 (带发光文字效果)
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Text = "1.en HUB PREMIUM"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.BackgroundTransparency = 1
 
 local Layout = Instance.new("UIListLayout", MainFrame)
 Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-Layout.Padding = UDim.new(0, 5)
+Layout.Padding = UDim.new(0, 8)
 
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "  1.en Hub V14 (Fly)"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-Title.Font = Enum.Font.SourceSansBold
-Instance.new("UICorner", Title)
-
--- 功能按钮工厂函数
-local function createButton(txt, color)
+-- 漂亮按钮生成器
+local function createStyledButton(txt, color)
     local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.BackgroundColor3 = color
+    btn.Size = UDim2.new(0.85, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     btn.Text = txt
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 14
-    Instance.new("UICorner", btn)
-    return btn
+    btn.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 13
+    btn.AutoButtonColor = false
+    
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 6)
+    
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Thickness = 1.5
+    stroke.Color = Color3.fromRGB(50, 50, 50)
+    stroke.Transparency = 0.5
+
+    -- 悬停动画
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.3), {Color = color}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(50, 50, 50)}):Play()
+    end)
+    
+    return btn, stroke
 end
 
-local EspBtn = createButton("真玩家透视: 关", Color3.fromRGB(160, 40, 40))
-local FlyBtn = createButton("1.en Fly: 关", Color3.fromRGB(60, 60, 160))
-local SpeedBtn = createButton("飞行速度: 1", Color3.fromRGB(100, 40, 160))
+local PlayerBtn, PlayerStroke = createStyledButton("PLAYER ESP", Color3.fromRGB(0, 255, 150))
+local MobBtn, MobStroke = createStyledButton("MOB ESP", Color3.fromRGB(255, 80, 80))
 
 ------------------------------------------------
--- 按钮交互
+-- 交互逻辑
 ------------------------------------------------
--- 透视开关
-EspBtn.MouseButton1Click:Connect(function()
-    ESP_ENABLED = not ESP_ENABLED
-    EspBtn.Text = ESP_ENABLED and "真玩家透视: 开" or "真玩家透视: 关"
-    EspBtn.BackgroundColor3 = ESP_ENABLED and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(160, 40, 40)
-    if ESP_ENABLED then
-        for _, p in pairs(Players:GetPlayers()) do applyESP(p) end
-    else
-        for _, v in pairs(_espStorage) do if v then v:Destroy() end end
-        _espStorage = {}
+PlayerBtn.MouseButton1Click:Connect(function()
+    ESP_PLAYER_ENABLED = not ESP_PLAYER_ENABLED
+    getfenv().ESP_PLAYER_ENABLED = ESP_PLAYER_ENABLED
+    PlayerBtn.TextColor3 = ESP_PLAYER_ENABLED and Color3.new(1, 1, 1) or Color3.new(0.6, 0.6, 0.6)
+    PlayerStroke.Color = ESP_PLAYER_ENABLED and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(50, 50, 50)
+    if ESP_PLAYER_ENABLED then
+        for _, p in pairs(Players:GetPlayers()) do if p.Character then createESP(p.Character, true) end end
     end
 end)
 
--- 飞行开关
-FlyBtn.MouseButton1Click:Connect(function()
-    FLYING = not FLYING
-    FlyBtn.Text = FLYING and "1.en Fly: 开" or "1.en Fly: 关"
-    FlyBtn.BackgroundColor3 = FLYING and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(60, 60, 160)
-    if FLYING then startFly() end
+MobBtn.MouseButton1Click:Connect(function()
+    ESP_MOB_ENABLED = not ESP_MOB_ENABLED
+    getfenv().ESP_MOB_ENABLED = ESP_MOB_ENABLED
+    MobBtn.TextColor3 = ESP_MOB_ENABLED and Color3.new(1, 1, 1) or Color3.new(0.6, 0.6, 0.6)
+    MobStroke.Color = ESP_MOB_ENABLED and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(50, 50, 50)
+    if ESP_MOB_ENABLED then
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(v) then
+                createESP(v, false)
+            end
+        end
+    end
 end)
 
--- 速度调节
-SpeedBtn.MouseButton1Click:Connect(function()
-    flySpeed = flySpeed + 1
-    if flySpeed > 5 then flySpeed = 1 end
-    SpeedBtn.Text = "飞行速度: " .. flySpeed
-end)
-
--- 隐藏/显示快捷键
+-- 快捷键：隐藏面板
 UserInputService.InputBegan:Connect(function(i, p)
-    if not p and i.KeyCode == TOGGLE_KEY then MainFrame.Visible = not MainFrame.Visible end
+    if not p and i.KeyCode == TOGGLE_KEY then
+        MainFrame.Visible = not MainFrame.Visible
+    end
 end)
 
-Players.PlayerAdded:Connect(applyESP)
-print("1.en Hub V14 集成版已加载！")
+print("1.en Hub V16 (Premium Neon) 加载成功！已移除飞行功能。")
