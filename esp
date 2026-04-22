@@ -1,17 +1,10 @@
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local localPlayer = Players.LocalPlayer
 
 -- 状态控制
-local PANEL_VISIBLE = true
 local ESP_ENABLED = false
-local FLYING_ENABLED = false
 local _espStorage = {}
-
--- FlyGuiV3 核心参数
-local flySpeed = 70
-local bv, bg = nil, nil
 local TOGGLE_KEY = Enum.KeyCode.RightControl
 
 ------------------------------------------------
@@ -27,6 +20,7 @@ end
 local function createESP(model)
     if not ESP_ENABLED or model == localPlayer.Character then return end
     local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+    
     if root and not root:FindFirstChild("ESP_UI") then
         local gui = Instance.new("BillboardGui", root)
         gui.Name = "ESP_UI"
@@ -57,127 +51,81 @@ local function createESP(model)
 end
 
 ------------------------------------------------
--- 核心：FlyGuiV3 飞行逻辑 (替换了原本的旧脚本)
-------------------------------------------------
-local function stopFlying()
-    FLYING_ENABLED = false
-    if bv then bv:Destroy() bv = nil end
-    if bg then bg:Destroy() bg = nil end
-    pcall(function()
-        local char = localPlayer.Character
-        char.Humanoid.PlatformStand = false
-        char.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
-        char.HumanoidRootPart.RotVelocity = Vector3.new(0,0,0)
-    end)
-end
-
-local function startFlying()
-    local char = localPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    stopFlying() 
-    FLYING_ENABLED = true
-
-    -- FlyGuiV3 核心：使用 BodyVelocity 实现无重力悬停
-    bv = Instance.new("BodyVelocity", root)
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(0, 0, 0)
-    
-    -- FlyGuiV3 核心：使用 BodyGyro 锁定身体不乱晃
-    bg = Instance.new("BodyGyro", root)
-    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bg.P = 9000 
-    
-    char.Humanoid.PlatformStand = true
-
-    task.spawn(function()
-        while FLYING_ENABLED and root.Parent do
-            local camera = workspace.CurrentCamera
-            local dir = Vector3.new(0, 0, 0)
-            
-            -- 读取输入
-            local f = (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0) + (UserInputService:IsKeyDown(Enum.KeyCode.S) and -1 or 0)
-            local r = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) + (UserInputService:IsKeyDown(Enum.KeyCode.A) and -1 or 0)
-            local u = (UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0) + (UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and -1 or 0)
-
-            -- 关键：FlyGuiV3 风格的相机坐标转换
-            -- 按 W 会朝相机看向的方向飞行（包括仰角）
-            dir = (camera.CFrame.LookVector * f) + (camera.CFrame.RightVector * r) + (Vector3.new(0, 1, 0) * u)
-            
-            if dir.Magnitude > 0 then
-                bv.Velocity = dir.Unit * flySpeed
-            else
-                bv.Velocity = Vector3.new(0, 0, 0) -- 完美静止悬停
-            end
-            
-            bg.CFrame = camera.CFrame
-            RunService.RenderStepped:Wait()
-        end
-        stopFlying()
-    end)
-end
-
-------------------------------------------------
--- UI 面板 (整合自动布局)
+-- UI 面板构造
 ------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "1enHub_FlyV3"
+ScreenGui.Name = "1enHub_Final_V7"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 200, 0, 220)
-MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Size = UDim2.new(0, 200, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -100, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true
+MainFrame.Draggable = true -- 允许拖动
 Instance.new("UICorner", MainFrame)
 
+-- 标题栏
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "1.en Hub V6"
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = "  1.en Hub V7"
 Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 20
-Instance.new("UICorner", Title)
+Title.TextSize = 16
+local titleCorner = Instance.new("UICorner", Title)
 
--- 自动排序容器
-local List = Instance.new("UIListLayout", MainFrame)
-List.Padding = UDim.new(0, 10)
-List.HorizontalAlignment = Enum.HorizontalAlignment.Center
-List.SortOrder = Enum.SortOrder.LayoutOrder
+-- ✖️ 关闭按钮
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Name = "CloseButton"
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -32, 0, 2)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "✖"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseBtn.TextSize = 18
+CloseBtn.Font = Enum.Font.SourceSansBold
 
--- 间距
-Instance.new("Frame", MainFrame).Size = UDim2.new(1, 0, 0, 45).BackgroundTransparency = 1
+-- 按钮功能：点击 ✖ 隐藏面板
+CloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+end)
 
-local function makeBtn(txt, order)
-    local b = Instance.new("TextButton", MainFrame)
-    b.Size = UDim2.new(0.9, 0, 0, 45)
-    b.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
-    b.Text = txt .. ": 关"
-    b.TextColor3 = Color3.new(1, 1, 1)
-    b.Font = Enum.Font.SourceSansBold
-    b.TextSize = 16
-    b.LayoutOrder = order
-    Instance.new("UICorner", b)
-    return b
-end
+-- 悬停变色效果
+CloseBtn.MouseEnter:Connect(function() CloseBtn.TextColor3 = Color3.new(1, 0, 0) end)
+CloseBtn.MouseLeave:Connect(function() CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80) end)
 
-local EspBtn = makeBtn("ESP 透视", 1)
-local FlyBtn = makeBtn("FlyV3 飞行", 2)
+-- 内容容器
+local Container = Instance.new("Frame", MainFrame)
+Container.Size = UDim2.new(1, 0, 1, -40)
+Container.Position = UDim2.new(0, 0, 0, 40)
+Container.BackgroundTransparency = 1
 
-local Hint = Instance.new("TextLabel", MainFrame)
-Hint.Size = UDim2.new(1, 0, 0, 30)
-Hint.Text = "R-Ctrl 隐藏 | 速度: 70"
-Hint.TextColor3 = Color3.new(0.5, 0.5, 0.5)
+local Layout = Instance.new("UIListLayout", Container)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+Layout.Padding = UDim.new(0, 10)
+
+-- 透视按钮
+local EspBtn = Instance.new("TextButton", Container)
+EspBtn.Size = UDim2.new(0.9, 0, 0, 45)
+EspBtn.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
+EspBtn.Text = "ESP 透视: 关"
+EspBtn.TextColor3 = Color3.new(1, 1, 1)
+EspBtn.Font = Enum.Font.SourceSansBold
+EspBtn.TextSize = 16
+Instance.new("UICorner", EspBtn)
+
+local Hint = Instance.new("TextLabel", Container)
+Hint.Size = UDim2.new(1, 0, 0, 20)
+Hint.Text = "按 [R-Ctrl] 重新呼出"
+Hint.TextColor3 = Color3.new(0.6, 0.6, 0.6)
 Hint.BackgroundTransparency = 1
 Hint.TextSize = 11
-Hint.LayoutOrder = 3
 
 ------------------------------------------------
--- 事件绑定
+-- 交互绑定
 ------------------------------------------------
 EspBtn.MouseButton1Click:Connect(function()
     ESP_ENABLED = not ESP_ENABLED
@@ -186,18 +134,13 @@ EspBtn.MouseButton1Click:Connect(function()
     if ESP_ENABLED then for _,v in pairs(workspace:GetChildren()) do createESP(v) end else clearESP() end
 end)
 
-FlyBtn.MouseButton1Click:Connect(function()
-    FLYING_ENABLED = not FLYING_ENABLED
-    FlyBtn.Text = FLYING_ENABLED and "FlyV3 飞行: 开" or "FlyV3 飞行: 关"
-    FlyBtn.BackgroundColor3 = FLYING_ENABLED and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(160, 40, 40)
-    if FLYING_ENABLED then startFlying() else stopFlying() end
-end)
-
+-- 快捷键切换显隐
 UserInputService.InputBegan:Connect(function(i, p)
     if not p and i.KeyCode == TOGGLE_KEY then
         MainFrame.Visible = not MainFrame.Visible
     end
 end)
 
-workspace.ChildAdded:Connect(createESP)
-print("1.en Hub V6 已加载 - 原飞行脚本已移除，FlyGuiV3 逻辑已植入")
+workspace.ChildAdded:Connect(function(c) if ESP_ENABLED then task.wait(0.1) createESP(c) end end)
+
+print("1.en Hub V7 加载成功！点击 ✖ 或按右Ctrl隐藏。")
