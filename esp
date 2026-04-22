@@ -1,156 +1,120 @@
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
-print("ESP 启动成功")
+print("ESP 系统已优化：仅显示玩家与怪物")
 
 ------------------------------------------------
--- 创建UI
+-- 核心配置
 ------------------------------------------------
+local SETTINGS = {
+    PlayerColor = Color3.fromRGB(0, 255, 0), -- 玩家绿色
+    MonsterColor = Color3.fromRGB(255, 0, 0), -- 怪物红色
+    UpdateRate = 0.2, -- 距离刷新频率
+    ScanRate = 3 -- 场景扫描频率
+}
 
-local function createBillboard(root, color)
+------------------------------------------------
+-- 创建 UI
+------------------------------------------------
+local function createBillboard(root, color, name)
+    -- 清理旧的 UI 防止重复
+    if root:FindFirstChild("ESP_UI") then
+        root.ESP_UI:Destroy()
+    end
 
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "ESP_UI"
-	gui.Size = UDim2.new(0,200,0,50)
-	gui.StudsOffset = Vector3.new(0,2,0)
-	gui.AlwaysOnTop = true -- 提高可见性
-	gui.MaxDistance = 1000
-	gui.Parent = root
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "ESP_UI"
+    gui.Size = UDim2.new(0, 200, 0, 50)
+    gui.StudsOffset = Vector3.new(0, 3, 0)
+    gui.AlwaysOnTop = true
+    gui.MaxDistance = 1000
+    gui.Parent = root
 
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1,0,1,0)
-	label.BackgroundTransparency = 1
-	label.TextScaled = true
-	label.Font = Enum.Font.SourceSansBold
-	label.TextStrokeTransparency = 0
-	label.TextColor3 = color
-	label.Parent = gui
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextScaled = true
+    label.Font = Enum.Font.SourceSansBold
+    label.TextColor3 = color
+    label.TextStrokeTransparency = 0
+    label.Parent = gui
 
-	return label
+    return label
 end
 
 ------------------------------------------------
--- 获取Root（通用）
+-- 获取 Root 节点
 ------------------------------------------------
-
 local function getRoot(model)
-	return model:FindFirstChild("HumanoidRootPart")
-		or model:FindFirstChild("Torso")
-		or model:FindFirstChild("UpperTorso")
-		or model.PrimaryPart
+    return model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
 end
 
 ------------------------------------------------
--- 玩家ESP
+-- 核心刷新逻辑
 ------------------------------------------------
-
-local function addPlayerESP(p)
-
-	if p == player then return end
-
-	local function apply(char)
-
-		local root = getRoot(char)
-		if not root then return end
-
-		if root:FindFirstChild("ESP_UI") then return end
-
-		local label = createBillboard(root, Color3.fromRGB(0,255,0))
-
-		task.spawn(function()
-			while char.Parent do
-
-				local myChar = player.Character
-				if myChar and getRoot(myChar) then
-
-					local dist =
-						(root.Position -
-						getRoot(myChar).Position).Magnitude
-
-					label.Text =
-						p.Name ..
-						"\n" .. math.floor(dist) .. "m"
-
-				end
-
-				task.wait(0.2)
-			end
-		end)
-
-	end
-
-	if p.Character then
-		apply(p.Character)
-	end
-
-	p.CharacterAdded:Connect(function(char)
-		task.wait(1)
-		apply(char)
-	end)
-
+local function startTracker(model, label, isPlayer)
+    task.spawn(function()
+        while model.Parent and label.Parent do
+            local myChar = player.Character
+            local root = getRoot(model)
+            
+            if myChar and getRoot(myChar) and root then
+                local dist = (root.Position - getRoot(myChar).Position).Magnitude
+                local displayName = isPlayer and model.Name or (model.Name or "Monster")
+                label.Text = string.format("%s\n[%d m]", displayName, math.floor(dist))
+            end
+            task.wait(SETTINGS.UpdateRate)
+        end
+    end)
 end
 
 ------------------------------------------------
--- 怪物ESP（高兼容）
+-- 智能判定与添加
 ------------------------------------------------
+local function applyESP(obj)
+    -- 1. 必须是模型
+    if not obj:IsA("Model") then return end
+    -- 2. 必须含有 Humanoid (这是判断是否为生物的关键)
+    local hum = obj:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    -- 3. 必须有根节点
+    local root = getRoot(obj)
+    if not root or root:FindFirstChild("ESP_UI") then return end
 
-local function addMonsterESP(obj)
-
-	if not obj:IsA("Model") then return end
-
-	-- 排除玩家
-	if Players:GetPlayerFromCharacter(obj) then return end
-
-	local root = getRoot(obj)
-	if not root then return end
-
-	if root:FindFirstChild("ESP_UI") then return end
-
-	local label = createBillboard(root, Color3.fromRGB(255,0,0))
-
-	task.spawn(function()
-		while obj.Parent do
-
-			local myChar = player.Character
-			if myChar and getRoot(myChar) then
-
-				local dist =
-					(root.Position -
-					getRoot(myChar).Position).Magnitude
-
-				label.Text =
-					obj.Name ..
-					"\n" .. math.floor(dist) .. "m"
-
-			end
-
-			task.wait(0.3)
-		end
-	end)
-
+    -- 区分玩家和怪物
+    local charPlayer = Players:GetPlayerFromCharacter(obj)
+    if charPlayer then
+        if charPlayer == player then return end -- 跳过自己
+        local label = createBillboard(root, SETTINGS.PlayerColor)
+        startTracker(obj, label, true)
+    else
+        -- 如果是带有 Humanoid 但不是玩家的模型，统一视为怪物
+        local label = createBillboard(root, SETTINGS.MonsterColor)
+        startTracker(obj, label, false)
+    end
 end
 
 ------------------------------------------------
--- 玩家加载
+-- 初始化与循环扫描
 ------------------------------------------------
 
-for _,p in pairs(Players:GetPlayers()) do
-	addPlayerESP(p)
-end
+-- 监听新玩家
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(char)
+        task.wait(1)
+        applyESP(char)
+    end)
+end)
 
-Players.PlayerAdded:Connect(addPlayerESP)
-
-------------------------------------------------
--- 怪物循环扫描（核心）
-------------------------------------------------
-
+-- 持续扫描工作区（捕获动态生成的怪物）
 task.spawn(function()
-	while true do
-
-		for _,obj in pairs(workspace:GetDescendants()) do
-			addMonsterESP(obj)
-		end
-
-		task.wait(2) -- 每2秒扫描一次
-	end
+    while true do
+        for _, child in pairs(workspace:GetChildren()) do
+            -- 仅扫描工作区根目录下的模型，提高效率
+            if child:IsA("Model") then
+                applyESP(child)
+            end
+        end
+        task.wait(SETTINGS.ScanRate)
+    end
 end)
