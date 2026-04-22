@@ -1,35 +1,41 @@
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local localPlayer = Players.LocalPlayer
 
--- 确保 LocalPlayer 已加载
-if not player then
-    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
-    player = Players.LocalPlayer
-end
-
-print("ESP 核心启动中...")
+-- 状态控制
+local ESP_ENABLED = false
+local _storage = {} -- 用于记录创建的物体，方便一键删除
 
 ------------------------------------------------
--- 工具函数
+-- 核心透视逻辑
 ------------------------------------------------
-local function getRoot(model)
-	return model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+
+-- 清除所有透视
+local function clearESP()
+    for _, item in pairs(_storage) do
+        if item then item:Destroy() end
+    end
+    _storage = {}
 end
 
--- 创建 UI 的函数
-local function createESP(model, color)
-    local root = getRoot(model)
-    if not root or root:FindFirstChild("ESP_UI") then return end
+-- 为单个模型创建透视
+local function createESP(model)
+    if not ESP_ENABLED then return end
+    local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+    if not root then return end
 
+    local isPlayer = Players:GetPlayerFromCharacter(model)
+    local color = isPlayer and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+
+    -- 文字 UI
     local gui = Instance.new("BillboardGui")
     gui.Name = "ESP_UI"
     gui.Size = UDim2.new(0, 100, 0, 40)
     gui.AlwaysOnTop = true
-    gui.DistanceLowerLimit = 0
-    gui.MaxDistance = 2000
     gui.ExtentsOffset = Vector3.new(0, 3, 0)
+    gui.Adornee = root
     gui.Parent = root
+    table.insert(_storage, gui)
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
@@ -40,51 +46,94 @@ local function createESP(model, color)
     label.Font = Enum.Font.SourceSansBold
     label.Parent = gui
 
-    -- 实时更新距离
+    -- 动态刷新
     task.spawn(function()
-        while model.Parent and root.Parent do
-            local myChar = player.Character
-            if myChar and getRoot(myChar) then
-                local dist = (root.Position - getRoot(myChar).Position).Magnitude
+        while ESP_ENABLED and model.Parent and root.Parent do
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
                 label.Text = string.format("%s\n%dm", model.Name, math.floor(dist))
             end
-            task.wait(0.1)
+            task.wait(0.2)
         end
+        gui:Destroy()
     end)
 end
 
-------------------------------------------------
--- 核心判定函数
-------------------------------------------------
-local function checkAndApply(obj)
-    if not obj:IsA("Model") then return end
-    if obj == player.Character then return end
-
-    -- 关键：通过 Humanoid 判定是否为生物（玩家或怪物）
-    local hum = obj:FindFirstChildOfClass("Humanoid")
-    if hum then
-        -- 区分颜色
-        local isPlayer = Players:GetPlayerFromCharacter(obj)
-        local color = isPlayer and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-        createESP(obj, color)
+-- 全局扫描
+local function refreshESP()
+    if not ESP_ENABLED then 
+        clearESP()
+        return 
+    end
+    
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj ~= localPlayer.Character then
+            if obj:FindFirstChildOfClass("Humanoid") then
+                createESP(obj)
+            end
+        end
     end
 end
 
 ------------------------------------------------
--- 启动监听
+-- UI 面板创建
 ------------------------------------------------
 
--- 1. 扫描当前已经在场的所有模型
-for _, desc in pairs(workspace:GetDescendants()) do
-    checkAndApply(desc)
-end
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ControlPanel"
+ScreenGui.ResetOnSpawn = false
+-- 尝试放入 PlayerGui，如果是在 Executor 运行，建议放入 CoreGui
+ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
--- 2. 监听新生成的模型 (关键：解决动态刷怪不显示问题)
-workspace.DescendantAdded:Connect(function(desc)
-    -- 延迟一瞬确保模型内部件（如Humanoid）已加载
-    task.delay(0.5, function()
-        checkAndApply(desc)
-    end)
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 150, 0, 100)
+Frame.Position = UDim2.new(0.1, 0, 0.1, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderSizePixel = 2
+Frame.Active = true
+Frame.Draggable = true -- 允许鼠标拖动面板
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "功能菜单"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Title.Parent = Frame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+ToggleBtn.Text = "透视: 关闭"
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 18
+ToggleBtn.Parent = Frame
+
+-- 按钮逻辑
+ToggleBtn.MouseButton1Click:Connect(function()
+    ESP_ENABLED = not ESP_ENABLED
+    
+    if ESP_ENABLED then
+        ToggleBtn.Text = "透视: 开启"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        refreshESP()
+    else
+        ToggleBtn.Text = "透视: 关闭"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        clearESP()
+    end
 end)
 
-print("ESP 扫描监听已激活")
+-- 监听新生成的怪物 (当开启时有效)
+workspace.DescendantAdded:Connect(function(obj)
+    if ESP_ENABLED then
+        task.wait(0.5)
+        if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+            createESP(obj)
+        end
+    end
+end)
+
+print("UI 面板已加载，左上角点击切换")
