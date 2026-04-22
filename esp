@@ -7,11 +7,11 @@ local ESP_ENABLED = false
 local TOGGLE_KEY = Enum.KeyCode.RightControl
 local _espStorage = {}
 
--- 核心参数：距离
-local MAX_DISTANCE = 999999 -- 将距离设为几乎无限
+-- 距离参数
+local MAX_DISTANCE = 999999 
 
 ------------------------------------------------
--- 逻辑：全图透视 (ESP)
+-- 逻辑：纯玩家透视 (过滤 NPC)
 ------------------------------------------------
 local function clearESP()
     for _, item in pairs(_espStorage) do
@@ -20,80 +20,72 @@ local function clearESP()
     _espStorage = {}
 end
 
-local function createESP(model)
-    if not ESP_ENABLED or model == localPlayer.Character then return end
-    
-    -- 尝试寻找核心零件
-    local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model.PrimaryPart
-    if root and not root:FindFirstChild("ESP_UI") then
-        local isPlayer = Players:GetPlayerFromCharacter(model)
-        
+local function createPlayerESP(player)
+    -- 核心过滤：只针对玩家，且不是自己
+    if not ESP_ENABLED or player == localPlayer then return end
+
+    local function apply(character)
+        if not character then return end
+        local root = character:WaitForChild("HumanoidRootPart", 10)
+        if not root then return end
+
+        -- 清除可能存在的旧 UI
+        if root:FindFirstChild("PlayerESP_UI") then root["PlayerESP_UI"]:Destroy() end
+
         local gui = Instance.new("BillboardGui", root)
-        gui.Name = "ESP_UI"
+        gui.Name = "PlayerESP_UI"
         gui.Size = UDim2.new(0, 100, 0, 40)
-        gui.AlwaysOnTop = true -- 确保穿墙可见
-        gui.MaxDistance = MAX_DISTANCE -- 关键：设置 UI 最大可见距离
+        gui.AlwaysOnTop = true
+        gui.MaxDistance = MAX_DISTANCE
         gui.ExtentsOffset = Vector3.new(0, 3, 0)
         table.insert(_espStorage, gui)
 
         local label = Instance.new("TextLabel", gui)
         label.Size = UDim2.new(1, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = isPlayer and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
-        label.TextStrokeTransparency = 0 -- 描边增加远距离辨识度
+        label.TextColor3 = Color3.new(0, 1, 0) -- 玩家统一显示绿色
+        label.TextStrokeTransparency = 0
         label.TextScaled = true
         label.Font = Enum.Font.SourceSansBold
 
         task.spawn(function()
-            while ESP_ENABLED and model.Parent and root.Parent do
+            while ESP_ENABLED and player.Parent and character.Parent and root.Parent do
                 local myRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if myRoot then
                     local dist = (root.Position - myRoot.Position).Magnitude
-                    label.Text = string.format("%s\n%dm", model.Name, math.floor(dist))
+                    label.Text = string.format("%s\n%dm", player.Name, math.floor(dist))
                 end
-                task.wait(0.5) -- 远距离刷新率无需太高，节省性能
+                task.wait(0.5)
             end
             if gui then gui:Destroy() end
         end)
     end
-end
 
--- 全局扫描 (深度扫描)
-local function refreshAll()
-    if not ESP_ENABLED then return end
-    -- 扫描 Players 里的所有玩家
-    for _, p in pairs(Players:GetPlayers()) do
-        if p.Character then createESP(p.Character) end
-    end
-    -- 扫描 Workspace 里的所有模型 (包含怪物)
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") then
-            createESP(v)
-        end
-    end
+    player.CharacterAdded:Connect(apply)
+    if player.Character then apply(player.Character) end
 end
 
 ------------------------------------------------
 -- UI 面板
 ------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "1enHub_Infinite"
+ScreenGui.Name = "1enHub_PlayerOnly"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 200, 0, 140)
 MainFrame.Position = UDim2.new(0.5, -100, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.Active = true
 MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "  1.en Hub V11"
+Title.Text = "  1.en Hub V12"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 16
 Instance.new("UICorner", Title)
@@ -103,7 +95,7 @@ CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position = UDim2.new(1, -32, 0, 2)
 CloseBtn.BackgroundTransparency = 1
 CloseBtn.Text = "✖"
-CloseBtn.TextColor3 = Color3.new(1, 0.4, 0.4)
+CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
 CloseBtn.TextSize = 18
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
 
@@ -111,13 +103,13 @@ local EspBtn = Instance.new("TextButton", MainFrame)
 EspBtn.Size = UDim2.new(0.9, 0, 0, 45)
 EspBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
 EspBtn.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
-EspBtn.Text = "全图透视: 关"
+EspBtn.Text = "玩家透视: 关"
 EspBtn.TextColor3 = Color3.new(1, 1, 1)
 EspBtn.Font = Enum.Font.SourceSansBold
 Instance.new("UICorner", EspBtn)
 
 local Hint = Instance.new("TextLabel", MainFrame)
-Hint.Text = "距离: 无限制 | 右Ctrl呼出"
+Hint.Text = "仅显示真实玩家 | 右Ctrl"
 Hint.Size = UDim2.new(1, 0, 0, 20)
 Hint.Position = UDim2.new(0, 0, 0.8, 0)
 Hint.TextColor3 = Color3.new(0.6, 0.6, 0.6)
@@ -125,13 +117,20 @@ Hint.BackgroundTransparency = 1
 Hint.TextSize = 10
 
 ------------------------------------------------
--- 绑定
+-- 交互与初始化
 ------------------------------------------------
 EspBtn.MouseButton1Click:Connect(function()
     ESP_ENABLED = not ESP_ENABLED
-    EspBtn.Text = ESP_ENABLED and "全图透视: 开" or "全图透视: 关"
+    EspBtn.Text = ESP_ENABLED and "玩家透视: 开" or "玩家透视: 关"
     EspBtn.BackgroundColor3 = ESP_ENABLED and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(160, 40, 40)
-    if ESP_ENABLED then refreshAll() else clearESP() end
+    
+    if ESP_ENABLED then
+        for _, p in pairs(Players:GetPlayers()) do
+            createPlayerESP(p)
+        end
+    else
+        clearESP()
+    end
 end)
 
 UserInputService.InputBegan:Connect(function(i, p)
@@ -140,14 +139,7 @@ UserInputService.InputBegan:Connect(function(i, p)
     end
 end)
 
--- 持续监听新怪物/玩家生成
-workspace.DescendantAdded:Connect(function(v)
-    if ESP_ENABLED then
-        task.wait(0.5) -- 等待模型完全加载
-        if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") then
-            createESP(v)
-        end
-    end
-end)
+-- 仅监听玩家加入
+Players.PlayerAdded:Connect(createPlayerESP)
 
-print("1.en Hub V11 加载成功！已开启无限距离透视。")
+print("1.en Hub V12 加载成功：NPC 已过滤，仅保留玩家透视。")
