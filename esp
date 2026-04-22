@@ -2,20 +2,25 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local localPlayer = Players.LocalPlayer
 
+-- 【核心：强力清理旧版本 UI】
+-- 这段代码会寻找并删除所有之前运行过的 1.en Hub 界面，防止 V11, V12 残留
+for _, oldUI in pairs(localPlayer:WaitForChild("PlayerGui"):GetChildren()) do
+    if oldUI.Name:find("1enHub") then
+        oldUI:Destroy()
+    end
+end
+
 -- 状态控制
 local ESP_ENABLED = false
 local TOGGLE_KEY = Enum.KeyCode.RightControl
 local _espStorage = {}
 
 ------------------------------------------------
--- 逻辑：深度玩家验证
+-- 逻辑：深度玩家验证 (只看真人，不看NPC)
 ------------------------------------------------
 local function isRealPlayer(player)
-    -- 验证是否为 Players 里的对象，且 UserId 正常（NPC 通常为负数或 0）
-    if player:IsA("Player") and player.UserId > 0 then
-        return true
-    end
-    return false
+    -- 只有 UserId 大于 0 的才是真人玩家，NPC 通常为 0 或负数
+    return player:IsA("Player") and player.UserId > 0
 end
 
 local function clearESP()
@@ -26,7 +31,6 @@ local function clearESP()
 end
 
 local function applyESP(player)
-    -- 双重过滤：必须是真实玩家，且不是自己
     if not isRealPlayer(player) or player == localPlayer then return end
 
     local function createUI(character)
@@ -34,24 +38,23 @@ local function applyESP(player)
         local root = character:WaitForChild("HumanoidRootPart", 10)
         if not root then return end
 
-        -- 彻底清理旧的标记
+        -- 清理该玩家身上可能残留的旧标记
         for _, old in pairs(root:GetChildren()) do
             if old.Name == "PlayerESP_UI" then old:Destroy() end
         end
 
-        local gui = Instance.new("BillboardGui")
+        local gui = Instance.new("BillboardGui", root)
         gui.Name = "PlayerESP_UI"
-        gui.Parent = root
         gui.Size = UDim2.new(0, 100, 0, 40)
         gui.AlwaysOnTop = true
-        gui.MaxDistance = 999999
+        gui.MaxDistance = 999999 -- 无限距离
         gui.ExtentsOffset = Vector3.new(0, 3, 0)
         table.insert(_espStorage, gui)
 
         local label = Instance.new("TextLabel", gui)
         label.Size = UDim2.new(1, 0, 1, 0)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(0, 255, 120) -- 亮绿色
+        label.TextColor3 = Color3.fromRGB(0, 255, 120)
         label.TextStrokeTransparency = 0
         label.TextScaled = true
         label.Font = Enum.Font.SourceSansBold
@@ -74,15 +77,15 @@ local function applyESP(player)
 end
 
 ------------------------------------------------
--- UI 面板 (V13)
+-- UI 面板 (V13.1 强制更新)
 ------------------------------------------------
-local ScreenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "1enHub_V13"
+local ScreenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
+ScreenGui.Name = "1enHub_V13_Fixed" -- 唯一标识符
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 200, 0, 140)
-MainFrame.Position = UDim2.new(0.5, -100, 0.4, 0)
+MainFrame.Position = UDim2.new(0.5, -100, 0.2, 0) -- 位置稍作调整，方便你区分新旧
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.Active = true
 MainFrame.Draggable = true
@@ -90,7 +93,7 @@ Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "  1.en Hub V13"
+Title.Text = "  1.en Hub V13.1 (Latest)"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -116,7 +119,7 @@ EspBtn.Font = Enum.Font.SourceSansBold
 Instance.new("UICorner", EspBtn)
 
 local Hint = Instance.new("TextLabel", MainFrame)
-Hint.Text = "深度过滤已开启 | 右Ctrl"
+Hint.Text = "旧版已自动清理 | 右Ctrl"
 Hint.Size = UDim2.new(1, 0, 0, 20)
 Hint.Position = UDim2.new(0, 0, 0.8, 0)
 Hint.TextColor3 = Color3.new(0.6, 0.6, 0.6)
@@ -146,4 +149,4 @@ end)
 
 Players.PlayerAdded:Connect(applyESP)
 
-print("1.en Hub V13：已强化玩家识别逻辑。")
+print("1.en Hub V13.1 加载成功！旧版本 UI 已被强制销毁。")
