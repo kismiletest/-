@@ -1,182 +1,155 @@
+--[[
+    Iruka Hub 2026 修复增强版
+    优化：增强反检测覆盖、修复断裂逻辑、加入霓虹视觉渲染
+]]
+
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local localPlayer = Players.LocalPlayer
 
--- 【清理旧版防止卡顿】
-local oldUI = localPlayer.PlayerGui:FindFirstChild("1enHub_V21")
-if oldUI then oldUI:Destroy() end
-
--- 【核心开关变量】
-local ESP_PLAYER_ENABLED = false
-local ESP_MOB_ENABLED = false
-local TOGGLE_KEY = Enum.KeyCode.RightControl
-local _espStorage = {}
-
-------------------------------------------------
--- 核心逻辑：精准过滤透视 (基于你要求的怪物过滤)
-------------------------------------------------
-local function isRealMonster(model)
-    if Players:GetPlayerFromCharacter(model) then return false end
-    local hum = model:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.MaxHealth <= 0 then return false end
-    
-    local n = model.Name:lower()
-    local npcNames = {"shop", "merchant", "guide", "quest", "npc", "bank", "worker", "job", "owner", "teleport", "dummy"}
-    for _, word in pairs(npcNames) do if n:find(word) then return false end end
-    
-    return true
-end
-
-local function createESP(model, isPlayer)
-    if not model or (isPlayer and model == localPlayer.Character) then return end
-    if not isPlayer and not isRealMonster(model) then return end
-
-    local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
-    if not root then return end
-
-    local tagName = isPlayer and "P_ESP" or "M_ESP"
-    if root:FindFirstChild(tagName) then return end
-
-    local gui = Instance.new("BillboardGui", root)
-    gui.Name = tagName
-    gui.Size = UDim2.new(0, 100, 0, 40)
-    gui.AlwaysOnTop = true
-    gui.MaxDistance = 9999
-    gui.ExtentsOffset = Vector3.new(0, 3, 0)
-    table.insert(_espStorage, gui)
-
-    local label = Instance.new("TextLabel", gui)
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = isPlayer and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 50, 50)
-    label.TextStrokeTransparency = 0.2
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-
-    task.spawn(function()
-        while model.Parent and root.Parent and gui.Parent do
-            local active = isPlayer and ESP_PLAYER_ENABLED or ESP_MOB_ENABLED
-            label.Visible = active
-            if active and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local d = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-                label.Text = string.format("%s\n%dm", model.Name, math.floor(d))
-            end
-            task.wait(0.5)
-        end
-    end)
-end
-
-------------------------------------------------
--- UI 构造：华丽流光界面
-------------------------------------------------
-local ScreenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
-ScreenGui.Name = "1enHub_V21"
+-- 确保 GUI 不会被重生重置
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "IrukaHub_Fixed"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- 尝试放入安全目录
+local CoreGui = game:GetService("CoreGui")
+local ParentGui = (gethui and gethui()) or (syn and syn.protect_gui and syn.protect_gui(ScreenGui)) or CoreGui:FindFirstChild("RobloxGui") or ScreenGui.Parent
+ScreenGui.Parent = ParentGui
 
--- 主面板 (半透明磨砂黑)
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 230, 0, 160)
-MainFrame.Position = UDim2.new(0.5, -115, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MainFrame.BackgroundTransparency = 0.1
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+-- 配置与状态
+local Config = { Speed = 300, HitboxSize = 60, SpeedValue = 16, JumpValue = 50, LookPart = "Head" }
+local States = { MoveToTarget = false, HitboxEnabled = false, NoClip = false, SpeedHack = false, JumpHack = false }
 
--- 【闪闪发亮的关键：霓虹边框动画】
-local UIStroke = Instance.new("UIStroke", MainFrame)
-UIStroke.Thickness = 3
-UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-task.spawn(function()
-    while RunService.RenderStepped:Wait() do
-        -- 彩虹跑马灯效果
-        UIStroke.Color = Color3.fromHSV((tick() * 0.1) % 1, 0.8, 1)
+----------------------------------------------------------------
+-- [ 核心功能逻辑：每帧强制执行 (防止游戏重置) ]
+----------------------------------------------------------------
+RunService.Stepped:Connect(function()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") then return end
+    local Hum = LocalPlayer.Character.Humanoid
+    local Root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    -- 速度与跳跃增强 (强制覆盖)
+    if States.SpeedHack then Hum.WalkSpeed = Config.SpeedValue end
+    if States.JumpHack then Hum.JumpPower = Config.JumpValue end
+    
+    -- 无碰撞 (NoClip)
+    if States.NoClip then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+
+    -- 碰撞箱 (Hitbox) 逻辑
+    if States.HitboxEnabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local targetHRP = p.Character.HumanoidRootPart
+                targetHRP.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+                targetHRP.Transparency = 0.7
+                targetHRP.CanCollide = false
+            end
+        end
     end
 end)
 
-local Layout = Instance.new("UIListLayout", MainFrame)
-Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-Layout.Padding = UDim.new(0, 12)
+----------------------------------------------------------------
+-- [ UI 构建工具函数 ]
+----------------------------------------------------------------
+local function MakeDraggable(obj)
+    local dragging, dragInput, dragStart, startPos
+    obj.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = obj.Position
+        end
+    end)
+    obj.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    obj.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+end
 
+----------------------------------------------------------------
+-- [ 主界面 UI ]
+----------------------------------------------------------------
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 400, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+local Stroke = Instance.new("UIStroke", MainFrame)
+Stroke.Thickness = 2
+MakeDraggable(MainFrame)
+
+-- 标题与霓虹特效
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 45)
-Title.Text = "1.en HUB PREMIUM"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "IRUKA HUB REBORN"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.TextSize = 18
 Title.BackgroundTransparency = 1
 
--- 漂亮按钮生成函数
-local function createButton(txt, color)
-    local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.85, 0, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    btn.Text = txt
-    btn.TextColor3 = Color3.new(0.7, 0.7, 0.7)
-    btn.Font = Enum.Font.GothamSemibold
-    btn.TextSize = 12
-    btn.AutoButtonColor = false
+task.spawn(function()
+    while task.wait(0.05) do
+        local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+        Stroke.Color = color
+        Title.TextColor3 = color
+    end
+end)
+
+-- 功能列表容器
+local Container = Instance.new("ScrollingFrame", MainFrame)
+Container.Size = UDim2.new(1, -20, 1, -50)
+Container.Position = UDim2.new(0, 10, 0, 45)
+Container.BackgroundTransparency = 1
+Container.CanvasSize = UDim2.new(0, 0, 2, 0)
+local Layout = Instance.new("UIListLayout", Container)
+Layout.Padding = UDim.new(0, 5)
+
+-- 创建按钮函数
+local function AddToggle(name, callback)
+    local btn = Instance.new("TextButton", Container)
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Text = name .. ": OFF"
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.Gotham
+    local state = false
+    Instance.new("UICorner", btn)
     
-    local s = Instance.new("UIStroke", btn)
-    s.Thickness = 1.5; s.Color = Color3.fromRGB(60, 60, 60); s.Transparency = 0.5
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-
-    -- 点击缩放动画
-    btn.MouseButton1Down:Connect(function()
-        btn:TweenSize(UDim2.new(0.8, 0, 0, 32), "Out", "Quad", 0.1, true)
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = name .. ": " .. (state and "ON" or "OFF")
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(40, 40, 40)
+        callback(state)
     end)
-    btn.MouseButton1Up:Connect(function()
-        btn:TweenSize(UDim2.new(0.85, 0, 0, 35), "Out", "Quad", 0.1, true)
-    end)
-
-    return btn, s
 end
 
-local PBtn, PS = createButton("真玩家透视: 关", Color3.fromRGB(0, 255, 255))
-local MBtn, MS = createButton("真怪物透视: 关", Color3.fromRGB(255, 50, 50))
+----------------------------------------------------------------
+-- [ 挂载功能 ]
+----------------------------------------------------------------
+AddToggle("Speed Hack (移动加速)", function(v) States.SpeedHack = v end)
+AddToggle("Jump Hack (跳跃增强)", function(v) States.JumpHack = v end)
+AddToggle("NoClip (穿墙)", function(v) States.NoClip = v end)
+AddToggle("Hitbox (大范围碰撞)", function(v) States.HitboxEnabled = v end)
 
-------------------------------------------------
--- 交互逻辑绑定
-------------------------------------------------
-PBtn.MouseButton1Click:Connect(function()
-    ESP_PLAYER_ENABLED = not ESP_PLAYER_ENABLED
-    PBtn.Text = ESP_PLAYER_ENABLED and "真玩家透视: 开" or "真玩家透视: 关"
-    PBtn.TextColor3 = ESP_PLAYER_ENABLED and Color3.new(1, 1, 1) or Color3.new(0.7, 0.7, 0.7)
-    PS.Color = ESP_PLAYER_ENABLED and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(60, 60, 60)
-    if ESP_PLAYER_ENABLED then
-        for _, p in pairs(Players:GetPlayers()) do if p.Character then createESP(p.Character, true) end end
-    end
-end)
-
-MBtn.MouseButton1Click:Connect(function()
-    ESP_MOB_ENABLED = not ESP_MOB_ENABLED
-    MBtn.Text = ESP_MOB_ENABLED and "真怪物透视: 开" or "真怪物透视: 关"
-    MBtn.TextColor3 = ESP_MOB_ENABLED and Color3.new(1, 1, 1) or Color3.new(0.7, 0.7, 0.7)
-    MS.Color = ESP_MOB_ENABLED and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(60, 60, 60)
-    if ESP_MOB_ENABLED then
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") then createESP(v, false) end
-        end
-    end
-end)
-
--- 实时更新
-workspace.DescendantAdded:Connect(function(v)
-    if v:IsA("Model") then
-        task.wait(0.5)
-        local isP = Players:GetPlayerFromCharacter(v) ~= nil
-        createESP(v, isP)
-    end
-end)
-
--- 右侧 Ctrl 键控制显隐
-UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == TOGGLE_KEY then
+-- 关闭/显示 切换按键
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
         MainFrame.Visible = not MainFrame.Visible
     end
 end)
 
-print("1.en Hub V21 (Ultimate Glow) 已加载！")
+print("Iruka Hub 已加载! 按 [RightControl] 隐藏/显示界面")
