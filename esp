@@ -3,18 +3,19 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local localPlayer = Players.LocalPlayer
 
--- 状态控制
+-- 状态变量
+local PANEL_VISIBLE = true
 local ESP_ENABLED = false
 local FLYING_ENABLED = false
 local _espStorage = {}
 
--- 飞行相关变量
-local flySpeed = 50
-local bv = nil
-local bg = nil
+-- 飞行配置
+local flySpeed = 70
+local bv, bg = nil, nil
+local TOGGLE_KEY = Enum.KeyCode.RightControl -- 隐藏面板键
 
 ------------------------------------------------
--- 核心透视逻辑
+-- 逻辑部分：透视 (ESP)
 ------------------------------------------------
 local function clearESP()
     for _, item in pairs(_espStorage) do
@@ -24,99 +25,77 @@ local function clearESP()
 end
 
 local function createESP(model)
-    if not ESP_ENABLED then return end
+    if not ESP_ENABLED or model == localPlayer.Character then return end
+    local hum = model:FindFirstChildOfClass("Humanoid")
     local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-    if not root or root:FindFirstChild("ESP_UI") then return end
+    
+    if hum and root and not root:FindFirstChild("ESP_UI") then
+        local gui = Instance.new("BillboardGui", root)
+        gui.Name = "ESP_UI"
+        gui.Size = UDim2.new(0, 100, 0, 40)
+        gui.AlwaysOnTop = true
+        gui.ExtentsOffset = Vector3.new(0, 3, 0)
+        table.insert(_espStorage, gui)
 
-    local isPlayer = Players:GetPlayerFromCharacter(model)
-    local color = isPlayer and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        local label = Instance.new("TextLabel", gui)
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = Players:GetPlayerFromCharacter(model) and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+        label.TextStrokeTransparency = 0
+        label.TextScaled = true
+        label.Font = Enum.Font.SourceSansBold
 
-    local gui = Instance.new("BillboardGui")
-    gui.Name = "ESP_UI"
-    gui.Size = UDim2.new(0, 100, 0, 40)
-    gui.AlwaysOnTop = true
-    gui.ExtentsOffset = Vector3.new(0, 3, 0)
-    gui.Adornee = root
-    gui.Parent = root
-    table.insert(_espStorage, gui)
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = color
-    label.TextStrokeTransparency = 0
-    label.TextScaled = true
-    label.Font = Enum.Font.SourceSansBold
-    label.Parent = gui
-
-    task.spawn(function()
-        while ESP_ENABLED and model.Parent and root.Parent do
-            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-                label.Text = string.format("%s\n%dm", model.Name, math.floor(dist))
+        task.spawn(function()
+            while ESP_ENABLED and model.Parent and root.Parent do
+                local myRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if myRoot then
+                    label.Text = string.format("%s\n%dm", model.Name, math.floor((root.Position - myRoot.Position).Magnitude))
+                end
+                task.wait(0.3)
             end
-            task.wait(0.2)
-        end
-        if gui then gui:Destroy() end
-    end)
-end
-
-local function refreshESP()
-    if not ESP_ENABLED then clearESP() return end
-    for _, obj in pairs(workspace:GetChildren()) do -- 优化：只扫描一级目录防止卡顿
-        if obj:IsA("Model") and obj ~= localPlayer.Character then
-            if obj:FindFirstChildOfClass("Humanoid") then
-                createESP(obj)
-            end
-        end
+            if gui then gui:Destroy() end
+        end)
     end
 end
 
 ------------------------------------------------
--- 核心飞行逻辑
+-- 逻辑部分：飞行 (Fly)
 ------------------------------------------------
 local function stopFlying()
     if bv then bv:Destroy() bv = nil end
     if bg then bg:Destroy() bg = nil end
-    local char = localPlayer.Character
-    if char and char:FindFirstChildOfClass("Humanoid") then
-        char:FindFirstChildOfClass("Humanoid").PlatformStand = false
-    end
+    pcall(function()
+        localPlayer.Character.Humanoid.PlatformStand = false
+    end)
 end
 
 local function startFlying()
     local char = localPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
-
-    stopFlying() -- 清理旧动力
-
-    bv = Instance.new("BodyVelocity")
+    
+    stopFlying()
+    bv = Instance.new("BodyVelocity", root)
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(0, 0, 0)
-    bv.Parent = root
-
-    bg = Instance.new("BodyGyro")
+    bg = Instance.new("BodyGyro", root)
     bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     bg.P = 9000
-    bg.CFrame = root.CFrame
-    bg.Parent = root
-
-    char:FindFirstChildOfClass("Humanoid").PlatformStand = true
+    
+    char.Humanoid.PlatformStand = true
 
     task.spawn(function()
         while FLYING_ENABLED and root.Parent do
             local camera = workspace.CurrentCamera
-            local moveDir = Vector3.new(0, 0, 0)
+            local dir = Vector3.new(0, 0, 0)
 
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
 
-            bv.Velocity = moveDir * flySpeed
+            bv.Velocity = dir * flySpeed
             bg.CFrame = camera.CFrame
             RunService.RenderStepped:Wait()
         end
@@ -125,90 +104,99 @@ local function startFlying()
 end
 
 ------------------------------------------------
--- UI 面板界面
+-- UI 构造部分 (自动布局)
 ------------------------------------------------
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "1enHub_Panel"
+local ScreenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
+ScreenGui.Name = "1enHub_V4"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 160, 0, 160)
-Frame.Position = UDim2.new(0.1, 0, 0.1, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Frame.Active = true
-Frame.Draggable = true
-Frame.Parent = ScreenGui
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 180, 0, 190)
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.Active = true
+MainFrame.Draggable = true
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "1.en Hub"
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+-- 标题
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = "1.en Hub V4"
 Title.TextColor3 = Color3.new(1, 1, 1)
-Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-Title.Parent = Frame
+Title.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Instance.new("UICorner", Title)
 
--- 透视按钮
-local EspBtn = Instance.new("TextButton")
-EspBtn.Size = UDim2.new(0.8, 0, 0, 40)
-EspBtn.Position = UDim2.new(0.1, 0, 0.25, 0)
-EspBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-EspBtn.Text = "透视: 关"
-EspBtn.TextColor3 = Color3.new(1, 1, 1)
-EspBtn.Font = Enum.Font.SourceSansBold
-EspBtn.TextSize = 16
-EspBtn.Parent = Frame
+-- 布局容器
+local Container = Instance.new("Frame", MainFrame)
+Container.Size = UDim2.new(1, 0, 1, -40)
+Container.Position = UDim2.new(0, 0, 0, 40)
+Container.BackgroundTransparency = 1
 
--- 飞行按钮
-local FlyBtn = Instance.new("TextButton")
-FlyBtn.Size = UDim2.new(0.8, 0, 0, 40)
-FlyBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
-FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-FlyBtn.Text = "飞行: 关"
-FlyBtn.TextColor3 = Color3.new(1, 1, 1)
-FlyBtn.Font = Enum.Font.SourceSansBold
-FlyBtn.TextSize = 16
-FlyBtn.Parent = Frame
+local Layout = Instance.new("UIListLayout", Container)
+Layout.Padding = UDim.new(0, 10)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+-- 按钮创建
+local function makeBtn(txt)
+    local b = Instance.new("TextButton", Container)
+    b.Size = UDim2.new(0.85, 0, 0, 40)
+    b.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
+    b.Text = txt .. ": 关"
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.SourceSansBold
+    b.TextSize = 15
+    Instance.new("UICorner", b)
+    return b
+end
+
+local EspBtn = makeBtn("透视显示")
+local FlyBtn = makeBtn("飞行脚本")
+
+local Hint = Instance.new("TextLabel", Container)
+Hint.Size = UDim2.new(1, 0, 0, 20)
+Hint.Text = "右Ctrl 隐藏面板"
+Hint.TextColor3 = Color3.new(0.7, 0.7, 0.7)
+Hint.BackgroundTransparency = 1
+Hint.TextSize = 11
 
 ------------------------------------------------
--- 逻辑绑定
+-- 交互绑定
 ------------------------------------------------
-
--- 透视开关
 EspBtn.MouseButton1Click:Connect(function()
     ESP_ENABLED = not ESP_ENABLED
     if ESP_ENABLED then
-        EspBtn.Text = "透视: 开"
-        EspBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        refreshESP()
+        EspBtn.Text = "透视显示: 开"
+        EspBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
+        for _, v in pairs(workspace:GetChildren()) do createESP(v) end
     else
-        EspBtn.Text = "透视: 关"
-        EspBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        EspBtn.Text = "透视显示: 关"
+        EspBtn.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
         clearESP()
     end
 end)
 
--- 飞行开关
 FlyBtn.MouseButton1Click:Connect(function()
     FLYING_ENABLED = not FLYING_ENABLED
     if FLYING_ENABLED then
-        FlyBtn.Text = "飞行: 开"
-        FlyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        FlyBtn.Text = "飞行脚本: 开"
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
         startFlying()
     else
-        FlyBtn.Text = "飞行: 关"
-        FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        FlyBtn.Text = "飞行脚本: 关"
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
         stopFlying()
     end
 end)
 
--- 持续监听新物体
-workspace.ChildAdded:Connect(function(obj)
-    if ESP_ENABLED then
-        task.wait(1)
-        if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
-            createESP(obj)
-        end
+UserInputService.InputBegan:Connect(function(i, p)
+    if not p and i.KeyCode == TOGGLE_KEY then
+        PANEL_VISIBLE = not PANEL_VISIBLE
+        MainFrame.Visible = PANEL_VISIBLE
     end
 end)
 
-print("1.en Hub 加载成功：透视与飞行已整合")
+workspace.ChildAdded:Connect(createESP)
+print("1.en Hub V4 加载完毕：按右侧Ctrl隐藏")
