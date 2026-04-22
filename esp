@@ -1,15 +1,167 @@
-local p = game:GetService("Players").LocalPlayer
-local sg = Instance.new("ScreenGui", p.PlayerGui)
-sg.Name = "EmergencyFix"
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
 
-local b = Instance.new("TextButton", sg)
-b.Size = UDim2.new(0, 200, 0, 50)
-b.Position = UDim2.new(0.5, -100, 0, 50)
-b.Text = "如果能看到这个按钮，说明脚本能跑"
+-- 【1. 安全清理】防止重复加载卡死
+local old = localPlayer.PlayerGui:FindFirstChild("1enHub_V19")
+if old then old:Destroy() end
 
-b.MouseButton1Click:Connect(function()
-    print("注入器正常，脚本逻辑可用")
-    b.Text = "运行成功！"
-    task.wait(2)
-    sg:Destroy()
+-- 【2. 全局配置】
+local ESP_PLAYER_ENABLED = false
+local ESP_MOB_ENABLED = false
+local TOGGLE_KEY = Enum.KeyCode.RightControl
+local _espStorage = {}
+
+------------------------------------------------
+-- 【3. 核心逻辑：精准过滤透视】
+------------------------------------------------
+local function isMonster(model)
+    if Players:GetPlayerFromCharacter(model) then return false end
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.MaxHealth <= 0 then return false end
+    
+    -- NPC 黑名单过滤
+    local n = model.Name:lower()
+    local ignore = {"shop","merchant","guide","quest","npc","bank","job","dummy"}
+    for _, word in pairs(ignore) do if n:find(word) then return false end end
+    
+    return true
+end
+
+local function createESP(model, isPlayer)
+    if not model or (isPlayer and model == localPlayer.Character) then return end
+    if not isPlayer and not isMonster(model) then return end
+
+    -- 使用 FindFirstChild 替代 WaitForChild 防止卡死
+    local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
+    if not root then return end
+
+    local tag = isPlayer and "P_Tag" or "M_Tag"
+    if root:FindFirstChild(tag) then return end
+
+    local gui = Instance.new("BillboardGui", root)
+    gui.Name = tag
+    gui.Size = UDim2.new(0, 100, 0, 40)
+    gui.AlwaysOnTop = true
+    gui.MaxDistance = 9999
+    gui.ExtentsOffset = Vector3.new(0, 3, 0)
+    table.insert(_espStorage, gui)
+
+    local label = Instance.new("TextLabel", gui)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = isPlayer and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 50, 50)
+    label.TextStrokeTransparency = 0.2
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+
+    task.spawn(function()
+        while model.Parent and root.Parent and gui.Parent do
+            local active = isPlayer and ESP_PLAYER_ENABLED or ESP_MOB_ENABLED
+            label.Visible = active
+            if active and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+                label.Text = string.format("%s\n%dm", model.Name, math.floor(d))
+            end
+            task.wait(0.5)
+        end
+    end)
+end
+
+------------------------------------------------
+-- 【4. UI 构造：闪闪发亮的霓虹面板】
+------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
+ScreenGui.Name = "1enHub_V19"
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.Position = UDim2.new(0.5, -110, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+-- 霓虹流光边框
+local UIStroke = Instance.new("UIStroke", MainFrame)
+UIStroke.Thickness = 2
+task.spawn(function()
+    while RunService.RenderStepped:Wait() do
+        UIStroke.Color = Color3.fromHSV((tick() * 0.1) % 1, 0.7, 1)
+    end
 end)
+
+local Layout = Instance.new("UIListLayout", MainFrame)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+Layout.Padding = UDim.new(0, 10)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Text = "1.en HUB V19"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.BackgroundTransparency = 1
+
+local function makeBtn(txt, color)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.85, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.Text = txt
+    btn.TextColor3 = Color3.new(0.6, 0.6, 0.6)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 12
+    local s = Instance.new("UIStroke", btn)
+    s.Thickness = 1.5
+    s.Color = Color3.fromRGB(60, 60, 60)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    return btn, s
+end
+
+local PBtn, PS = makeBtn("真玩家透视: 关", Color3.fromRGB(0, 255, 255))
+local MBtn, MS = makeBtn("真怪物透视: 关", Color3.fromRGB(255, 50, 50))
+
+------------------------------------------------
+-- 【5. 交互逻辑】
+------------------------------------------------
+PBtn.MouseButton1Click:Connect(function()
+    ESP_PLAYER_ENABLED = not ESP_PLAYER_ENABLED
+    PBtn.Text = ESP_PLAYER_ENABLED and "真玩家透视: 开" or "真玩家透视: 关"
+    PBtn.TextColor3 = ESP_PLAYER_ENABLED and Color3.new(1,1,1) or Color3.new(0.6,0.6,0.6)
+    PS.Color = ESP_PLAYER_ENABLED and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(60,60,60)
+    if ESP_PLAYER_ENABLED then
+        for _, p in pairs(Players:GetPlayers()) do if p.Character then createESP(p.Character, true) end end
+    end
+end)
+
+MBtn.MouseButton1Click:Connect(function()
+    ESP_MOB_ENABLED = not ESP_MOB_ENABLED
+    MBtn.Text = ESP_MOB_ENABLED and "真怪物透视: 开" or "真怪物透视: 关"
+    MBtn.TextColor3 = ESP_MOB_ENABLED and Color3.new(1,1,1) or Color3.new(0.6,0.6,0.6)
+    MS.Color = ESP_MOB_ENABLED and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(60,60,60)
+    if ESP_MOB_ENABLED then
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") then createESP(v, false) end
+        end
+    end
+end)
+
+-- 快捷键显示/隐藏面板
+UserInputService.InputBegan:Connect(function(i, g)
+    if not g and i.KeyCode == TOGGLE_KEY then MainFrame.Visible = not MainFrame.Visible end
+end)
+
+-- 自动监听新加入的玩家或怪物
+workspace.DescendantAdded:Connect(function(v)
+    if v:IsA("Model") then
+        task.wait(0.5)
+        local p = Players:GetPlayerFromCharacter(v)
+        createESP(v, p ~= nil)
+    end
+end)
+
+print("1.en Hub V19 已启用！右侧 Ctrl 键控制。")
