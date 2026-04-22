@@ -1,68 +1,112 @@
--- ===== Services =====
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-
-local player = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- ===== GUI =====
-local gui = Instance.new("ScreenGui", player.PlayerGui)
+-- 状态控制
+local AIMBOT_ENABLED = false
+local AIM_KEY = Enum.UserInputType.MouseButton2 -- 默认右键自瞄
+local SMOOTHNESS = 0.2 -- 平滑度 (0.01 到 1，越小越平滑/慢)
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 200, 0, 100)
-frame.Position = UDim2.new(0, 20, 0, 200)
-frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+------------------------------------------------
+-- 核心自瞄逻辑
+------------------------------------------------
 
-local btn = Instance.new("TextButton", frame)
-btn.Size = UDim2.new(1, -20, 0, 40)
-btn.Position = UDim2.new(0, 10, 0, 30)
-btn.Text = "AUTO AIM : OFF"
-btn.TextColor3 = Color3.new(1,1,1)
-btn.BackgroundColor3 = Color3.fromRGB(200,60,60)
+-- 获取距离准心最近的目标
+local function getClosestTarget()
+    local closestTarget = nil
+    local shortestDistance = math.huge
 
--- ===== Logic =====
-local enabled = false
-
--- 一番近いNPCを探す
-local function getClosestNPC()
-	local closest
-	local dist = math.huge
-
-	for _, m in pairs(workspace:GetChildren()) do
-		if m:IsA("Model") and m:FindFirstChild("Humanoid") and m:FindFirstChild("HumanoidRootPart") then
-			local d = (camera.CFrame.Position - m.HumanoidRootPart.Position).Magnitude
-			if d < dist then
-				dist = d
-				closest = m
-			end
-		end
-	end
-
-	return closest
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj ~= localPlayer.Character then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            local head = obj:FindFirstChild("Head") or obj:FindFirstChild("HumanoidRootPart")
+            
+            -- 必须活着且有头部
+            if hum and hum.Health > 0 and head then
+                -- 将物体的世界坐标转换到屏幕坐标
+                local pos, onScreen = camera:WorldToViewportPoint(head.Position)
+                
+                if onScreen then
+                    -- 计算目标点与屏幕中心（准心）的距离
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    
+                    if dist < shortestDistance then
+                        closestTarget = head
+                        shortestDistance = dist
+                    end
+                end
+            end
+        end
+    end
+    return closestTarget
 end
 
--- カメラ制御
+-- 实时锁定
 RunService.RenderStepped:Connect(function()
-	if not enabled then return end
-
-	local npc = getClosestNPC()
-	if npc then
-		camera.CFrame = CFrame.new(
-			camera.CFrame.Position,
-			npc.HumanoidRootPart.Position
-		)
-	end
+    if AIMBOT_ENABLED and UserInputService:IsMouseButtonPressed(AIM_KEY) then
+        local target = getClosestTarget()
+        if target then
+            -- 平滑转动相机
+            local targetPos = CFrame.new(camera.CFrame.Position, target.Position)
+            camera.CFrame = camera.CFrame:Lerp(targetPos, SMOOTHNESS)
+        end
+    end
 end)
 
--- ボタン
-btn.MouseButton1Click:Connect(function()
-	enabled = not enabled
+------------------------------------------------
+-- UI 增强 (在原有面板基础上增加)
+------------------------------------------------
 
-	if enabled then
-		btn.Text = "AUTO AIM : ON"
-		btn.BackgroundColor3 = Color3.fromRGB(60,200,60)
-	else
-		btn.Text = "AUTO AIM : OFF"
-		btn.BackgroundColor3 = Color3.fromRGB(200,60,60)
-	end
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AimbotPanel"
+ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 160, 0, 150)
+Frame.Position = UDim2.new(0.1, 0, 0.3, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "自瞄/透视 菜单"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+Title.Parent = Frame
+
+-- 自瞄按钮
+local AimBtn = Instance.new("TextButton")
+AimBtn.Size = UDim2.new(0.9, 0, 0, 40)
+AimBtn.Position = UDim2.new(0.05, 0, 0.3, 0)
+AimBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+AimBtn.Text = "自瞄: 关闭"
+AimBtn.TextColor3 = Color3.new(1, 1, 1)
+AimBtn.Font = Enum.Font.SourceSansBold
+AimBtn.TextSize = 16
+AimBtn.Parent = Frame
+
+-- 提示文字
+local Tip = Instance.new("TextLabel")
+Tip.Size = UDim2.new(1, 0, 0, 20)
+Tip.Position = UDim2.new(0, 0, 0.75, 0)
+Tip.Text = "开启后长按鼠标右键锁定"
+Tip.TextColor3 = Color3.fromRGB(200, 200, 200)
+Tip.BackgroundTransparency = 1
+Tip.TextSize = 12
+Tip.Parent = Frame
+
+AimBtn.MouseButton1Click:Connect(function()
+    AIMBOT_ENABLED = not AIMBOT_ENABLED
+    if AIMBOT_ENABLED then
+        AimBtn.Text = "自瞄: 开启"
+        AimBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    else
+        AimBtn.Text = "自瞄: 关闭"
+        AimBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    end
 end)
