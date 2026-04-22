@@ -96,7 +96,7 @@ Frame.Parent = ScreenGui
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "功能菜单"
+Title.Text = "1.en Hub"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 Title.Parent = Frame
@@ -116,11 +116,11 @@ ToggleBtn.MouseButton1Click:Connect(function()
     ESP_ENABLED = not ESP_ENABLED
     
     if ESP_ENABLED then
-        ToggleBtn.Text = "透视: 开启"
+        ToggleBtn.Text = "透视: 开逼"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
         refreshESP()
     else
-        ToggleBtn.Text = "透视: 关闭"
+        ToggleBtn.Text = "透视: 关逼"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
         clearESP()
     end
