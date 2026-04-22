@@ -1,33 +1,36 @@
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local localPlayer = Players.LocalPlayer
 
 -- 状态控制
 local ESP_ENABLED = false
-local _storage = {} -- 用于记录创建的物体，方便一键删除
+local FLYING_ENABLED = false
+local _espStorage = {}
+
+-- 飞行相关变量
+local flySpeed = 50
+local bv = nil
+local bg = nil
 
 ------------------------------------------------
 -- 核心透视逻辑
 ------------------------------------------------
-
--- 清除所有透视
 local function clearESP()
-    for _, item in pairs(_storage) do
+    for _, item in pairs(_espStorage) do
         if item then item:Destroy() end
     end
-    _storage = {}
+    _espStorage = {}
 end
 
--- 为单个模型创建透视
 local function createESP(model)
     if not ESP_ENABLED then return end
     local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-    if not root then return end
+    if not root or root:FindFirstChild("ESP_UI") then return end
 
     local isPlayer = Players:GetPlayerFromCharacter(model)
     local color = isPlayer and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
 
-    -- 文字 UI
     local gui = Instance.new("BillboardGui")
     gui.Name = "ESP_UI"
     gui.Size = UDim2.new(0, 100, 0, 40)
@@ -35,7 +38,7 @@ local function createESP(model)
     gui.ExtentsOffset = Vector3.new(0, 3, 0)
     gui.Adornee = root
     gui.Parent = root
-    table.insert(_storage, gui)
+    table.insert(_espStorage, gui)
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
@@ -46,7 +49,6 @@ local function createESP(model)
     label.Font = Enum.Font.SourceSansBold
     label.Parent = gui
 
-    -- 动态刷新
     task.spawn(function()
         while ESP_ENABLED and model.Parent and root.Parent do
             if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -55,18 +57,13 @@ local function createESP(model)
             end
             task.wait(0.2)
         end
-        gui:Destroy()
+        if gui then gui:Destroy() end
     end)
 end
 
--- 全局扫描
 local function refreshESP()
-    if not ESP_ENABLED then 
-        clearESP()
-        return 
-    end
-    
-    for _, obj in pairs(workspace:GetDescendants()) do
+    if not ESP_ENABLED then clearESP() return end
+    for _, obj in pairs(workspace:GetChildren()) do -- 优化：只扫描一级目录防止卡顿
         if obj:IsA("Model") and obj ~= localPlayer.Character then
             if obj:FindFirstChildOfClass("Humanoid") then
                 createESP(obj)
@@ -76,22 +73,71 @@ local function refreshESP()
 end
 
 ------------------------------------------------
--- UI 面板创建
+-- 核心飞行逻辑
 ------------------------------------------------
+local function stopFlying()
+    if bv then bv:Destroy() bv = nil end
+    if bg then bg:Destroy() bg = nil end
+    local char = localPlayer.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        char:FindFirstChildOfClass("Humanoid").PlatformStand = false
+    end
+end
 
+local function startFlying()
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    stopFlying() -- 清理旧动力
+
+    bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = root
+
+    bg = Instance.new("BodyGyro")
+    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bg.P = 9000
+    bg.CFrame = root.CFrame
+    bg.Parent = root
+
+    char:FindFirstChildOfClass("Humanoid").PlatformStand = true
+
+    task.spawn(function()
+        while FLYING_ENABLED and root.Parent do
+            local camera = workspace.CurrentCamera
+            local moveDir = Vector3.new(0, 0, 0)
+
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+
+            bv.Velocity = moveDir * flySpeed
+            bg.CFrame = camera.CFrame
+            RunService.RenderStepped:Wait()
+        end
+        stopFlying()
+    end)
+end
+
+------------------------------------------------
+-- UI 面板界面
+------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ControlPanel"
+ScreenGui.Name = "1enHub_Panel"
 ScreenGui.ResetOnSpawn = false
--- 尝试放入 PlayerGui，如果是在 Executor 运行，建议放入 CoreGui
 ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 150, 0, 100)
+Frame.Size = UDim2.new(0, 160, 0, 160)
 Frame.Position = UDim2.new(0.1, 0, 0.1, 0)
 Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Frame.BorderSizePixel = 2
 Frame.Active = true
-Frame.Draggable = true -- 允许鼠标拖动面板
+Frame.Draggable = true
 Frame.Parent = ScreenGui
 
 local Title = Instance.new("TextLabel")
@@ -101,39 +147,68 @@ Title.TextColor3 = Color3.new(1, 1, 1)
 Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 Title.Parent = Frame
 
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-ToggleBtn.Text = "透视: 关闭"
-ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
-ToggleBtn.Font = Enum.Font.SourceSansBold
-ToggleBtn.TextSize = 18
-ToggleBtn.Parent = Frame
+-- 透视按钮
+local EspBtn = Instance.new("TextButton")
+EspBtn.Size = UDim2.new(0.8, 0, 0, 40)
+EspBtn.Position = UDim2.new(0.1, 0, 0.25, 0)
+EspBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+EspBtn.Text = "透视: 关"
+EspBtn.TextColor3 = Color3.new(1, 1, 1)
+EspBtn.Font = Enum.Font.SourceSansBold
+EspBtn.TextSize = 16
+EspBtn.Parent = Frame
 
--- 按钮逻辑
-ToggleBtn.MouseButton1Click:Connect(function()
+-- 飞行按钮
+local FlyBtn = Instance.new("TextButton")
+FlyBtn.Size = UDim2.new(0.8, 0, 0, 40)
+FlyBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
+FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+FlyBtn.Text = "飞行: 关"
+FlyBtn.TextColor3 = Color3.new(1, 1, 1)
+FlyBtn.Font = Enum.Font.SourceSansBold
+FlyBtn.TextSize = 16
+FlyBtn.Parent = Frame
+
+------------------------------------------------
+-- 逻辑绑定
+------------------------------------------------
+
+-- 透视开关
+EspBtn.MouseButton1Click:Connect(function()
     ESP_ENABLED = not ESP_ENABLED
-    
     if ESP_ENABLED then
-        ToggleBtn.Text = "透视: 开逼"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        EspBtn.Text = "透视: 开"
+        EspBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
         refreshESP()
     else
-        ToggleBtn.Text = "透视: 关逼"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        EspBtn.Text = "透视: 关"
+        EspBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
         clearESP()
     end
 end)
 
--- 监听新生成的怪物 (当开启时有效)
-workspace.DescendantAdded:Connect(function(obj)
+-- 飞行开关
+FlyBtn.MouseButton1Click:Connect(function()
+    FLYING_ENABLED = not FLYING_ENABLED
+    if FLYING_ENABLED then
+        FlyBtn.Text = "飞行: 开"
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        startFlying()
+    else
+        FlyBtn.Text = "飞行: 关"
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        stopFlying()
+    end
+end)
+
+-- 持续监听新物体
+workspace.ChildAdded:Connect(function(obj)
     if ESP_ENABLED then
-        task.wait(0.5)
+        task.wait(1)
         if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
             createESP(obj)
         end
     end
 end)
 
-print("UI 面板已加载，左上角点击切换")
+print("1.en Hub 加载成功：透视与飞行已整合")
