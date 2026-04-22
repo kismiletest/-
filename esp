@@ -4,26 +4,49 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local localPlayer = Players.LocalPlayer
 
--- 清理旧版
+-- 【清理旧版】
 for _, oldUI in pairs(localPlayer:WaitForChild("PlayerGui"):GetChildren()) do
     if oldUI.Name:find("1enHub") then oldUI:Destroy() end
 end
 
--- 全局变量
+-- 【全局变量】
 local ESP_PLAYER_ENABLED = false
 local ESP_MOB_ENABLED = false
 local TOGGLE_KEY = Enum.KeyCode.RightControl
 local _espStorage = {}
 
 ------------------------------------------------
--- 核心逻辑：透视系统 (保持 V15 的强大过滤)
+-- 核心逻辑：极致精准过滤
 ------------------------------------------------
+local function isRealMonster(model)
+    if Players:GetPlayerFromCharacter(model) then return false end -- 排除玩家
+    
+    local name = model.Name:lower()
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    
+    -- 1. 名字关键词黑名单 (彻底过滤NPC)
+    local npcNames = {"shop", "merchant", "guide", "quest", "npc", "bank", "worker", "job", "owner", "teleport", "dummy", "innocent"}
+    for _, word in pairs(npcNames) do
+        if name:find(word) then return false end
+    end
+    
+    -- 2. 生命体征判断 (没有血条或最大血量为0的不是怪物)
+    if not hum or hum.MaxHealth <= 0 then 
+        return false 
+    end
+    
+    return true
+end
+
 local function createESP(model, isPlayer)
     if not model then return end
+    if isPlayer and model == localPlayer.Character then return end -- 不显示自己
+    if not isPlayer and not isRealMonster(model) then return end -- 过滤NPC
+
     local root = model:WaitForChild("HumanoidRootPart", 5) or model:FindFirstChild("Head")
     if not root then return end
 
-    local uiName = isPlayer and "PlayerESP_UI" or "MobESP_UI"
+    local uiName = isPlayer and "P_ESP" or "M_ESP"
     if root:FindFirstChild(uiName) then return end
 
     local gui = Instance.new("BillboardGui", root)
@@ -37,19 +60,20 @@ local function createESP(model, isPlayer)
     local label = Instance.new("TextLabel", gui)
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = isPlayer and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 100, 0)
-    label.TextStrokeTransparency = 0.5
+    -- 颜色：玩家青色，怪物红色
+    label.TextColor3 = isPlayer and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 40, 40)
+    label.TextStrokeTransparency = 0.2
     label.TextScaled = true
     label.Font = Enum.Font.GothamBold
 
     task.spawn(function()
-        local tag = isPlayer and "ESP_PLAYER_ENABLED" or "ESP_MOB_ENABLED"
-        while getfenv()[tag] and model.Parent and root.Parent do
-            local myRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if myRoot then
-                local dist = (root.Position - myRoot.Position).Magnitude
-                local name = isPlayer and (Players:GetPlayerFromCharacter(model) and Players:GetPlayerFromCharacter(model).DisplayName or model.Name) or model.Name
-                label.Text = string.format("%s\n%dm", name, math.floor(dist))
+        while model.Parent and root.Parent do
+            local active = isPlayer and ESP_PLAYER_ENABLED or ESP_MOB_ENABLED
+            label.Visible = active
+            
+            if active and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (root.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+                label.Text = string.format("%s\n%dm", model.Name, math.floor(dist))
             end
             task.wait(0.5)
         end
@@ -58,122 +82,64 @@ local function createESP(model, isPlayer)
 end
 
 ------------------------------------------------
--- UI 美化：闪闪发亮的面板
+-- UI 构造 (流光霓虹风格)
 ------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
-ScreenGui.Name = "1enHub_V16_Neon"
+ScreenGui.Name = "1enHub_V18_Pure"
 ScreenGui.ResetOnSpawn = false
 
--- 主面板 (磨砂黑背景)
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.Size = UDim2.new(0, 220, 0, 150)
 MainFrame.Position = UDim2.new(0.5, -110, 0.4, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MainFrame.BackgroundTransparency = 0.1
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
--- 霓虹发光外框
+-- RGB 边框
 local UIStroke = Instance.new("UIStroke", MainFrame)
 UIStroke.Thickness = 2
-UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-UIStroke.Color = Color3.fromRGB(0, 170, 255) -- 初始青色
-
--- 动画：让边框颜色闪烁流转
 task.spawn(function()
-    while true do
-        local t = tick()
-        local r = math.sin(t * 2) * 0.5 + 0.5
-        local g = math.sin(t * 2 + 2) * 0.5 + 0.5
-        local b = math.sin(t * 2 + 4) * 0.5 + 0.5
-        UIStroke.Color = Color3.new(r, g, b)
-        RunService.RenderStepped:Wait()
+    while RunService.RenderStepped:Wait() do
+        UIStroke.Color = Color3.fromHSV((tick() * 0.1) % 1, 0.7, 1)
     end
 end)
 
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-
--- 标题 (带发光文字效果)
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 45)
-Title.Text = "1.en HUB PREMIUM"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0, 45); Title.Text = "1.en HUB V18"; Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold; Title.TextSize = 16; Title.BackgroundTransparency = 1
 
 local Layout = Instance.new("UIListLayout", MainFrame)
-Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-Layout.Padding = UDim.new(0, 8)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; Layout.Padding = UDim.new(0, 10)
 
--- 漂亮按钮生成器
-local function createStyledButton(txt, color)
+local function createButton(txt, color)
     local btn = Instance.new("TextButton", MainFrame)
     btn.Size = UDim2.new(0.85, 0, 0, 35)
     btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    btn.Text = txt
-    btn.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    btn.Font = Enum.Font.GothamSemibold
-    btn.TextSize = 13
-    btn.AutoButtonColor = false
-    
-    local corner = Instance.new("UICorner", btn)
-    corner.CornerRadius = UDim.new(0, 6)
+    btn.Text = txt; btn.TextColor3 = Color3.new(0.6, 0.6, 0.6)
+    btn.Font = Enum.Font.GothamSemibold; btn.TextSize = 12
     
     local stroke = Instance.new("UIStroke", btn)
-    stroke.Thickness = 1.5
-    stroke.Color = Color3.fromRGB(50, 50, 50)
-    stroke.Transparency = 0.5
-
-    -- 悬停动画
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.3), {Color = color}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(50, 50, 50)}):Play()
-    end)
+    stroke.Thickness = 1.5; stroke.Color = Color3.fromRGB(60, 60, 60)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     return btn, stroke
 end
 
-local PlayerBtn, PlayerStroke = createStyledButton("PLAYER ESP", Color3.fromRGB(0, 255, 150))
-local MobBtn, MobStroke = createStyledButton("MOB ESP", Color3.fromRGB(255, 80, 80))
+local PlayerBtn, PStroke = createButton("PLAYER ESP", Color3.fromRGB(0, 255, 255))
+local MobBtn, MStroke = createButton("MONSTER ONLY", Color3.fromRGB(255, 40, 40))
 
 ------------------------------------------------
--- 交互逻辑
+-- 交互与监听
 ------------------------------------------------
 PlayerBtn.MouseButton1Click:Connect(function()
     ESP_PLAYER_ENABLED = not ESP_PLAYER_ENABLED
-    getfenv().ESP_PLAYER_ENABLED = ESP_PLAYER_ENABLED
-    PlayerBtn.TextColor3 = ESP_PLAYER_ENABLED and Color3.new(1, 1, 1) or Color3.new(0.6, 0.6, 0.6)
-    PlayerStroke.Color = ESP_PLAYER_ENABLED and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(50, 50, 50)
+    PlayerBtn.TextColor3 = ESP_PLAYER_ENABLED and Color3.new(1,1,1) or Color3.new(0.6,0.6,0.6)
+    PStroke.Color = ESP_PLAYER_ENABLED and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(60,60,60)
     if ESP_PLAYER_ENABLED then
         for _, p in pairs(Players:GetPlayers()) do if p.Character then createESP(p.Character, true) end end
     end
 end)
 
-MobBtn.MouseButton1Click:Connect(function()
-    ESP_MOB_ENABLED = not ESP_MOB_ENABLED
-    getfenv().ESP_MOB_ENABLED = ESP_MOB_ENABLED
-    MobBtn.TextColor3 = ESP_MOB_ENABLED and Color3.new(1, 1, 1) or Color3.new(0.6, 0.6, 0.6)
-    MobStroke.Color = ESP_MOB_ENABLED and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(50, 50, 50)
-    if ESP_MOB_ENABLED then
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(v) then
-                createESP(v, false)
-            end
-        end
-    end
-end)
-
--- 快捷键：隐藏面板
-UserInputService.InputBegan:Connect(function(i, p)
-    if not p and i.KeyCode == TOGGLE_KEY then
-        MainFrame.Visible = not MainFrame.Visible
-    end
-end)
-
-print("1.en Hub V16 (Premium Neon) 加载成功！已移除飞行功能。")
+MobBtn.MouseButton1Click:Connect
