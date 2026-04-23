@@ -1,61 +1,66 @@
--- [[ 1.en Hub: 自动拿刀 + 智能斩击修复版 ]] --
+-- [[ 1.en Hub: 稳定流·全自动无限刀 ]] --
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
-local UIS = game:GetService("UserInputService")
 
--- 配置
 local Settings = {
     AutoAttack = false,
     AttackRange = 300,
-    MaxRange = 3000,
-    AttackSpeed = 0.15, -- 微调至0.15防止抽搐过快
-    WeaponName = ""     -- 留空则自动拿背包里第一把刀
+    AttackSpeed = 0.3,   -- 稍微放慢速度，增加稳定性
+    Offset = 3.5,        -- 站在怪物前方 3.5 码
 }
 
--- [[ UI 部分 (沿用并简化) ]] --
+-- UI
 local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 200, 0, 150)
-MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-Instance.new("UICorner", MainFrame)
-
-local ToggleBtn = Instance.new("TextButton", MainFrame)
-ToggleBtn.Size = UDim2.new(1, -20, 0, 40)
-ToggleBtn.Position = UDim2.new(0, 10, 0, 40)
-ToggleBtn.Text = "开启自动斩击"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+local ToggleBtn = Instance.new("TextButton", ScreenGui)
+ToggleBtn.Size = UDim2.new(0, 150, 0, 50)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
+ToggleBtn.Text = "自动斩击: 关闭"
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 ToggleBtn.TextColor3 = Color3.new(1,1,1)
 
-local RangeLabel = Instance.new("TextLabel", MainFrame)
-RangeLabel.Size = UDim2.new(1,0,0,20)
-RangeLabel.Position = UDim2.new(0,0,0,90)
-RangeLabel.Text = "范围: " .. Settings.AttackRange
-RangeLabel.TextColor3 = Color3.new(0,1,1)
-RangeLabel.BackgroundTransparency = 1
+ToggleBtn.MouseButton1Click:Connect(function()
+    Settings.AutoAttack = not Settings.AutoAttack
+    ToggleBtn.Text = Settings.AutoAttack and "自动斩击: 运行中" or "自动斩击: 关闭"
+    ToggleBtn.BackgroundColor3 = Settings.AutoAttack and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(50, 50, 50)
+end)
 
--- [[ 核心功能逻辑 ]] --
-
--- 1. 自动拿刀逻辑
-local function AutoEquipWeapon()
+-- 自动拿刀
+local function EquipWeapon()
     local char = Player.Character
-    if not char then return end
-    
-    -- 如果手里已经有东西了，就不重复拿
-    if char:FindFirstChildOfClass("Tool") then return end
-    
-    -- 查找背包
-    local backpack = Player:WaitForChild("Backpack")
-    local tool = backpack:FindFirstChildOfClass("Tool") -- 寻找背包里任何工具
-    
-    if tool then
-        -- 装备工具
-        char.Humanoid:EquipTool(tool)
+    if char and not char:FindFirstChildOfClass("Tool") then
+        local tool = Player.Backpack:FindFirstChildOfClass("Tool")
+        if tool then
+            char.Humanoid:EquipTool(tool)
+        end
     end
 end
 
--- 2. 斩击循环
+-- 获取最近的怪
+local function GetClosestTarget()
+    local closest = nil
+    local maxDist = Settings.AttackRange
+    local char = Player.Character
+    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if not myRoot then return nil end
+
+    -- 扫描 Workspace 里的所有模型
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Parent ~= char and obj.Health > 0 then
+            local tRoot = obj.Parent:FindFirstChild("HumanoidRootPart")
+            if tRoot then
+                local dist = (myRoot.Position - tRoot.Position).Magnitude
+                if dist < maxDist then
+                    maxDist = dist
+                    closest = tRoot
+                end
+            end
+        end
+    end
+    return closest
+end
+
 task.spawn(function()
     while true do
         task.wait(Settings.AttackSpeed)
@@ -65,51 +70,28 @@ task.spawn(function()
             local myRoot = char and char:FindFirstChild("HumanoidRootPart")
             
             if myRoot then
-                -- 自动拿刀
-                AutoEquipWeapon()
+                EquipWeapon()
                 
-                local oldCFrame = myRoot.CFrame
-                local foundTarget = false
+                local target = GetClosestTarget() -- 每次只锁定一个最近的目标
                 
-                -- 扫描敌人
-                for _, p in pairs(Players:GetPlayers()) do
-                    if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        local tRoot = p.Character.HumanoidRootPart
-                        local tHum = p.Character:FindFirstChildOfClass("Humanoid")
-                        
-                        -- 存活判定 + 距离
-                        if tHum and tHum.Health > 0 then
-                            local dist = (myRoot.Position - tRoot.Position).Magnitude
-                            if dist <= Settings.AttackRange then
-                                foundTarget = true
-                                
-                                -- 瞬移背刺
-                                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
-                                
-                                -- 触发攻击
-                                local tool = char:FindFirstChildOfClass("Tool")
-                                if tool then tool:Activate() end
-                                
-                                task.wait(0.02)
-                            end
-                        end
+                if target then
+                    -- 瞬移到目标面前并看向它
+                    local targetPos = target.CFrame * CFrame.new(0, 0, Settings.Offset).Position
+                    myRoot.CFrame = CFrame.lookAt(targetPos, target.Position)
+                    
+                    -- 挥刀
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if tool then 
+                        tool:Activate() 
                     end
-                    if not Settings.AutoAttack then break end
-                end
-                
-                -- 关键点：只有找到了目标才回原位。如果没有目标，不要乱瞬移。
-                if foundTarget then
-                    myRoot.CFrame = oldCFrame
+                    
+                    -- 【关键】：停留更长一点点，确保伤害触发
+                    task.wait(0.1) 
+                else
+                    -- 如果范围内没怪了，才考虑停下来或者回原位
+                    -- 这里留空，让角色停在最后一个怪的位置，防止一直“往返瞬移”
                 end
             end
         end
     end
 end)
-
-ToggleBtn.MouseButton1Click:Connect(function()
-    Settings.AutoAttack = not Settings.AutoAttack
-    ToggleBtn.Text = Settings.AutoAttack and "运行中..." or "开启自动斩击"
-    ToggleBtn.BackgroundColor3 = Settings.AutoAttack and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(40, 40, 50)
-end)
-
-print("✅ 智能拿刀 + 斩击版已加载")
