@@ -1,4 +1,4 @@
--- [[ Iruka Hub: 增强版透视控制面板 ]] --
+-- [[ 1.en Hub: ESP MANAGER 移动适配版 ]] --
 
 local Players = game:GetService("Players")
 local RS = game:GetService("RunService")
@@ -17,76 +17,97 @@ local Settings = {
 
 -- [[ UI 基础构建 ]] --
 local ScreenGui = Instance.new("ScreenGui", (gethui and gethui()) or game:GetService("CoreGui"))
-ScreenGui.Name = "Iruka_ESP_System"
+ScreenGui.Name = "EnHub_ESP_System"
 
--- 1. 悬浮唤起按钮 (新增功能)
+-- 1. 悬浮唤起按钮 (适配手机触摸)
 local ToggleButton = Instance.new("TextButton", ScreenGui)
-ToggleButton.Size = UDim2.new(0, 50, 0, 50)
-ToggleButton.Position = UDim2.new(0, 10, 0.5, -25)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-ToggleButton.Text = "MENU"
+ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+ToggleButton.Position = UDim2.new(0, 5, 0.4, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+ToggleButton.Text = "1.en"
 ToggleButton.TextColor3 = Color3.new(0, 1, 1)
 ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.TextSize = 12
-local BtnCorner = Instance.new("UICorner", ToggleButton)
-BtnCorner.CornerRadius = UDim.new(1, 0)
+ToggleButton.TextSize = 14
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
 local BtnStroke = Instance.new("UIStroke", ToggleButton)
 BtnStroke.Thickness = 2
 BtnStroke.Color = Color3.new(0, 1, 1)
 
 -- 2. 主面板
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 250, 0, 350)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -175)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.Size = UDim2.new(0, 240, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -120, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BorderSizePixel = 0
-MainFrame.Visible = false -- 默认隐藏
+MainFrame.Visible = false 
 
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 local MainStroke = Instance.new("UIStroke", MainFrame)
 MainStroke.Thickness = 2
 MainStroke.Color = Color3.new(0, 1, 1)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "IRUKA ESP"
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Text = "1.en Hub ESP MANAGER"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
 Title.BackgroundTransparency = 1
 
 local Container = Instance.new("ScrollingFrame", MainFrame)
-Container.Size = UDim2.new(1, -20, 1, -60)
+Container.Size = UDim2.new(1, -20, 1, -65)
 Container.Position = UDim2.new(0, 10, 0, 50)
 Container.BackgroundTransparency = 1
-Container.CanvasSize = UDim2.new(0, 0, 1.2, 0)
+Container.CanvasSize = UDim2.new(0, 0, 1.3, 0)
 Container.ScrollBarThickness = 2
 local Layout = Instance.new("UIListLayout", Container)
 Layout.Padding = UDim.new(0, 8)
 
--- [[ UI 逻辑函数 ]] --
+-- [[ UI 交互逻辑 ]] --
 
--- 开关面板函数
 local function ToggleMenu()
     MainFrame.Visible = not MainFrame.Visible
 end
 
 ToggleButton.MouseButton1Click:Connect(ToggleMenu)
 
--- 创建功能切换项
+-- 手机端面板拖拽实现
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        dragging = false
+    end
+end)
+
 local function CreateToggle(text, settingName)
     local Btn = Instance.new("TextButton", Container)
-    Btn.Size = UDim2.new(1, 0, 0, 35)
-    Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    Btn.Size = UDim2.new(1, 0, 0, 38)
+    Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     Btn.Text = text .. ": OFF"
-    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.TextColor3 = Color3.fromRGB(180, 180, 180)
     Btn.Font = Enum.Font.Gotham
+    Btn.TextSize = 13
     Instance.new("UICorner", Btn)
 
     Btn.MouseButton1Click:Connect(function()
         Settings[settingName] = not Settings[settingName]
         Btn.Text = text .. ": " .. (Settings[settingName] and "ON" or "OFF")
-        Btn.TextColor3 = Settings[settingName] and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(200, 200, 200)
+        Btn.TextColor3 = Settings[settingName] and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(180, 180, 180)
     end)
 end
 
@@ -96,24 +117,20 @@ CreateToggle("透视怪物", "Show_Monsters")
 CreateToggle("显示名字", "Show_Name")
 CreateToggle("显示距离", "Show_Distance")
 
--- [[ ESP 核心渲染 ]] --
-
-local function GetTargetESP(obj)
-    return obj:FindFirstChild("IrukaESP") or obj:FindFirstChild("ESP_Tag")
-end
+-- [[ ESP 核心逻辑 ]] --
 
 local function CreateESP(obj, color)
-    if GetTargetESP(obj) then return end
+    if obj:FindFirstChild("EnESP") then return end
     
     local Highlight = Instance.new("Highlight", obj)
-    Highlight.Name = "IrukaESP"
-    Highlight.FillTransparency = 0.5
+    Highlight.Name = "EnESP"
+    Highlight.FillTransparency = 0.6
     Highlight.FillColor = color
     Highlight.OutlineColor = Color3.new(1, 1, 1)
 
     local Billboard = Instance.new("BillboardGui", obj)
-    Billboard.Name = "ESP_Tag"
-    Billboard.Size = UDim2.new(0, 150, 0, 30)
+    Billboard.Name = "EnTag"
+    Billboard.Size = UDim2.new(0, 100, 0, 20)
     Billboard.Adornee = obj:FindFirstChild("Head") or obj.PrimaryPart
     Billboard.AlwaysOnTop = true
     Billboard.ExtentsOffset = Vector3.new(0, 3, 0)
@@ -123,32 +140,33 @@ local function CreateESP(obj, color)
     Label.BackgroundTransparency = 1
     Label.TextColor3 = color
     Label.Font = Enum.Font.GothamBold
-    Label.TextSize = 13
+    Label.TextSize = 12
     Label.Text = ""
 end
 
+-- 性能降频：每 0.1 秒处理一次，减少手机发热
+local lastTick = 0
 RS.RenderStepped:Connect(function()
-    -- 彩虹 UI 效果
     if Settings.Rainbow_UI then
         local hue = tick() % 5 / 5
-        local color = Color3.fromHSV(hue, 0.7, 1)
-        MainStroke.Color = color
-        BtnStroke.Color = color
-        ToggleButton.TextColor3 = color
+        local col = Color3.fromHSV(hue, 0.7, 1)
+        MainStroke.Color = col
+        BtnStroke.Color = col
+        Title.TextColor3 = col
     end
 
-    -- 全局开关逻辑
+    if tick() - lastTick < 0.1 then return end
+    lastTick = tick()
+
     if not Settings.ESP_Enabled then
         for _, v in pairs(workspace:GetDescendants()) do
-            if v.Name == "IrukaESP" or v.Name == "ESP_Tag" then v:Destroy() end
+            if v.Name == "EnESP" or v.Name == "EnTag" then v:Destroy() end
         end
         return
     end
 
-    -- 扫描并渲染
     for _, v in pairs(workspace:GetChildren()) do
         local isPlayer = Players:GetPlayerFromCharacter(v)
-        -- 修正：只有没有 "NPC" 属性且不是玩家的 Humanoid 才是目标
         local isMonster = v:FindFirstChild("Humanoid") and not isPlayer and v:GetAttribute("IsNPC") ~= true
         
         local valid = false
@@ -164,24 +182,16 @@ RS.RenderStepped:Connect(function()
 
         if valid and v.PrimaryPart then
             CreateESP(v, col)
-            local tag = v:FindFirstChild("ESP_Tag")
-            if tag then
+            local tag = v:FindFirstChild("EnTag")
+            if tag and tag:FindFirstChild("TextLabel") then
                 local dist = math.floor((LocalPlayer.Character.PrimaryPart.Position - v.PrimaryPart.Position).Magnitude)
                 tag.TextLabel.Text = (Settings.Show_Name and v.Name or "") .. (Settings.Show_Distance and " ["..dist.."m]" or "")
             end
         else
-            if v:FindFirstChild("IrukaESP") then v.IrukaESP:Destroy() end
-            if v:FindFirstChild("ESP_Tag") then v.ESP_Tag:Destroy() end
+            if v:FindFirstChild("EnESP") then v.EnESP:Destroy() end
+            if v:FindFirstChild("EnTag") then v.EnTag:Destroy() end
         end
     end
 end)
 
--- 快捷键支持
-UIS.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == Enum.KeyCode.RightControl then
-        ToggleMenu()
-    end
-end)
-
-print("Iruka ESP Loaded! 点击左侧按钮或按 Right-Control 开关菜单")
+print("1.en Hub ESP MANAGER Loaded!")
