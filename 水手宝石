@@ -1,137 +1,115 @@
--- [[ 1.en Hub: 自动无限斩击 - 攻速 0.1 优化版 ]] --
+-- [[ 1.en Hub: 自动拿刀 + 智能斩击修复版 ]] --
 
 local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
 
--- 核心配置
+-- 配置
 local Settings = {
-    AutoAttack = false,   
-    AttackRange = 300,    -- 默认范围
-    MaxRange = 3000,      -- 滑动条最大值
-    AttackSpeed = 0.1,    -- 你的要求：攻速 0.1秒/次
-    BypassDelay = 0.02,   -- 停留时间（微调以适配高攻速）
+    AutoAttack = false,
+    AttackRange = 300,
+    MaxRange = 3000,
+    AttackSpeed = 0.15, -- 微调至0.15防止抽搐过快
+    WeaponName = ""     -- 留空则自动拿背包里第一把刀
 }
 
--- [[ UI 界面 ]] --
+-- [[ UI 部分 (沿用并简化) ]] --
 local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
-ScreenGui.Name = "AutoBlade_V3"
-ScreenGui.ResetOnSpawn = false
-
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 200, 0, 160)
+MainFrame.Size = UDim2.new(0, 200, 0, 150)
 MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-MainFrame.BorderSizePixel = 0
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 Instance.new("UICorner", MainFrame)
 
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "自动无限刀 (SPD: 0.1)"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.GothamBold
-Title.BackgroundTransparency = 1
-
 local ToggleBtn = Instance.new("TextButton", MainFrame)
-ToggleBtn.Size = UDim2.new(1, -20, 0, 35)
-ToggleBtn.Position = UDim2.new(0, 10, 0, 45)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+ToggleBtn.Size = UDim2.new(1, -20, 0, 40)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 40)
 ToggleBtn.Text = "开启自动斩击"
-ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", ToggleBtn)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+ToggleBtn.TextColor3 = Color3.new(1,1,1)
 
 local RangeLabel = Instance.new("TextLabel", MainFrame)
-RangeLabel.Size = UDim2.new(1, -20, 0, 20)
-RangeLabel.Position = UDim2.new(0, 10, 0, 85)
-RangeLabel.Text = "斩击范围: " .. Settings.AttackRange
-RangeLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
+RangeLabel.Size = UDim2.new(1,0,0,20)
+RangeLabel.Position = UDim2.new(0,0,0,90)
+RangeLabel.Text = "范围: " .. Settings.AttackRange
+RangeLabel.TextColor3 = Color3.new(0,1,1)
 RangeLabel.BackgroundTransparency = 1
 
--- 滑动条系统
-local SliderBack = Instance.new("Frame", MainFrame)
-SliderBack.Size = UDim2.new(1, -20, 0, 10)
-SliderBack.Position = UDim2.new(0, 10, 0, 115)
-SliderBack.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-Instance.new("UICorner", SliderBack)
+-- [[ 核心功能逻辑 ]] --
 
-local SliderFill = Instance.new("Frame", SliderBack)
-SliderFill.Size = UDim2.new(Settings.AttackRange / Settings.MaxRange, 0, 1, 0)
-SliderFill.BackgroundColor3 = Color3.fromRGB(0, 255, 127)
-Instance.new("UICorner", SliderFill)
-
--- 滑动逻辑
-local isDragging = false
-local function UpdateSlider(input)
-    local relativeX = math.clamp((input.Position.X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
-    Settings.AttackRange = math.floor(relativeX * Settings.MaxRange)
-    SliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
-    RangeLabel.Text = "斩击范围: " .. Settings.AttackRange
+-- 1. 自动拿刀逻辑
+local function AutoEquipWeapon()
+    local char = Player.Character
+    if not char then return end
+    
+    -- 如果手里已经有东西了，就不重复拿
+    if char:FindFirstChildOfClass("Tool") then return end
+    
+    -- 查找背包
+    local backpack = Player:WaitForChild("Backpack")
+    local tool = backpack:FindFirstChildOfClass("Tool") -- 寻找背包里任何工具
+    
+    if tool then
+        -- 装备工具
+        char.Humanoid:EquipTool(tool)
+    end
 end
 
-SliderBack.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDragging = true
-        UpdateSlider(input)
-    end
-end)
-UIS.InputChanged:Connect(function(input)
-    if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        UpdateSlider(input)
-    end
-end)
-UIS.InputEnded:Connect(function() isDragging = false end)
-
--- 开关切换
-ToggleBtn.MouseButton1Click:Connect(function()
-    Settings.AutoAttack = not Settings.AutoAttack
-    ToggleBtn.Text = Settings.AutoAttack and "斩击中..." or "开启自动斩击"
-    ToggleBtn.BackgroundColor3 = Settings.AutoAttack and Color3.fromRGB(0, 120, 90) or Color3.fromRGB(35, 35, 45)
-end)
-
--- [[ 核心逻辑执行 ]] --
+-- 2. 斩击循环
 task.spawn(function()
     while true do
-        task.wait(Settings.AttackSpeed) -- 这里就是你要求的 0.1 攻速
+        task.wait(Settings.AttackSpeed)
         
         if Settings.AutoAttack then
             local char = Player.Character
             local myRoot = char and char:FindFirstChild("HumanoidRootPart")
-            local tool = char and char:FindFirstChildOfClass("Tool") -- 自动检测手里拿的刀
             
             if myRoot then
-                local oldCFrame = myRoot.CFrame
+                -- 自动拿刀
+                AutoEquipWeapon()
                 
-                -- 遍历所有敌人
+                local oldCFrame = myRoot.CFrame
+                local foundTarget = false
+                
+                -- 扫描敌人
                 for _, p in pairs(Players:GetPlayers()) do
                     if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                         local tRoot = p.Character.HumanoidRootPart
                         local tHum = p.Character:FindFirstChildOfClass("Humanoid")
                         
-                        -- 活着的且在范围内的
+                        -- 存活判定 + 距离
                         if tHum and tHum.Health > 0 then
                             local dist = (myRoot.Position - tRoot.Position).Magnitude
                             if dist <= Settings.AttackRange then
-                                -- 1. 极速闪现到背后
+                                foundTarget = true
+                                
+                                -- 瞬移背刺
                                 myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
                                 
-                                -- 2. 自动挥刀
-                                if tool then
-                                    tool:Activate()
-                                end
+                                -- 触发攻击
+                                local tool = char:FindFirstChildOfClass("Tool")
+                                if tool then tool:Activate() end
                                 
-                                -- 3. 微量延迟确保服务器接收
-                                task.wait(Settings.BypassDelay)
+                                task.wait(0.02)
                             end
                         end
                     end
                     if not Settings.AutoAttack then break end
                 end
                 
-                -- 回到起始位置
-                myRoot.CFrame = oldCFrame
+                -- 关键点：只有找到了目标才回原位。如果没有目标，不要乱瞬移。
+                if foundTarget then
+                    myRoot.CFrame = oldCFrame
+                end
             end
         end
     end
 end)
 
-print("✅ 攻速 0.1 模式已加载")
+ToggleBtn.MouseButton1Click:Connect(function()
+    Settings.AutoAttack = not Settings.AutoAttack
+    ToggleBtn.Text = Settings.AutoAttack and "运行中..." or "开启自动斩击"
+    ToggleBtn.BackgroundColor3 = Settings.AutoAttack and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(40, 40, 50)
+end)
+
+print("✅ 智能拿刀 + 斩击版已加载")
