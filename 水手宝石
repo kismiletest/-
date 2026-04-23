@@ -1,97 +1,118 @@
--- [[ 1.en Hub: 稳定流·全自动无限刀 ]] --
-
+-- 水手宝石｜无限范围 + 吸怪 UI双开关
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
 
-local Settings = {
-    AutoAttack = false,
-    AttackRange = 300,
-    AttackSpeed = 0.3,   -- 稍微放慢速度，增加稳定性
-    Offset = 3.5,        -- 站在怪物前方 3.5 码
-}
+-- 开关状态
+local RangeEnabled = false
+local MagnetEnabled = false
+local InfiniteRange = 999999
+local MagnetRadius = 35 -- 吸怪范围大小
 
--- UI
-local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
-local ToggleBtn = Instance.new("TextButton", ScreenGui)
-ToggleBtn.Size = UDim2.new(0, 150, 0, 50)
-ToggleBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
-ToggleBtn.Text = "自动斩击: 关闭"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-ToggleBtn.TextColor3 = Color3.new(1,1,1)
+-- ========== 极简UI面板 ==========
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "SailorHub"
+Gui.Parent = PlayerGui
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-ToggleBtn.MouseButton1Click:Connect(function()
-    Settings.AutoAttack = not Settings.AutoAttack
-    ToggleBtn.Text = Settings.AutoAttack and "自动斩击: 运行中" or "自动斩击: 关闭"
-    ToggleBtn.BackgroundColor3 = Settings.AutoAttack and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(50, 50, 50)
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 120)
+Frame.Position = UDim2.new(0.03,0,0.25,0)
+Frame.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
+Frame.BorderSizePixel = 3
+Frame.Parent = Gui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0.25,0)
+Title.BackgroundTransparency = 1
+Title.Text = "水手功能"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.Bold
+Title.TextSize = 20
+Title.Parent = Frame
+
+-- 无限范围按钮
+local BtnRange = Instance.new("TextButton")
+BtnRange.Size = UDim2.new(0.8,0,0.22,0)
+BtnRange.Position = UDim2.new(0.1,0,0.28,0)
+BtnRange.BackgroundColor3 = Color3.new(0.25,0.25,0.25)
+BtnRange.Text = "无限范围 [关]"
+BtnRange.TextColor3 = Color3.new(1,1,1)
+BtnRange.Parent = Frame
+
+-- 吸怪按钮
+local BtnMagnet = Instance.new("TextButton")
+BtnMagnet.Size = UDim2.new(0.8,0,0.22,0)
+BtnMagnet.Position = UDim2.new(0.1,0,0.55,0)
+BtnMagnet.BackgroundColor3 = Color3.new(0.25,0.25,0.25)
+BtnMagnet.Text = "吸怪 [关]"
+BtnMagnet.TextColor3 = Color3.new(1,1,1)
+BtnMagnet.Parent = Frame
+
+-- ========== UI更新 ==========
+local function UpdateUI()
+    BtnRange.Text = RangeEnabled and "无限范围 [开]" or "无限范围 [关]"
+    BtnRange.BackgroundColor3 = RangeEnabled and Color3.new(0.15,0.7,0.15) or Color3.new(0.25,0.25,0.25)
+
+    BtnMagnet.Text = MagnetEnabled and "吸怪 [开]" or "吸怪 [关]"
+    BtnMagnet.BackgroundColor3 = MagnetEnabled and Color3.new(0.15,0.5,0.8) or Color3.new(0.25,0.25,0.25)
+end
+
+-- 按钮点击
+BtnRange.MouseButton1Click:Connect(function()
+    RangeEnabled = not RangeEnabled
+    UpdateUI()
 end)
 
--- 自动拿刀
-local function EquipWeapon()
-    local char = Player.Character
-    if char and not char:FindFirstChildOfClass("Tool") then
-        local tool = Player.Backpack:FindFirstChildOfClass("Tool")
-        if tool then
-            char.Humanoid:EquipTool(tool)
-        end
-    end
-end
+BtnMagnet.MouseButton1Click:Connect(function()
+    MagnetEnabled = not MagnetEnabled
+    UpdateUI()
+end)
 
--- 获取最近的怪
-local function GetClosestTarget()
-    local closest = nil
-    local maxDist = Settings.AttackRange
-    local char = Player.Character
-    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
-    
-    if not myRoot then return nil end
-
-    -- 扫描 Workspace 里的所有模型
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Parent ~= char and obj.Health > 0 then
-            local tRoot = obj.Parent:FindFirstChild("HumanoidRootPart")
-            if tRoot then
-                local dist = (myRoot.Position - tRoot.Position).Magnitude
-                if dist < maxDist then
-                    maxDist = dist
-                    closest = tRoot
-                end
-            end
-        end
-    end
-    return closest
-end
-
+-- ========== 无限范围循环 ==========
 task.spawn(function()
-    while true do
-        task.wait(Settings.AttackSpeed)
-        
-        if Settings.AutoAttack then
-            local char = Player.Character
-            local myRoot = char and char:FindFirstChild("HumanoidRootPart")
-            
-            if myRoot then
-                EquipWeapon()
-                
-                local target = GetClosestTarget() -- 每次只锁定一个最近的目标
-                
-                if target then
-                    -- 瞬移到目标面前并看向它
-                    local targetPos = target.CFrame * CFrame.new(0, 0, Settings.Offset).Position
-                    myRoot.CFrame = CFrame.lookAt(targetPos, target.Position)
-                    
-                    -- 挥刀
-                    local tool = char:FindFirstChildOfClass("Tool")
-                    if tool then 
-                        tool:Activate() 
-                    end
-                    
-                    -- 【关键】：停留更长一点点，确保伤害触发
-                    task.wait(0.1) 
-                else
-                    -- 如果范围内没怪了，才考虑停下来或者回原位
-                    -- 这里留空，让角色停在最后一个怪的位置，防止一直“往返瞬移”
+    while task.wait(0.1) do
+        if not RangeEnabled then continue end
+        pcall(function()
+            for _,v in pairs(getgc(true)) do
+                if type(v) == "table" and v.Range then
+                    v.Range = InfiniteRange
                 end
             end
-        end
+        end)
     end
 end)
+
+-- ========== 吸怪核心 ==========
+task.spawn(function()
+    while task.wait(0.05) do
+        if not MagnetEnabled or not RootPart then continue end
+        pcall(function()
+            for _,Model in pairs(workspace:GetDescendants()) do
+                if Model:IsA("Model") and Model ~= Character then
+                    local Hum = Model:FindFirstChildOfClass("Humanoid")
+                    local HRP = Model:FindFirstChild("HumanoidRootPart")
+                    if Hum and HRP and Hum.Health > 0 then
+                        local Dist = (RootPart.Position - HRP.Position).Magnitude
+                        if Dist <= MagnetRadius then
+                            HRP.Velocity = (RootPart.Position - HRP.Position).Unit * 45
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- 角色重生刷新
+Player.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    Humanoid = Character:WaitForChild("Humanoid")
+    RootPart = Character:WaitForChild("HumanoidRootPart")
+end)
+
+UpdateUI()
+print("✅ 水手宝石｜无限范围+吸怪 UI 加载完成")
