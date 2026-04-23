@@ -1,61 +1,160 @@
--- [[ 1.en Hub: Aimbot 模块 ]] --
+-- [[ 1.en Hub: Aimbot Only 手机精简版 ]] --
 
+local Players = game:GetService("Players")
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- [[ 配置参数 ]] --
 local Settings = {
     Aimbot_Enabled = false,
-    Aim_Bone = "Head", -- 瞄准部位: "Head" 或 "UpperTorso"
-    Aimbot_Smoothness = 0.2, -- 平滑度 (0.01 - 1)，越小越平滑
-    Aimbot_FOV = 150, -- 锁定的圆圈范围
-    Show_FOV = true
+    Aim_Bone = "Head",       -- 瞄准部位: "Head" 或 "HumanoidRootPart"
+    Smoothness = 0.15,       -- 平滑度: 越小越平滑，0.1-0.2 适合手机
+    FOV_Radius = 150,        -- 锁定范围半径
+    Show_FOV = true,         -- 是否显示圆圈
+    Rainbow_UI = true        -- UI 彩虹特效
 }
 
-local Camera = workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse() -- 虽然是手机，但底层坐标逻辑通用
+-- [[ UI 基础构建 ]] --
+local ScreenGui = Instance.new("ScreenGui", (gethui and gethui()) or game:GetService("CoreGui"))
 
--- 1. 绘制 FOV 圆圈 (手机端可视化)
+-- 悬浮控制按钮
+local ToggleButton = Instance.new("TextButton", ScreenGui)
+ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+ToggleButton.Position = UDim2.new(0, 10, 0.4, 0)
+ToggleButton.Text = "AIM"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+ToggleButton.TextColor3 = Color3.new(0, 1, 1)
+ToggleButton.Font = Enum.Font.GothamBold
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
+local BtnStroke = Instance.new("UIStroke", ToggleButton)
+BtnStroke.Thickness = 2
+
+-- 主面板
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 220, 0, 220)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -110)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.Visible = false
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Thickness = 2
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "1.en Hub AIMBOT"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.BackgroundTransparency = 1
+
+local Container = Instance.new("Frame", MainFrame)
+Container.Size = UDim2.new(1, -20, 1, -50)
+Container.Position = UDim2.new(0, 10, 0, 45)
+Container.BackgroundTransparency = 1
+local Layout = Instance.new("UIListLayout", Container)
+Layout.Padding = UDim.new(0, 10)
+
+-- 自瞄范围圆圈 (FOV)
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 2
-FOVCircle.NumSides = 460
+FOVCircle.Thickness = 1
+FOVCircle.NumSides = 60
 FOVCircle.Filled = false
-FOVCircle.Transparency = 0.7
+FOVCircle.Transparency = 0.8
 FOVCircle.Color = Color3.new(0, 1, 1)
 
--- 2. 获取最靠近准星的目标
-local function GetClosestTarget()
-    local closestTarget = nil
-    local shortestDistance = Settings.Aimbot_FOV
+-- [[ 功能切换按钮 ]] --
+local function CreateToggle(text, settingName)
+    local Btn = Instance.new("TextButton", Container)
+    Btn.Size = UDim2.new(1, 0, 0, 40)
+    Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    Btn.Text = text .. ": OFF"
+    Btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Btn.Font = Enum.Font.Gotham
+    Instance.new("UICorner", Btn)
 
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild(Settings.Aim_Bone) then
-            -- 检查目标是否在屏幕内
-            local pos, onScreen = Camera:WorldToViewportPoint(v.Character[Settings.Aim_Bone].Position)
-            if onScreen then
-                local distance = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                if distance < shortestDistance then
-                    closestTarget = v.Character[Settings.Aim_Bone]
-                    shortestDistance = distance
+    Btn.MouseButton1Click:Connect(function()
+        Settings[settingName] = not Settings[settingName]
+        Btn.Text = text .. ": " .. (Settings[settingName] and "ON" or "OFF")
+        Btn.TextColor3 = Settings[settingName] and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(180, 180, 180)
+    end)
+end
+
+CreateToggle("启用自瞄锁定", "Aimbot_Enabled")
+CreateToggle("显示自瞄范围", "Show_FOV")
+
+ToggleButton.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
+
+-- [[ 核心逻辑 ]] --
+
+-- 寻找屏幕内最靠近准星的目标
+local function GetClosestTarget()
+    local target = nil
+    local shortestDistance = Settings.FOV_Radius
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local part = player.Character:FindFirstChild(Settings.Aim_Bone)
+            if part then
+                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local distance = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if distance < shortestDistance then
+                        target = part
+                        shortestDistance = distance
+                    end
                 end
             end
         end
     end
-    return closestTarget
+    
+    -- 如果玩家中没目标，可以扫描工作区的 NPC (可选)
+    if not target then
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:FindFirstChildOfClass("Humanoid") and obj ~= LocalPlayer.Character then
+                local part = obj:FindFirstChild(Settings.Aim_Bone) or obj.PrimaryPart
+                if part then
+                    local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        local distance = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                        if distance < shortestDistance then
+                            target = part
+                            shortestDistance = distance
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return target
 end
 
--- 3. 核心追踪循环
+-- 渲染每帧执行
 RS.RenderStepped:Connect(function()
-    -- 更新 FOV 圆圈位置
+    -- 彩虹特效
+    if Settings.Rainbow_UI then
+        local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
+        MainStroke.Color = color
+        BtnStroke.Color = color
+        Title.TextColor3 = color
+        FOVCircle.Color = color
+    end
+
+    -- 更新 FOV 圆圈位置和状态
     FOVCircle.Visible = Settings.Aimbot_Enabled and Settings.Show_FOV
-    FOVCircle.Radius = Settings.Aimbot_FOV
+    FOVCircle.Radius = Settings.FOV_Radius
     FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
+    -- 执行自瞄
     if Settings.Aimbot_Enabled then
         local target = GetClosestTarget()
         if target then
-            -- 移动端平滑差值计算 (Lerp)
-            local targetPos = Camera:WorldToToScreenPoint(target.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(
-                CFrame.new(Camera.CFrame.Position, target.Position), 
-                Settings.Aimbot_Smoothness
-            )
+            -- 使用 CFrame:Lerp 实现手机平滑锁头，防止被反作弊封号
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Position), Settings.Smoothness)
         end
     end
 end)
+
+print("1.en Hub: Aimbot Mode Loaded!")
