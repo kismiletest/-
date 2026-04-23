@@ -1,7 +1,8 @@
--- [[ Iruka Hub: 高级透视 & 怪物过滤系统 ]] --
+-- [[ 1.en Hub: 高级透视 & 怪物过滤系统 ]] --
 
 local Players = game:GetService("Players")
 local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -12,183 +13,186 @@ local Settings = {
     Show_Monsters = false,
     Show_Distance = true,
     Show_Name = true,
-    Team_Check = false,
     Rainbow_UI = true
 }
 
 -- [[ UI 构建 ]] --
 local ScreenGui = Instance.new("ScreenGui", (gethui and gethui()) or game:GetService("CoreGui"))
-ScreenGui.Name = "Iruka_ESP_UI"
+ScreenGui.Name = "1enHub_ESP"
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 250, 0, 350)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -175)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.Size = UDim2.new(0, 260, 0, 360)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -180)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BorderSizePixel = 0
+MainFrame.Active = true -- 允许交互
 
 local MainCorner = Instance.new("UICorner", MainFrame)
-MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.CornerRadius = UDim.new(0, 15)
 
 local MainStroke = Instance.new("UIStroke", MainFrame)
-MainStroke.Thickness = 2
+MainStroke.Thickness = 2.5
 MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 MainStroke.Color = Color3.fromRGB(0, 255, 255)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "IRUKA ESP MANAGER"
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Text = "1.en Hub"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.TextSize = 22
 Title.BackgroundTransparency = 1
 
--- 功能开关列表
+--- [[ 拖动逻辑补丁 ]] ---
+local function EnableDragging(frame)
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+EnableDragging(MainFrame)
+
+-- 功能开关容器
 local Container = Instance.new("ScrollingFrame", MainFrame)
-Container.Size = UDim2.new(1, -20, 1, -60)
-Container.Position = UDim2.new(0, 10, 0, 50)
+Container.Size = UDim2.new(1, -20, 1, -70)
+Container.Position = UDim2.new(0, 10, 0, 60)
 Container.BackgroundTransparency = 1
-Container.CanvasSize = UDim2.new(0, 0, 1.5, 0)
-Container.ScrollBarThickness = 2
+Container.CanvasSize = UDim2.new(0, 0, 1.2, 0)
+Container.ScrollBarThickness = 0
 
 local Layout = Instance.new("UIListLayout", Container)
-Layout.Padding = UDim.new(0, 8)
+Layout.Padding = UDim.new(0, 10)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 local function CreateToggle(text, settingName)
     local Btn = Instance.new("TextButton", Container)
-    Btn.Size = UDim2.new(1, 0, 0, 35)
-    Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    Btn.Size = UDim2.new(0.9, 0, 0, 40)
+    Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     Btn.Text = text .. ": OFF"
     Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    Btn.Font = Enum.Font.Gotham
+    Btn.Font = Enum.Font.GothamSemibold
     Btn.TextSize = 14
-    Instance.new("UICorner", Btn)
+    Btn.AutoButtonColor = true
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 8)
 
     Btn.MouseButton1Click:Connect(function()
         Settings[settingName] = not Settings[settingName]
         Btn.Text = text .. ": " .. (Settings[settingName] and "ON" or "OFF")
-        Btn.TextColor3 = Settings[settingName] and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(200, 200, 200)
         
-        -- 增加一点点击反馈动效
-        Btn:TweenSize(UDim2.new(1, -5, 0, 33), "Out", "Quad", 0.1, true, function()
-            Btn:TweenSize(UDim2.new(1, 0, 0, 35), "Out", "Quad", 0.1)
-        end)
+        -- 视觉反馈
+        local targetColor = Settings[settingName] and Color3.fromRGB(0, 200, 150) or Color3.fromRGB(30, 30, 40)
+        game:GetService("TweenService"):Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = targetColor}):Play()
+        Btn.TextColor3 = Settings[settingName] and Color3.new(1, 1, 1) or Color3.fromRGB(200, 200, 200)
     end)
 end
 
-CreateToggle("启用透视系统", "ESP_Enabled")
-CreateToggle("透视玩家", "Show_Players")
-CreateToggle("透视怪物 (过滤NPC)", "Show_Monsters")
-CreateToggle("显示名字", "Show_Name")
-CreateToggle("显示距离", "Show_Distance")
+CreateToggle("启用全局 ESP", "ESP_Enabled")
+CreateToggle("显示玩家 (蓝色)", "Show_Players")
+CreateToggle("显示怪物 (红色)", "Show_Monsters")
+CreateToggle("显示距离信息", "Show_Distance")
+CreateToggle("显示目标名字", "Show_Name")
 
--- [[ ESP 核心逻辑 ]] --
-local function CreateESP(obj, color)
-    if obj:FindFirstChild("IrukaESP") then return end
+-- [[ ESP 系统核心逻辑 ]] --
+local function GetESPObjects(obj, color)
+    local highlight = obj:FindFirstChild("HubHighlight")
+    local billboard = obj:FindFirstChild("HubTag")
     
-    local Highlight = Instance.new("Highlight")
-    Highlight.Name = "IrukaESP"
-    Highlight.Parent = obj
-    Highlight.FillTransparency = 0.5
-    Highlight.OutlineTransparency = 0
-    Highlight.FillColor = color
-    Highlight.OutlineColor = Color3.new(1, 1, 1)
-
-    local Billboard = Instance.new("BillboardGui", obj)
-    Billboard.Name = "ESP_Tag"
-    Billboard.Size = UDim2.new(0, 200, 0, 50)
-    Billboard.Adornee = obj:FindFirstChild("Head") or obj.PrimaryPart
-    Billboard.AlwaysOnTop = true
-    Billboard.ExtentsOffset = Vector3.new(0, 3, 0)
-
-    local TagLabel = Instance.new("TextLabel", Billboard)
-    TagLabel.Size = UDim2.new(1, 0, 1, 0)
-    TagLabel.BackgroundTransparency = 1
-    TagLabel.TextColor3 = color
-    TagLabel.TextStrokeTransparency = 0
-    TagLabel.Font = Enum.Font.GothamBold
-    TagLabel.TextSize = 14
-    TagLabel.Text = ""
-
-    return Highlight, TagLabel
+    if not highlight and Settings.ESP_Enabled then
+        highlight = Instance.new("Highlight", obj)
+        highlight.Name = "HubHighlight"
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+    end
+    
+    if not billboard and Settings.ESP_Enabled then
+        billboard = Instance.new("BillboardGui", obj)
+        billboard.Name = "HubTag"
+        billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.AlwaysOnTop = true
+        billboard.ExtentsOffset = Vector3.new(0, 3, 0)
+        local label = Instance.new("TextLabel", billboard)
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextStrokeTransparency = 0.5
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 14
+    end
+    
+    return highlight, billboard and billboard:FindFirstChildOfClass("TextLabel")
 end
 
 RS.RenderStepped:Connect(function()
-    -- UI 霓虹流光效果
+    -- 彩虹 UI 特效
     if Settings.Rainbow_UI then
-        MainStroke.Color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
-        Title.TextColor3 = MainStroke.Color
+        local hue = tick() % 5 / 5
+        MainStroke.Color = Color3.fromHSV(hue, 0.8, 1)
+        Title.TextColor3 = Color3.fromHSV(hue, 0.6, 1)
     end
 
-    if not Settings.ESP_Enabled then
-        -- 清理透视
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v.Name == "IrukaESP" or v.Name == "ESP_Tag" then v:Destroy() end
-        end
-        return
-    end
-
-    -- 遍历 Workspace 寻找目标
+    -- 核心遍历
     for _, v in pairs(workspace:GetChildren()) do
         local isPlayer = Players:GetPlayerFromCharacter(v)
-        local isMonster = v:FindFirstChild("Humanoid") and not isPlayer and not v:SetAttribute("IsNPC", true) -- 根据需要调整过滤条件
+        local isMonster = v:FindFirstChild("Humanoid") and not isPlayer
         
-        local targetValid = false
-        local targetColor = Color3.new(1,1,1)
+        local shouldShow = false
+        local color = Color3.new(1, 1, 1)
 
-        if isPlayer and Settings.Show_Players and v ~= LocalPlayer.Character then
-            targetValid = true
-            targetColor = Color3.fromRGB(0, 170, 255)
-        elseif isMonster and Settings.Show_Monsters then
-            targetValid = true
-            targetColor = Color3.fromRGB(255, 40, 40)
+        if Settings.ESP_Enabled then
+            if isPlayer and Settings.Show_Players and v ~= LocalPlayer.Character then
+                shouldShow = true
+                color = Color3.fromRGB(0, 170, 255)
+            elseif isMonster and Settings.Show_Monsters then
+                shouldShow = true
+                color = Color3.fromRGB(255, 50, 50)
+            end
         end
 
-        if targetValid and v:FindFirstChild("HumanoidRootPart") then
-            local highlight, label = CreateESP(v, targetColor)
-            if label then
+        if shouldShow and v:FindFirstChild("HumanoidRootPart") then
+            local high, label = GetESPObjects(v, color)
+            if high and label then
+                high.FillColor = color
+                high.Enabled = true
+                
                 local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - v.HumanoidRootPart.Position).Magnitude)
-                local nameStr = Settings.Show_Name and v.Name or ""
-                local distStr = Settings.Show_Distance and (" [" .. dist .. "m]") or ""
-                label.Text = nameStr .. distStr
-                label.Visible = true
+                local txt = ""
+                if Settings.Show_Name then txt = v.Name end
+                if Settings.Show_Distance then txt = txt .. " [" .. dist .. "m]" end
+                label.Text = txt
+                label.TextColor3 = color
             end
         else
-            if v:FindFirstChild("IrukaESP") then v.IrukaESP:Destroy() end
-            if v:FindFirstChild("ESP_Tag") then v.ESP_Tag:Destroy() end
+            -- 清理无效 ESP
+            if v:FindFirstChild("HubHighlight") then v.HubHighlight:Destroy() end
+            if v:FindFirstChild("HubTag") then v.HubTag:Destroy() end
         end
     end
 end)
 
--- 拖动功能
-local UserInputService = game:GetService("UserInputService")
-local dragging, dragInput, dragStart, startPos
-
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
--- 隐藏按键
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.RightControl then
+-- 快捷键隐藏
+UIS.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
         ScreenGui.Enabled = not ScreenGui.Enabled
     end
 end)
 
-print("Iruka ESP Loaded! Press Right-Control to Toggle Menu.")
+print("1.en Hub 加载成功! 按 [Right Control] 切换菜单")
