@@ -1,55 +1,56 @@
---【水手宝石 无限范围 UI面板 开关版】
+-- [[ 1.en Hub: 水手宝石 范围修正版 ]] --
+
 local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- 变量初始化
 local Character = Player.Character or Player.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
 local RootPart = Character:WaitForChild("HumanoidRootPart")
 
--- 开关状态
 local enableInfiniteRange = false
 local InfiniteRangeVal = 999999
 
--- ========== 创建UI ==========
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SailorGemUI"
-ScreenGui.Parent = PlayerGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- ========== 1. UI 面板构建 ==========
+local ScreenGui = Instance.new("ScreenGui", PlayerGui)
+ScreenGui.Name = "SailorGemUI_V2"
+ScreenGui.ResetOnSpawn = false
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 180, 0, 80)
-MainFrame.Position = UDim2.new(0.05,0,0.3,0)
-MainFrame.BackgroundColor3 = Color3.new(0.15,0.15,0.15)
-MainFrame.BorderSizePixel = 2
-MainFrame.Parent = ScreenGui
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 180, 0, 90)
+MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+Instance.new("UICorner", MainFrame)
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1,0,0.4,0)
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "水手宝石 (修正版)"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
 Title.BackgroundTransparency = 1
-Title.Text = "水手宝石功能"
-Title.TextColor3 = Color3.new(1,1,1)
-Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 18
-Title.Parent = MainFrame
 
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0.7,0,0.45,0)
-ToggleBtn.Position = UDim2.new(0.15,0,0.5,0)
-ToggleBtn.BackgroundColor3 = Color3.new(0.3,0.3,0.3)
-ToggleBtn.Text = "关闭"
-ToggleBtn.TextColor3 = Color3.new(1,1,1)
-ToggleBtn.Font = Enum.Font.SourceSans
-ToggleBtn.TextSize = 16
-ToggleBtn.Parent = MainFrame
+local ToggleBtn = Instance.new("TextButton", MainFrame)
+ToggleBtn.Size = UDim2.new(0, 140, 0, 35)
+ToggleBtn.Position = UDim2.new(0.5, -70, 0.5, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+ToggleBtn.Text = "功能: 关闭"
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleBtn.Font = Enum.Font.Gotham
+Instance.new("UICorner", ToggleBtn)
 
--- ========== 切换开关逻辑 ==========
+-- ========== 2. 核心逻辑优化 ==========
+
+-- 更新按钮显示
 local function UpdateUI()
     if enableInfiniteRange then
-        ToggleBtn.Text = "开启"
-        ToggleBtn.BackgroundColor3 = Color3.new(0.2,0.6,0.2)
+        ToggleBtn.Text = "功能: 开启"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
     else
-        ToggleBtn.Text = "关闭"
-        ToggleBtn.BackgroundColor3 = Color3.new(0.3,0.3,0.3)
+        ToggleBtn.Text = "功能: 关闭"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     end
 end
 
@@ -58,46 +59,59 @@ ToggleBtn.MouseButton1Click:Connect(function()
     UpdateUI()
 end)
 
--- ========== 无限范围核心逻辑 ==========
+-- 优化内存扫描 (这是之前卡机的元凶)
 task.spawn(function()
-    while task.wait(0.1) do
-        if not enableInfiniteRange then continue end
-        pcall(function()
-            for _,v in pairs(getgc(true)) do
-                if type(v) == "table" and v.Range then
-                    v.Range = InfiniteRangeVal
-                end
-            end
-        end)
-    end
-end)
-
--- 技能远程命中补充
-Humanoid.InputBegan:Connect(function(Key)
-    if not enableInfiniteRange then return end
-    if Key.KeyCode == Enum.KeyCode.E then -- 你的宝石技能按键
-        task.spawn(function()
-            for _,Target in pairs(workspace:GetDescendants()) do
-                if Target:IsA("Model") and Target:FindFirstChild("Humanoid") 
-                and Target.Humanoid.Health > 0 and Target ~= Character then
-                    local TRoot = Target:FindFirstChild("HumanoidRootPart")
-                    if TRoot then
-                        RootPart.CFrame = TRoot.CFrame
-                        task.wait(0.01)
-                        RootPart.CFrame = Character.HumanoidRootPart.CFrame
+    while true do
+        task.wait(3) -- 每3秒扫描一次内存，足以维持范围，且不会让手机卡死
+        if enableInfiniteRange then
+            pcall(function()
+                local objects = getgc(true)
+                for i = 1, #objects do
+                    local v = objects[i]
+                    if type(v) == "table" and rawget(v, "Range") then
+                        v.Range = InfiniteRangeVal
                     end
                 end
-            end
-        end)
+            end)
+        end
     end
 end)
 
--- 角色重生重载
+-- 优化攻击逻辑 (防止暴力瞬移崩服)
+local function PerformAttack()
+    if not enableInfiniteRange then return end
+    
+    local originalPos = RootPart.CFrame
+    -- 仅扫描玩家或具有 Humanoid 的 Model，而不是整个 Workspace 的碎片
+    for _, targetPlayer in pairs(Players:GetPlayers()) do
+        if targetPlayer ~= Player and targetPlayer.Character then
+            local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local tHum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+            
+            if tRoot and tHum and tHum.Health > 0 then
+                -- 进行快速打击
+                RootPart.CFrame = tRoot.CFrame * CFrame.new(0, 0, 2)
+                task.wait(0.05) -- 给物理引擎喘息时间
+            end
+        end
+    end
+    -- 返回原位
+    RootPart.CFrame = originalPos
+end
+
+-- 按键绑定
+UIS.InputBegan:Connect(function(input, processed)
+    if processed or not enableInfiniteRange then return end
+    if input.KeyCode == Enum.KeyCode.E then
+        task.spawn(PerformAttack)
+    end
+end)
+
+-- 角色刷新处理
 Player.CharacterAdded:Connect(function(newChar)
     Character = newChar
-    Humanoid = Character:WaitForChild("Humanoid")
     RootPart = Character:WaitForChild("HumanoidRootPart")
 end)
 
 UpdateUI()
-print("✅ 水手宝石UI面板 + 范围开关 加载完成")
+print("✅ 优化版水手宝石加载完成，已移除卡顿逻辑")
