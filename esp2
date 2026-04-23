@@ -112,10 +112,10 @@ local function CreateToggle(text, settingName)
 end
 
 CreateToggle("启用透视系统", "ESP_Enabled")
-CreateToggle("透视玩家", "Show_Players")
-CreateToggle("透视怪物", "Show_Monsters")
-CreateToggle("显示名字", "Show_Name")
-CreateToggle("显示距离", "Show_Distance")
+CreateToggle("透视傻逼玩家", "Show_Players")
+CreateToggle("透视死爹烂妈怪物", "Show_Monsters")
+CreateToggle("显示没脑玩家怪物名字", "Show_Name")
+CreateToggle("显示傻逼玩家怪物距离", "Show_Distance")
 
 -- [[ ESP 核心逻辑 ]] --
 
