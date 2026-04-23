@@ -1,48 +1,119 @@
--- [[ 1.en Hub: ESP MANAGER 最终强化版 ]] --
+-- [[ 1.en Hub: ESP MANAGER 移动最终版 (全过滤解除) ]] --
 
--- ... (前面的 UI 构建代码保持不变，直到 CreateToggle 部分) ...
+local Players = game:GetService("Players")
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local Settings = {
+    ESP_Enabled = false,
+    Show_Players = false,
+    Show_Monsters = false,
+    Show_Distance = true,
+    Show_Name = true,
+    Rainbow_UI = true
+}
+
+-- [[ UI 构建逻辑保持不变 ]] --
+local ScreenGui = Instance.new("ScreenGui", (gethui and gethui()) or game:GetService("CoreGui"))
+local ToggleButton = Instance.new("TextButton", ScreenGui)
+ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+ToggleButton.Position = UDim2.new(0, 5, 0.4, 0)
+ToggleButton.Text = "1.en"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+ToggleButton.TextColor3 = Color3.new(0, 1, 1)
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
+local BtnStroke = Instance.new("UIStroke", ToggleButton)
+BtnStroke.Thickness = 2
+BtnStroke.Color = Color3.new(0, 1, 1)
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 240, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -120, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.Visible = false
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Thickness = 2
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Text = "1.en Hub ESP MANAGER"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.BackgroundTransparency = 1
+
+local Container = Instance.new("ScrollingFrame", MainFrame)
+Container.Size = UDim2.new(1, -20, 1, -65)
+Container.Position = UDim2.new(0, 10, 0, 50)
+Container.BackgroundTransparency = 1
+local Layout = Instance.new("UIListLayout", Container)
+Layout.Padding = UDim.new(0, 8)
+
+-- 面板开关与拖拽逻辑
+ToggleButton.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
+
+local function CreateToggle(text, settingName)
+    local Btn = Instance.new("TextButton", Container)
+    Btn.Size = UDim2.new(1, 0, 0, 38)
+    Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    Btn.Text = text .. ": OFF"
+    Btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Instance.new("UICorner", Btn)
+
+    Btn.MouseButton1Click:Connect(function()
+        Settings[settingName] = not Settings[settingName]
+        Btn.Text = text .. ": " .. (Settings[settingName] and "ON" or "OFF")
+        Btn.TextColor3 = Settings[settingName] and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(180, 180, 180)
+    end)
+end
 
 CreateToggle("启用透视系统", "ESP_Enabled")
 CreateToggle("透视傻逼玩家", "Show_Players")
-CreateToggle("透视所有怪物(含NPC)", "Show_Monsters") -- 这里取消了NPC过滤
+CreateToggle("透视所有生物(含NPC)", "Show_Monsters")
 CreateToggle("显示没脑名字", "Show_Name")
-CreateToggle("显示傻逼距离", "Show_Distance")
+CreateToggle("显示距离", "Show_Distance")
 
--- [[ ESP 核心逻辑：移除所有限制条件 ]] --
+-- [[ 核心渲染逻辑优化 ]] --
 
 local function CreateESP(obj, color)
     if obj:FindFirstChild("EnESP") then return end
     
     local Highlight = Instance.new("Highlight", obj)
     Highlight.Name = "EnESP"
-    Highlight.FillTransparency = 0.6
+    Highlight.FillTransparency = 0.5
     Highlight.FillColor = color
-    Highlight.OutlineColor = Color3.new(1, 1, 1)
 
     local Billboard = Instance.new("BillboardGui", obj)
     Billboard.Name = "EnTag"
     Billboard.Size = UDim2.new(0, 100, 0, 20)
-    -- 适配：如果没头就绑在主躯干上
-    Billboard.Adornee = obj:FindFirstChild("Head") or obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
+    -- 适配：防止有些怪物没头，优先绑在 HumanoidRootPart 上
+    Billboard.Adornee = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj.PrimaryPart
     Billboard.AlwaysOnTop = true
     Billboard.ExtentsOffset = Vector3.new(0, 3, 0)
 
     local Label = Instance.new("TextLabel", Billboard)
+    Label.Name = "TagLabel"
     Label.Size = UDim2.new(1, 0, 1, 0)
     Label.BackgroundTransparency = 1
     Label.TextColor3 = color
     Label.Font = Enum.Font.GothamBold
     Label.TextSize = 12
     Label.Text = ""
-    Label.Name = "TagLabel"
 end
 
--- 性能优化处理
+-- 每 0.15 秒扫描一次，防止手机过热，同时保证流畅度
 local lastTick = 0
 RS.RenderStepped:Connect(function()
-    -- 彩虹 UI 逻辑省略...
-    
-    if tick() - lastTick < 0.15 then return end -- 稍微降低频率保护手机
+    if Settings.Rainbow_UI then
+        local hue = tick() % 5 / 5
+        local col = Color3.fromHSV(hue, 0.7, 1)
+        MainStroke.Color = col
+        BtnStroke.Color = col
+        Title.TextColor3 = col
+    end
+
+    if tick() - lastTick < 0.15 then return end
     lastTick = tick()
 
     if not Settings.ESP_Enabled then
@@ -52,39 +123,37 @@ RS.RenderStepped:Connect(function()
         return
     end
 
-    -- 深度遍历：不仅找第一层，防止怪物在文件夹里
-    -- 注意：大规模 Descendants 遍历在手机上较卡，建议针对特定文件夹改用 GetChildren
-    for _, v in pairs(workspace:GetDescendants()) do 
-        if v:IsA("Model") and v ~= LocalPlayer.Character then
-            local isPlayer = Players:GetPlayerFromCharacter(v)
-            -- 核心修改：只要有 Humanoid 就算怪物，不管是不是 NPC
-            local isHumanoid = v:FindFirstChildOfClass("Humanoid") 
-            
-            local valid = false
-            local col = Color3.new(1,1,1)
+    -- 使用 GetDescendants 以穿透文件夹寻找隐藏的怪物/NPC
+    for _, v in pairs(workspace:GetChildren()) do 
+        -- 如果怪物在文件夹里，可以把上面一行改为 workspace.Folder:GetChildren() 提高效率
+        local isPlayer = Players:GetPlayerFromCharacter(v)
+        -- 核心：只要有 Humanoid 就算怪物，不再检查 IsNPC 属性
+        local hasHumanoid = v:FindFirstChildOfClass("Humanoid") 
+        
+        local valid = false
+        local col = Color3.new(1,1,1)
 
-            if isPlayer and Settings.Show_Players then
-                valid = true
-                col = Color3.fromRGB(0, 170, 255)
-            elseif isHumanoid and not isPlayer and Settings.Show_Monsters then
-                valid = true
-                col = Color3.fromRGB(255, 40, 40)
-            end
+        if isPlayer and Settings.Show_Players and v ~= LocalPlayer.Character then
+            valid = true
+            col = Color3.fromRGB(0, 170, 255) -- 玩家蓝色
+        elseif hasHumanoid and not isPlayer and Settings.Show_Monsters then
+            valid = true
+            col = Color3.fromRGB(255, 40, 40) -- 怪物红色
+        end
 
-            -- 渲染逻辑
-            local root = v:FindFirstChild("HumanoidRootPart") or v.PrimaryPart
-            if valid and root then
-                CreateESP(v, col)
-                local tag = v:FindFirstChild("EnTag")
-                if tag and tag:FindFirstChild("TagLabel") then
-                    local dist = math.floor((LocalPlayer.Character.PrimaryPart.Position - root.Position).Magnitude)
-                    tag.TagLabel.Text = (Settings.Show_Name and v.Name or "") .. (Settings.Show_Distance and " ["..dist.."m]" or "")
-                end
-            else
-                -- 如果不再符合条件，则清除
-                if v:FindFirstChild("EnESP") then v.EnESP:Destroy() end
-                if v:FindFirstChild("EnTag") then v.EnTag:Destroy() end
+        if valid and (v:FindFirstChild("HumanoidRootPart") or v.PrimaryPart) then
+            CreateESP(v, col)
+            local tag = v:FindFirstChild("EnTag")
+            if tag and tag:FindFirstChild("TagLabel") then
+                local root = v:FindFirstChild("HumanoidRootPart") or v.PrimaryPart
+                local dist = math.floor((LocalPlayer.Character.PrimaryPart.Position - root.Position).Magnitude)
+                tag.TagLabel.Text = (Settings.Show_Name and v.Name or "") .. (Settings.Show_Distance and " ["..dist.."m]" or "")
             end
+        else
+            if v:FindFirstChild("EnESP") then v.EnESP:Destroy() end
+            if v:FindFirstChild("EnTag") then v.EnTag:Destroy() end
         end
     end
 end)
+
+print("1.en Hub Loaded! NPC filtering disabled.")
