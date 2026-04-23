@@ -1,4 +1,4 @@
--- [[ 1.en Hub: 高级透视 & 怪物过滤系统 ]] --
+-- [[ Iruka Hub: 高级透视 & 怪物过滤系统 ]] --
 
 local Players = game:GetService("Players")
 local RS = game:GetService("RunService")
