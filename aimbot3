@@ -1,0 +1,61 @@
+-- [[ 1.en Hub: Aimbot 模块 ]] --
+
+local Settings = {
+    Aimbot_Enabled = false,
+    Aim_Bone = "Head", -- 瞄准部位: "Head" 或 "UpperTorso"
+    Aimbot_Smoothness = 0.2, -- 平滑度 (0.01 - 1)，越小越平滑
+    Aimbot_FOV = 150, -- 锁定的圆圈范围
+    Show_FOV = true
+}
+
+local Camera = workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse() -- 虽然是手机，但底层坐标逻辑通用
+
+-- 1. 绘制 FOV 圆圈 (手机端可视化)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 460
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.7
+FOVCircle.Color = Color3.new(0, 1, 1)
+
+-- 2. 获取最靠近准星的目标
+local function GetClosestTarget()
+    local closestTarget = nil
+    local shortestDistance = Settings.Aimbot_FOV
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild(Settings.Aim_Bone) then
+            -- 检查目标是否在屏幕内
+            local pos, onScreen = Camera:WorldToViewportPoint(v.Character[Settings.Aim_Bone].Position)
+            if onScreen then
+                local distance = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                if distance < shortestDistance then
+                    closestTarget = v.Character[Settings.Aim_Bone]
+                    shortestDistance = distance
+                end
+            end
+        end
+    end
+    return closestTarget
+end
+
+-- 3. 核心追踪循环
+RS.RenderStepped:Connect(function()
+    -- 更新 FOV 圆圈位置
+    FOVCircle.Visible = Settings.Aimbot_Enabled and Settings.Show_FOV
+    FOVCircle.Radius = Settings.Aimbot_FOV
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    if Settings.Aimbot_Enabled then
+        local target = GetClosestTarget()
+        if target then
+            -- 移动端平滑差值计算 (Lerp)
+            local targetPos = Camera:WorldToToScreenPoint(target.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(
+                CFrame.new(Camera.CFrame.Position, target.Position), 
+                Settings.Aimbot_Smoothness
+            )
+        end
+    end
+end)
