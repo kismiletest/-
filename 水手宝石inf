@@ -1,117 +1,101 @@
--- [[ 1.en Hub: 水手宝石 范围修正版 ]] --
+-- [[ 1.en Hub: 无限范围绕过版 ]] --
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
-
--- 变量初始化
 local Character = Player.Character or Player.CharacterAdded:Wait()
 local RootPart = Character:WaitForChild("HumanoidRootPart")
 
-local enableInfiniteRange = false
-local InfiniteRangeVal = 999999
+-- 配置
+local Settings = {
+    Enabled = false,
+    AttackRange = 500, -- 虽然叫无限，但建议设置一个范围（如500-1000），防止被服务器瞬间踢出
+    AttackDelay = 0.03  -- 攻击间隔，防止物理引擎卡顿
+}
 
--- ========== 1. UI 面板构建 ==========
-local ScreenGui = Instance.new("ScreenGui", PlayerGui)
-ScreenGui.Name = "SailorGemUI_V2"
-ScreenGui.ResetOnSpawn = false
+-- [[ UI 面板 ]] --
+local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
+ScreenGui.Name = "BypassRangeUI"
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 180, 0, 90)
+MainFrame.Size = UDim2.new(0, 160, 0, 70)
 MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.BorderSizePixel = 0
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Instance.new("UICorner", MainFrame)
 
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "水手宝石 (修正版)"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.BackgroundTransparency = 1
-
 local ToggleBtn = Instance.new("TextButton", MainFrame)
-ToggleBtn.Size = UDim2.new(0, 140, 0, 35)
-ToggleBtn.Position = UDim2.new(0.5, -70, 0.5, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-ToggleBtn.Text = "功能: 关闭"
+ToggleBtn.Size = UDim2.new(1, -20, 1, -20)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 10)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+ToggleBtn.Text = "无限范围: 关闭"
 ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
-ToggleBtn.Font = Enum.Font.Gotham
+ToggleBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", ToggleBtn)
 
--- ========== 2. 核心逻辑优化 ==========
-
--- 更新按钮显示
-local function UpdateUI()
-    if enableInfiniteRange then
-        ToggleBtn.Text = "功能: 开启"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
-    else
-        ToggleBtn.Text = "功能: 关闭"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    end
-end
-
+-- 切换逻辑
 ToggleBtn.MouseButton1Click:Connect(function()
-    enableInfiniteRange = not enableInfiniteRange
-    UpdateUI()
+    Settings.Enabled = not Settings.Enabled
+    ToggleBtn.Text = "无限范围: " .. (Settings.Enabled and "开启" or "关闭")
+    ToggleBtn.BackgroundColor3 = Settings.Enabled and Color3.fromRGB(0, 170, 127) or Color3.fromRGB(50, 50, 55)
 end)
 
--- 优化内存扫描 (这是之前卡机的元凶)
-task.spawn(function()
-    while true do
-        task.wait(3) -- 每3秒扫描一次内存，足以维持范围，且不会让手机卡死
-        if enableInfiniteRange then
-            pcall(function()
-                local objects = getgc(true)
-                for i = 1, #objects do
-                    local v = objects[i]
-                    if type(v) == "table" and rawget(v, "Range") then
-                        v.Range = InfiniteRangeVal
-                    end
+-- [[ 核心绕过逻辑 ]] --
+
+-- 获取有效目标（过滤掉死掉的和太远的）
+local function GetTargets()
+    local targets = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            local tRoot = p.Character.HumanoidRootPart
+            if hum and hum.Health > 0 then
+                local dist = (RootPart.Position - tRoot.Position).Magnitude
+                if dist <= Settings.AttackRange then
+                    table.insert(targets, tRoot)
                 end
-            end)
-        end
-    end
-end)
-
--- 优化攻击逻辑 (防止暴力瞬移崩服)
-local function PerformAttack()
-    if not enableInfiniteRange then return end
-    
-    local originalPos = RootPart.CFrame
-    -- 仅扫描玩家或具有 Humanoid 的 Model，而不是整个 Workspace 的碎片
-    for _, targetPlayer in pairs(Players:GetPlayers()) do
-        if targetPlayer ~= Player and targetPlayer.Character then
-            local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local tHum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-            
-            if tRoot and tHum and tHum.Health > 0 then
-                -- 进行快速打击
-                RootPart.CFrame = tRoot.CFrame * CFrame.new(0, 0, 2)
-                task.wait(0.05) -- 给物理引擎喘息时间
             end
         end
     end
-    -- 返回原位
-    RootPart.CFrame = originalPos
+    return targets
 end
 
--- 按键绑定
+-- 绕过检测的攻击方法：坐标同步欺骗
+local function BypassAttack()
+    if not Settings.Enabled then return end
+    
+    local targets = GetTargets()
+    local oldCFrame = RootPart.CFrame
+    
+    for _, tRoot in pairs(targets) do
+        -- 原理：在极短的时间内（毫秒级）将你的坐标重叠在敌人身上并快速撤回
+        -- 这种方法通常能触发服务器判定“你在敌人身边”，从而实现远距离攻击
+        
+        -- 1. 瞬移到目标身后
+        RootPart.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3) 
+        
+        -- 2. 模拟攻击所需的微小等待（绕过距离校验）
+        task.wait(Settings.AttackDelay) 
+        
+        -- 3. 如果想更暴力，可以在此处触发你的技能代码
+        -- game:GetService("ReplicatedStorage").Events.Attack:FireServer() 
+    end
+    
+    -- 攻击完所有目标后返回
+    RootPart.CFrame = oldCFrame
+end
+
+-- 监听按键 E
 UIS.InputBegan:Connect(function(input, processed)
-    if processed or not enableInfiniteRange then return end
+    if processed or not Settings.Enabled then return end
     if input.KeyCode == Enum.KeyCode.E then
-        task.spawn(PerformAttack)
+        task.spawn(BypassAttack)
     end
 end)
 
--- 角色刷新处理
+-- 重生处理
 Player.CharacterAdded:Connect(function(newChar)
     Character = newChar
     RootPart = Character:WaitForChild("HumanoidRootPart")
 end)
 
-UpdateUI()
-print("✅ 优化版水手宝石加载完成，已移除卡顿逻辑")
+print("✅ 水手宝石绕过版加载成功")
