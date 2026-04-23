@@ -1,173 +1,99 @@
--- [[ 1.en Hub: 强力注入兼容版 ]] --
+-- [[ 1.en Hub - 核心功能强制版 ]] --
 
--- 基础变量获取
 local Players = game:GetService("Players")
 local RS = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- 尝试获取最安全的 UI 存放路径（防止被游戏检测或拦截）
-local TargetParent = nil
-if gethui then TargetParent = gethui()
-elseif syn and syn.protect_gui then 
-    local g = Instance.new("ScreenGui")
-    syn.protect_gui(g)
-    TargetParent = g
-elseif game:GetService("CoreGui"):FindFirstChild("RobloxGui") then
-    TargetParent = game:GetService("CoreGui").RobloxGui
-else
-    TargetParent = game:GetService("CoreGui")
-end
+-- 尝试在不同的地方创建 UI，直到成功为止
+local UI_Container = nil
+pcall(function() UI_Container = gethui() end)
+if not UI_Container then pcall(function() UI_Container = game:GetService("CoreGui") end) end
+if not UI_Container then UI_Container = LocalPlayer:WaitForChild("PlayerGui") end
 
--- 如果已经存在，先销毁旧的
-if TargetParent:FindFirstChild("1enHub_Universal") then
-    TargetParent:FindFirstChild("1enHub_Universal"):Destroy()
-end
+-- 状态
+_G.ESP_Active = false
+_G.Show_Players = false
+_G.Show_Monsters = false
 
-local ScreenGui = Instance.new("ScreenGui", TargetParent)
-ScreenGui.Name = "1enHub_Universal"
-ScreenGui.IgnoreGuiInset = true
+-- [[ 极简 UI 按钮 ]] --
+local Folder = Instance.new("ScreenGui", UI_Container)
+Folder.Name = "OneEnHub_Simple"
 
--- 配置
-local Settings = {
-    ESP = false,
-    Players = false,
-    Monsters = false,
-    Dist = true,
-    Names = true
-}
-
--- [[ UI 面板 ]] --
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 220, 0, 280)
-Main.Position = UDim2.new(0.5, -110, 0.5, -140)
-Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Main.BorderSizePixel = 0
-Main.Active = true
-Main.Draggable = true -- 使用旧版引擎自带拖拽，兼容性最强
-
-local Corner = Instance.new("UICorner", Main)
-local Stroke = Instance.new("UIStroke", Main)
-Stroke.Thickness = 2
-Stroke.Color = Color3.fromRGB(0, 255, 255)
-
-local Title = Instance.new("TextLabel", Main)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "1.en Hub"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
-Title.BackgroundTransparency = 1
-
-local Container = Instance.new("Frame", Main)
-Container.Size = UDim2.new(1, -20, 1, -50)
-Container.Position = UDim2.new(0, 10, 0, 45)
-Container.BackgroundTransparency = 1
-
-local Layout = Instance.new("UIListLayout", Container)
-Layout.Padding = UDim.new(0, 5)
-
--- 按钮创建器
-local function MakeToggle(name, key)
-    local btn = Instance.new("TextButton", Container)
-    btn.Size = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+local function CreateMiniBtn(name, pos, callback)
+    local btn = Instance.new("TextButton", Folder)
+    btn.Size = UDim2.new(0, 100, 0, 30)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     btn.Text = name .. ": OFF"
     btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 12
-    Instance.new("UICorner", btn)
-
+    btn.Font = Enum.Font.SourceSansBold
+    btn.BorderSizePixel = 2
+    btn.BorderColor3 = Color3.fromRGB(0, 255, 255)
+    btn.ZIndex = 10
+    
     btn.MouseButton1Click:Connect(function()
-        Settings[key] = not Settings[key]
-        btn.Text = name .. ": " .. (Settings[key] and "ON" or "OFF")
-        btn.BackgroundColor3 = Settings[key] and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(40, 40, 40)
+        local state = callback()
+        btn.Text = name .. ": " .. (state and "ON" or "OFF")
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(30, 30, 30)
     end)
+    return btn
 end
 
-MakeToggle("透视总开关", "ESP")
-MakeToggle("玩家透视", "Players")
-MakeToggle("怪物透视", "Monsters")
-MakeToggle("显示距离", "Dist")
-MakeToggle("显示名称", "Names")
+-- 创建控制按钮（位于左上角）
+CreateMiniBtn("总开关", UDim2.new(0, 10, 0, 50), function() _G.ESP_Active = not _G.ESP_Active return _G.ESP_Active end)
+CreateMiniBtn("透视玩家", UDim2.new(0, 10, 0, 90), function() _G.Show_Players = not _G.Show_Players return _G.Show_Players end)
+CreateMiniBtn("透视怪物", UDim2.new(0, 10, 0, 130), function() _G.Show_Monsters = not _G.Show_Monsters return _G.Show_Monsters end)
 
--- [[ ESP 系统 ]] --
-local function UpdateESP(obj, color)
-    local high = obj:FindFirstChild("High1en")
-    if not high then
-        high = Instance.new("Highlight")
-        high.Name = "High1en"
-        high.Parent = obj
-    end
-    high.FillColor = color
-    high.Enabled = Settings.ESP
-    high.FillTransparency = 0.5
-
-    local tag = obj:FindFirstChild("Tag1en")
-    if not tag then
-        tag = Instance.new("BillboardGui")
-        tag.Name = "Tag1en"
-        tag.Size = UDim2.new(0, 100, 0, 40)
-        tag.AlwaysOnTop = true
-        tag.ExtentsOffset = Vector3.new(0, 3, 0)
-        local l = Instance.new("TextLabel", tag)
-        l.Size = UDim2.new(1, 0, 1, 0)
-        l.BackgroundTransparency = 1
-        l.Font = Enum.Font.GothamBold
-        l.TextSize = 12
-        tag.Parent = obj
-    end
-    
-    local label = tag:FindFirstChildOfClass("TextLabel")
-    label.TextColor3 = color
-    label.Visible = Settings.ESP
-    
-    local dist = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) and 
-        math.floor((LocalPlayer.Character.HumanoidRootPart.Position - obj.HumanoidRootPart.Position).Magnitude) or 0
-    
-    local str = ""
-    if Settings.Names then str = obj.Name end
-    if Settings.Dist then str = str .. " [" .. dist .. "]" end
-    label.Text = str
-end
-
+-- [[ ESP 渲染代码 ]] --
 RS.RenderStepped:Connect(function()
-    -- 彩虹边框
-    Stroke.Color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
-    
-    if not Settings.ESP then
-        -- 隐藏所有
+    if not _G.ESP_Active then
         for _, v in pairs(workspace:GetDescendants()) do
-            if v.Name == "High1en" or v.Name == "Tag1en" then v:Destroy() end
+            if v.Name == "1en_ESP" then v:Destroy() end
         end
-        return 
+        return
     end
 
     for _, v in pairs(workspace:GetChildren()) do
         local isPlayer = Players:GetPlayerFromCharacter(v)
         local isMonster = v:FindFirstChild("Humanoid") and not isPlayer
         
-        -- 过滤 NPC (跳过没有 HRP 的或者名字含 NPC 的)
-        if isMonster and (v.Name:lower():find("npc") or not v:FindFirstChild("HumanoidRootPart")) then
+        -- 过滤 NPC
+        if isMonster and (v.Name:lower():find("npc") or v.Name:lower():find("quest")) then
             isMonster = false
         end
 
-        if isPlayer and Settings.Players and v ~= LocalPlayer.Character and v:FindFirstChild("HumanoidRootPart") then
-            UpdateESP(v, Color3.fromRGB(0, 255, 255))
-        elseif isMonster and Settings.Monsters and v:FindFirstChild("HumanoidRootPart") then
-            UpdateESP(v, Color3.fromRGB(255, 50, 50))
+        local show = false
+        local color = Color3.new(1, 1, 1)
+
+        if isPlayer and _G.Show_Players and v ~= LocalPlayer.Character then
+            show = true; color = Color3.fromRGB(0, 200, 255)
+        elseif isMonster and _G.Show_Monsters then
+            show = true; color = Color3.fromRGB(255, 50, 50)
+        end
+
+        if show and v:FindFirstChild("HumanoidRootPart") then
+            -- 绘制名字标签
+            local tag = v:FindFirstChild("1en_ESP")
+            if not tag then
+                tag = Instance.new("BillboardGui", v)
+                tag.Name = "1en_ESP"
+                tag.Size = UDim2.new(0, 100, 0, 30)
+                tag.AlwaysOnTop = true
+                tag.ExtentsOffset = Vector3.new(0, 3, 0)
+                local l = Instance.new("TextLabel", tag)
+                l.Size = UDim2.new(1, 0, 1, 0)
+                l.BackgroundTransparency = 1
+                l.Font = Enum.Font.SourceSansBold
+                l.TextSize = 14
+            end
+            local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - v.HumanoidRootPart.Position).Magnitude)
+            tag.TextLabel.Text = v.Name .. " [" .. dist .. "m]"
+            tag.TextLabel.TextColor3 = color
         else
-            if v:FindFirstChild("High1en") then v.High1en:Destroy() end
-            if v:FindFirstChild("Tag1en") then v.Tag1en:Destroy() end
+            if v:FindFirstChild("1en_ESP") then v["1en_ESP"]:Destroy() end
         end
     end
 end)
 
--- 快捷键：RightShift (考虑到部分执行器拦截了 Ctrl)
-UIS.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.RightControl then
-        ScreenGui.Enabled = not ScreenGui.Enabled
-    end
-end)
-
-print("1.en Hub 强力版已就绪 - 按右 Shift 或右 Ctrl 切换")
+print("1.en Hub Simple Loaded. Look at the left top corner.")
