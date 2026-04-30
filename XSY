@@ -5,7 +5,7 @@ end
 if setfpscap then
     setfpscap(1000000)
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "XSY",
+        Title = "1.en",
         Text = "帧率已解锁!",
         Duration = 5,
         Button1 = "好的"
@@ -13,7 +13,7 @@ if setfpscap then
     warn("FPS Unlocked!")
 else
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "XSY",
+        Title = "1.en",
         Text = "你的注入器不支持",
         Duration = 5,
         Button1 = "好的"
@@ -23,7 +23,7 @@ end
 
 local WindUI = (loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")))();
 local Window = WindUI:CreateWindow({
-    Title = "XSY中心",
+    Title = "1.en中心",
     Author = "Blox Fruit",
     Folder = "BY　1.en",
     Size = UDim2.fromOffset(550, 300),
@@ -39,7 +39,7 @@ local Window = WindUI:CreateWindow({
     },
 });
 Window:EditOpenButton({
-    Title = "XSY中心-打開",
+    Title = "1.en中心-打開",
     Icon = "monitor",
     CornerRadius = UDim.new(0, 6),
     StrokeThickness = 2,
