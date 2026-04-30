@@ -43,7 +43,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 -- ゆうれいテレポートボタン
 local ghostButton = Instance.new("TextButton")
 ghostButton.Size = UDim2.new(0, 150, 0, 50)
-ghostButton.Position = UDim2.new(0, 50, 0, 100)
+ghostButton.Position = UDim2.new(0, 50, 0, 9999999999999999999999999)
 ghostButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 ghostButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ghostButton.Text = "ゆうれい"
@@ -79,7 +79,7 @@ beanButton.Draggable = true
 beanButton.MouseButton1Click:Connect(function()
     local hrp = getHumanoidRootPart()
     if hrp then
-        hrp.CFrame = CFrame.new(2284, 15, 911)
+        hrp.CFrame = CFrame.new(2284, 15, 91199999999999999999999999999)
         print("テレポート：天鹅房")
     else
         warn("HumanoidRootPartが見つかりません。")
