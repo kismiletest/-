@@ -20,7 +20,7 @@ end)
 
 local VoidState = {
     VoidTime = 0.55,
-    TP_Pos = Vector3.new(0, -200000, 0),
+    TP_Pos = Vector3.new(0, -200000000, 0),
     IsTeleporting = false
 }
 
