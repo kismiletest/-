@@ -1,0 +1,27 @@
+repeat wait() until game:IsLoaded() and game.Players.LocalPlayer
+getgenv().Key = ""
+getgenv().config =  {
+    team = "Pirates", -- "Pirates" "Marines"
+    hpTimeout = 15,
+    targetTimeout = 20,
+    lowHealth = 4000,
+    safeHealth = 4500,
+    blackScreen = false,
+    useSkill = false, -- only x f gas fruit
+    equipPaleScarf = false,
+    webhookurl = "",
+    webhookEnable = false,
+    webhookSendMinutes = 5,
+    attackSpeed = 0.001,
+    mode = 1, -- 2 or 1 
+    sea = 3,
+    region = "Singapore",
+    trans = false, -- auto press V t rex 
+    bltween = true, -- bypass may thang di chuyen toc do cao lien tuc > 7s - kho gay dame 
+    bpsit = true, -- khong hunt may thang ngoi thuyen - kho gay dame 
+    autoEatFruit = false, 
+    autoEatFruitNames = "", -- T-Rex-T-Rex", "Gas-Gas", "Dragon-Dragon", "Kitsune-Kitsune", "Pain-Pain", "Blade-Blade"
+    boostfps = false,
+    autoV4 = false, 
+}
+loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/refs/heads/main/Bountynew.lua"))()
