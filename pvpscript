@@ -1,5 +1,4 @@
--- wow this script had an infinite loop that wasnt resolved, this output was generated at runtime and is very bad.
--- script id: 44f9ab8b96cd4d13.lua
+
 local _gameGetService2 =game["GetService"]
 local _call3 =_gameGetService2(game, "RunService")
 local _gameHttpGet4 =game["HttpGet"]
