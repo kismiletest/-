@@ -1,10 +1,62 @@
+--// WIND UI
+local WindUI = loadstring(game:HttpGet(
+"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
+))()
+
 --------------------------------------------------
--- FULL PLAYER ESP (NO BUG)
+-- SERVICES
 --------------------------------------------------
 
-local ESPFolder = Instance.new("Folder")
-ESPFolder.Name = "1enESPFolder"
-ESPFolder.Parent = game.CoreGui
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- VARIABLES
+--------------------------------------------------
+
+local KillAura = false
+local ESPEnabled = false
+local HakiEnabled = false
+
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
+
+local Window = WindUI:CreateWindow({
+    Title = "1.en Hub",
+    Icon = "swords",
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(540,420),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 170,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
+})
+
+local Tabs = {
+    Combat = Window:Tab({
+        Title = "Combat",
+        Icon = "sword"
+    }),
+
+    Visual = Window:Tab({
+        Title = "Visual",
+        Icon = "eye"
+    })
+}
+
+--------------------------------------------------
+-- FULL PLAYER ESP
+--------------------------------------------------
 
 local ESPConnections = {}
 
@@ -17,17 +69,17 @@ local function RemoveESP(Player)
 
     if Player.Character then
 
-        local Char = Player.Character
+        local Character = Player.Character
 
         local ESP =
-            Char:FindFirstChild("1enESP")
+            Character:FindFirstChild("1enESP")
 
         if ESP then
             ESP:Destroy()
         end
 
         local Head =
-            Char:FindFirstChild("Head")
+            Character:FindFirstChild("Head")
 
         if Head then
 
@@ -121,8 +173,7 @@ local function AddESP(Player)
     --------------------------------------------------
 
     ESPConnections[Player] =
-        game:GetService("RunService")
-        .RenderStepped:Connect(function()
+        RunService.RenderStepped:Connect(function()
 
         if not ESPEnabled then
             return
@@ -166,7 +217,7 @@ local function AddESP(Player)
 end
 
 --------------------------------------------------
--- LOAD PLAYERS
+-- PLAYER LOAD
 --------------------------------------------------
 
 local function SetupPlayer(Player)
@@ -200,7 +251,7 @@ Players.PlayerAdded:Connect(
 )
 
 --------------------------------------------------
--- TOGGLE
+-- ESP TOGGLE
 --------------------------------------------------
 
 Tabs.Visual:Toggle({
@@ -233,3 +284,84 @@ Tabs.Visual:Toggle({
         end
     end
 })
+
+--------------------------------------------------
+-- KILL AURA
+--------------------------------------------------
+
+Tabs.Combat:Toggle({
+    Title = "Kill Aura",
+    Value = false,
+
+    Callback = function(v)
+        KillAura = v
+    end
+})
+
+task.spawn(function()
+
+    while task.wait(0.1) do
+
+        if KillAura then
+
+            pcall(function()
+
+                local Character =
+                    LocalPlayer.Character
+
+                if not Character then
+                    return
+                end
+
+                local Tool =
+                    Character:FindFirstChildOfClass(
+                        "Tool"
+                    )
+
+                if Tool then
+                    Tool:Activate()
+                end
+
+            end)
+        end
+    end
+end)
+
+--------------------------------------------------
+-- AUTO HAKI
+--------------------------------------------------
+
+Tabs.Combat:Toggle({
+    Title = "Auto Haki",
+    Value = false,
+
+    Callback = function(v)
+
+        if v and not HakiEnabled then
+
+            HakiEnabled = true
+
+            pcall(function()
+
+                ReplicatedStorage.Remotes
+                .CommF_:InvokeServer(
+                    "Buso"
+                )
+
+            end)
+
+        end
+
+        if not v then
+            HakiEnabled = false
+        end
+    end
+})
+
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(
+    Enum.KeyCode.RightControl
+)
