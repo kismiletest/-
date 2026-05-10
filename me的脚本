@@ -57,19 +57,20 @@ local Tabs = {
 -- REMOVE ESP
 --------------------------------------------------
 
-local function RemoveESP(Model)
+local function RemoveESP(Character)
 
-    local ESP = Model:FindFirstChild("1enESP")
+    local ESP = Character:FindFirstChild("1enESP")
 
     if ESP then
         ESP:Destroy()
     end
 
-    local Head = Model:FindFirstChild("Head")
+    local Head = Character:FindFirstChild("Head")
 
     if Head then
 
-        local Billboard = Head:FindFirstChild("1enBillboard")
+        local Billboard =
+            Head:FindFirstChild("1enBillboard")
 
         if Billboard then
             Billboard:Destroy()
@@ -78,164 +79,172 @@ local function RemoveESP(Model)
 end
 
 --------------------------------------------------
--- CREATE ESP
+-- PLAYER ESP ONLY
 --------------------------------------------------
 
-local function CreateESP(Model, Name)
-
-    if not ESPEnabled then
-        return
-    end
-
-    local Humanoid = Model:FindFirstChild("Humanoid")
-    local Head = Model:FindFirstChild("Head")
-    local HRP = Model:FindFirstChild("HumanoidRootPart")
-
-    if not Humanoid or not Head or not HRP then
-        return
-    end
-
-    RemoveESP(Model)
-
-    --------------------------------------------------
-    -- OUTLINE ONLY
-    --------------------------------------------------
-
-    local Highlight = Instance.new("Highlight")
-    Highlight.Name = "1enESP"
-    Highlight.FillTransparency = 1
-    Highlight.OutlineTransparency = 0
-    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    Highlight.Parent = Model
-
-    --------------------------------------------------
-    -- NAME + HP + DISTANCE
-    --------------------------------------------------
-
-    local Billboard = Instance.new("BillboardGui")
-    Billboard.Name = "1enBillboard"
-    Billboard.Size = UDim2.new(0,200,0,50)
-    Billboard.AlwaysOnTop = true
-    Billboard.StudsOffset = Vector3.new(0,2.5,0)
-    Billboard.Parent = Head
-
-    local Text = Instance.new("TextLabel")
-    Text.Size = UDim2.new(1,0,1,0)
-    Text.BackgroundTransparency = 1
-    Text.TextScaled = true
-    Text.Font = Enum.Font.GothamBold
-    Text.TextColor3 = Color3.new(1,1,1)
-    Text.TextStrokeTransparency = 0
-    Text.Parent = Billboard
-
-    task.spawn(function()
-
-        while Model.Parent and Billboard.Parent and ESPEnabled do
-            task.wait(0.2)
-
-            local MyHRP =
-                LocalPlayer.Character and
-                LocalPlayer.Character:FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            if not MyHRP then
-                continue
-            end
-
-            local Distance = math.floor(
-                (MyHRP.Position - HRP.Position).Magnitude
-            )
-
-            Text.Text =
-                Name ..
-                "\nHP : " ..
-                math.floor(Humanoid.Health) ..
-                "\nDistance : " ..
-                Distance
-        end
-    end)
-end
-
---------------------------------------------------
--- PLAYER ESP
---------------------------------------------------
-
-local function SetupPlayer(Player)
+local function CreateESP(Player)
 
     if Player == LocalPlayer then
         return
     end
 
+    local function Setup(Character)
+
+        if not ESPEnabled then
+            return
+        end
+
+        local Humanoid =
+            Character:WaitForChild("Humanoid",5)
+
+        local Head =
+            Character:WaitForChild("Head",5)
+
+        local HRP =
+            Character:WaitForChild(
+                "HumanoidRootPart",5
+            )
+
+        if not Humanoid or not Head or not HRP then
+            return
+        end
+
+        RemoveESP(Character)
+
+        --------------------------------------------------
+        -- HIGHLIGHT
+        --------------------------------------------------
+
+        local Highlight = Instance.new("Highlight")
+        Highlight.Name = "1enESP"
+        Highlight.FillTransparency = 1
+        Highlight.OutlineTransparency = 0
+        Highlight.DepthMode =
+            Enum.HighlightDepthMode.AlwaysOnTop
+        Highlight.Parent = Character
+
+        --------------------------------------------------
+        -- BILLBOARD
+        --------------------------------------------------
+
+        local Billboard = Instance.new("BillboardGui")
+        Billboard.Name = "1enBillboard"
+        Billboard.Size = UDim2.new(0,200,0,50)
+        Billboard.AlwaysOnTop = true
+        Billboard.StudsOffset =
+            Vector3.new(0,2.5,0)
+        Billboard.Parent = Head
+
+        local Text = Instance.new("TextLabel")
+        Text.Size = UDim2.new(1,0,1,0)
+        Text.BackgroundTransparency = 1
+        Text.TextScaled = true
+        Text.Font = Enum.Font.GothamBold
+        Text.TextColor3 = Color3.new(1,1,1)
+        Text.TextStrokeTransparency = 0
+        Text.Parent = Billboard
+
+        --------------------------------------------------
+        -- UPDATE
+        --------------------------------------------------
+
+        task.spawn(function()
+
+            while ESPEnabled
+            and Character.Parent
+            and Billboard.Parent do
+
+                task.wait(0.2)
+
+                local MyHRP =
+                    LocalPlayer.Character and
+                    LocalPlayer.Character:
+                    FindFirstChild(
+                        "HumanoidRootPart"
+                    )
+
+                if not MyHRP then
+                    continue
+                end
+
+                local Distance =
+                    math.floor(
+                        (
+                            MyHRP.Position
+                            - HRP.Position
+                        ).Magnitude
+                    )
+
+                Text.Text =
+                    Player.Name ..
+                    "\nHP : " ..
+                    math.floor(Humanoid.Health) ..
+                    "\nDistance : " ..
+                    Distance
+            end
+        end)
+    end
+
     if Player.Character then
-        CreateESP(Player.Character, Player.Name)
+        Setup(Player.Character)
     end
 
     Player.CharacterAdded:Connect(function(Char)
+
         task.wait(1)
-        CreateESP(Char, Player.Name)
+
+        if ESPEnabled then
+            Setup(Char)
+        end
     end)
 end
 
-for _,Player in pairs(Players:GetPlayers()) do
-    SetupPlayer(Player)
+--------------------------------------------------
+-- LOAD PLAYERS
+--------------------------------------------------
+
+for _,Player in pairs(
+    Players:GetPlayers()
+) do
+    CreateESP(Player)
 end
 
-Players.PlayerAdded:Connect(SetupPlayer)
-
---------------------------------------------------
--- MOB ESP
---------------------------------------------------
-
-task.spawn(function()
-
-    while task.wait(3) do
-
-        if ESPEnabled and workspace:FindFirstChild("Enemies") then
-
-            for _,Mob in pairs(workspace.Enemies:GetChildren()) do
-
-                if Mob:FindFirstChild("Humanoid") then
-                    CreateESP(Mob, Mob.Name)
-                end
-            end
-        end
-    end
-end)
+Players.PlayerAdded:Connect(CreateESP)
 
 --------------------------------------------------
 -- ESP TOGGLE
 --------------------------------------------------
 
 Tabs.Visual:Toggle({
-    Title = "Player + Mob ESP",
+
+    Title = "Player ESP",
     Value = false,
 
     Callback = function(v)
 
         ESPEnabled = v
 
-        if not v then
+        if v then
 
-            --------------------------------------------------
-            -- REMOVE PLAYER ESP
-            --------------------------------------------------
+            for _,Player in pairs(
+                Players:GetPlayers()
+            ) do
 
-            for _,Player in pairs(Players:GetPlayers()) do
+                if Player ~= LocalPlayer
+                and Player.Character then
 
-                if Player.Character then
-                    RemoveESP(Player.Character)
+                    CreateESP(Player)
                 end
             end
 
-            --------------------------------------------------
-            -- REMOVE MOB ESP
-            --------------------------------------------------
+        else
 
-            if workspace:FindFirstChild("Enemies") then
+            for _,Player in pairs(
+                Players:GetPlayers()
+            ) do
 
-                for _,Mob in pairs(workspace.Enemies:GetChildren()) do
-                    RemoveESP(Mob)
+                if Player.Character then
+                    RemoveESP(Player.Character)
                 end
             end
         end
