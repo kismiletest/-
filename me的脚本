@@ -12,6 +12,8 @@ local WindUI = loadstring(game:HttpGet(
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -20,6 +22,7 @@ local LocalPlayer = Players.LocalPlayer
 --------------------------------------------------
 
 local AutoDungeon = false
+local DungeonConnection
 
 --------------------------------------------------
 -- WINDOW
@@ -59,45 +62,64 @@ Tabs.Main:Toggle({
 
     Callback = function(v)
         AutoDungeon = v
-    end
-})
 
-task.spawn(function()
-    while task.wait(1) do
-        if AutoDungeon then
-            pcall(function()
+        if v then
+            task.spawn(function()
 
-                -- 自动攻击
-                local Character = LocalPlayer.Character
-                if Character then
-                    local Tool = Character:FindFirstChildOfClass("Tool")
+                while AutoDungeon do
+                    task.wait(1)
 
-                    if Tool then
-                        Tool:Activate()
+                    pcall(function()
 
-                        VirtualUser:Button1Down(
-                            Vector2.new(0,0),
-                            workspace.CurrentCamera.CFrame
-                        )
-                    end
+                        local character =
+                            LocalPlayer.Character or
+                            LocalPlayer.CharacterAdded:Wait()
+
+                        local humanoidRootPart =
+                            character:WaitForChild("HumanoidRootPart")
+
+                        local map = Workspace:FindFirstChild("Map")
+                        if not map then return end
+
+                        local dungeonFolder =
+                            map:FindFirstChild("Dungeon")
+
+                        if not dungeonFolder then return end
+
+                        for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
+
+                            local teleporter =
+                                levelFolder:FindFirstChild("ExitTeleporter")
+
+                            if teleporter and teleporter:FindFirstChild("Root") then
+
+                                local rootPart = teleporter.Root
+
+                                local distance =
+                                    (humanoidRootPart.Position - rootPart.Position).Magnitude
+
+                                if distance <= 1000 then
+
+                                    local tween =
+                                        TweenService:Create(
+                                            humanoidRootPart,
+                                            TweenInfo.new(0.8),
+                                            {CFrame = rootPart.CFrame}
+                                        )
+
+                                    tween:Play()
+                                    tween.Completed:Wait()
+
+                                    break
+                                end
+                            end
+                        end
+                    end)
                 end
-
-                -- 自动霸气
-                local Remotes =
-                    ReplicatedStorage:
-                    FindFirstChild("Remotes")
-
-                if Remotes and
-                Remotes:FindFirstChild("CommF_") then
-
-                    Remotes.CommF_:
-                    InvokeServer("Buso")
-                end
-
             end)
         end
     end
-end)
+})
 
 --------------------------------------------------
 -- KEYBIND
