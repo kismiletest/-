@@ -97,7 +97,13 @@ local function getCurrentDungeon()
     end
 
     for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
-        if levelFolder:FindFirstChild(CONFIG.TargetTeleporterName) then
+
+        local teleporter = levelFolder:FindFirstChild(
+            CONFIG.TargetTeleporterName,
+            true
+        )
+
+        if teleporter then
             return levelFolder.Name
         end
     end
@@ -105,7 +111,7 @@ local function getCurrentDungeon()
     return "Unknown"
 end
 
--- Get Teleporters
+-- 获取所有传送点
 local function getAllExitTeleporters()
     local teleporters = {}
 
@@ -116,10 +122,14 @@ local function getAllExitTeleporters()
     if not dungeonFolder then return teleporters end
 
     for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
-        local teleporter = levelFolder:FindFirstChild(CONFIG.TargetTeleporterName)
+
+        local teleporter = levelFolder:FindFirstChild(
+            CONFIG.TargetTeleporterName,
+            true
+        )
 
         if teleporter then
-            local rootPart = teleporter:FindFirstChild("Root")
+            local rootPart = teleporter:FindFirstChild("Root", true)
 
             if rootPart then
                 table.insert(teleporters, {
@@ -138,6 +148,7 @@ local function teleportToTarget(rootPart)
     if isTeleporting then return end
 
     local currentTime = tick()
+
     if currentTime - lastTeleportTime < CONFIG.CooldownAfterTeleport then
         return
     end
@@ -165,12 +176,14 @@ local function teleportToTarget(rootPart)
     tween:Play()
 
     tween.Completed:Connect(function()
+
         if CONFIG.DisableMovement then
             humanoid.WalkSpeed = 16
             humanoid.JumpPower = 50
         end
 
         task.wait(0.5)
+
         isTeleporting = false
     end)
 end
@@ -180,14 +193,21 @@ local function mainLoop()
     while true do
         task.wait(CONFIG.CheckInterval)
 
-        DungeonLabel.Text = "Dungeon : " .. getCurrentDungeon()
+        DungeonLabel.Text =
+            "Dungeon : " .. getCurrentDungeon()
 
         if isDetecting then
+
             if humanoid.Health > 0 then
-                local teleporters = getAllExitTeleporters()
+
+                local teleporters =
+                    getAllExitTeleporters()
 
                 for _, tp in ipairs(teleporters) do
-                    local distance = (humanoidRootPart.Position - tp.position).Magnitude
+
+                    local distance =
+                        (humanoidRootPart.Position
+                        - tp.position).Magnitude
 
                     if distance <= CONFIG.DetectionRadius then
                         teleportToTarget(tp.rootPart)
@@ -201,15 +221,23 @@ end
 
 -- Toggle Button
 ToggleButton.MouseButton1Click:Connect(function()
+
     isDetecting = not isDetecting
 
     if isDetecting then
+
         ToggleButton.Text = "STOP"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
+        ToggleButton.BackgroundColor3 =
+            Color3.fromRGB(0,170,0)
+
         StatusLabel.Text = "Status : ON"
+
     else
+
         ToggleButton.Text = "START"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(170,0,0)
+        ToggleButton.BackgroundColor3 =
+            Color3.fromRGB(170,0,0)
+
         StatusLabel.Text = "Status : OFF"
     end
 end)
