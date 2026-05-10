@@ -84,8 +84,9 @@ local function updateCharacterReferences()
     humanoid = character:WaitForChild("Humanoid")
 end
 
--- 获取地下城关卡
+-- 获取当前最近地下城
 local function getCurrentDungeon()
+
     local map = Workspace:FindFirstChild("Map")
     if not map then
         return "None"
@@ -96,6 +97,9 @@ local function getCurrentDungeon()
         return "None"
     end
 
+    local closestName = "Unknown"
+    local closestDistance = math.huge
+
     for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
 
         local teleporter = levelFolder:FindFirstChild(
@@ -104,22 +108,43 @@ local function getCurrentDungeon()
         )
 
         if teleporter then
-            return levelFolder.Name
+
+            local rootPart = teleporter:FindFirstChild(
+                "Root",
+                true
+            )
+
+            if rootPart then
+
+                local distance =
+                    (humanoidRootPart.Position
+                    - rootPart.Position).Magnitude
+
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestName = levelFolder.Name
+                end
+            end
         end
     end
 
-    return "Unknown"
+    return closestName
 end
 
 -- 获取所有传送点
 local function getAllExitTeleporters()
+
     local teleporters = {}
 
     local map = Workspace:FindFirstChild("Map")
-    if not map then return teleporters end
+    if not map then
+        return teleporters
+    end
 
     local dungeonFolder = map:FindFirstChild("Dungeon")
-    if not dungeonFolder then return teleporters end
+    if not dungeonFolder then
+        return teleporters
+    end
 
     for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
 
@@ -129,9 +154,14 @@ local function getAllExitTeleporters()
         )
 
         if teleporter then
-            local rootPart = teleporter:FindFirstChild("Root", true)
+
+            local rootPart = teleporter:FindFirstChild(
+                "Root",
+                true
+            )
 
             if rootPart then
+
                 table.insert(teleporters, {
                     rootPart = rootPart,
                     position = rootPart.Position
@@ -145,11 +175,15 @@ end
 
 -- Teleport Function
 local function teleportToTarget(rootPart)
-    if isTeleporting then return end
+
+    if isTeleporting then
+        return
+    end
 
     local currentTime = tick()
 
-    if currentTime - lastTeleportTime < CONFIG.CooldownAfterTeleport then
+    if currentTime - lastTeleportTime
+        < CONFIG.CooldownAfterTeleport then
         return
     end
 
@@ -190,7 +224,9 @@ end
 
 -- Main Loop
 local function mainLoop()
+
     while true do
+
         task.wait(CONFIG.CheckInterval)
 
         DungeonLabel.Text =
@@ -210,7 +246,9 @@ local function mainLoop()
                         - tp.position).Magnitude
 
                     if distance <= CONFIG.DetectionRadius then
+
                         teleportToTarget(tp.rootPart)
+
                         break
                     end
                 end
@@ -227,6 +265,7 @@ ToggleButton.MouseButton1Click:Connect(function()
     if isDetecting then
 
         ToggleButton.Text = "STOP"
+
         ToggleButton.BackgroundColor3 =
             Color3.fromRGB(0,170,0)
 
@@ -235,6 +274,7 @@ ToggleButton.MouseButton1Click:Connect(function()
     else
 
         ToggleButton.Text = "START"
+
         ToggleButton.BackgroundColor3 =
             Color3.fromRGB(170,0,0)
 
@@ -244,7 +284,9 @@ end)
 
 -- Character Respawn
 localPlayer.CharacterAdded:Connect(function()
+
     task.wait(1)
+
     updateCharacterReferences()
 end)
 
