@@ -1,6 +1,6 @@
 repeat task.wait() until game:IsLoaded()
 
---// WIND UI
+--// UI
 local WindUI = loadstring(game:HttpGet(
 "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
 ))()
@@ -9,20 +9,24 @@ local WindUI = loadstring(game:HttpGet(
 -- SERVICES
 --------------------------------------------------
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
+local Services = {
+    Players = game:GetService("Players"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
+    VirtualUser = game:GetService("VirtualUser"),
+    RunService = game:GetService("RunService")
+}
 
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = Services.Players.LocalPlayer
 
 --------------------------------------------------
--- VARIABLES
+-- STATES
 --------------------------------------------------
 
-local AttackAura = false
-local AutoV3 = false
-local AutoV4 = false
-local HakiEnabled = false
+local States = {
+    FeatureA = false,
+    FeatureB = false,
+    FeatureC = false
+}
 
 --------------------------------------------------
 -- WINDOW
@@ -45,33 +49,110 @@ local Window = WindUI:CreateWindow({
     }
 })
 
+--------------------------------------------------
+-- TABS
+--------------------------------------------------
+
 local Tabs = {
-    Combat = Window:Tab({
-        Title = "Combat",
-        Icon = "sword"
+    Main = Window:Tab({
+        Title = "Main",
+        Icon = "home"
+    }),
+
+    Player = Window:Tab({
+        Title = "Player",
+        Icon = "user"
     })
 }
 
 --------------------------------------------------
--- ATTACK AURA
+-- MAIN FEATURES
 --------------------------------------------------
 
-Tabs.Combat:Toggle({
-    Title = "Attack Aura",
+Tabs.Main:Toggle({
+    Title = "Feature A",
     Value = false,
 
     Callback = function(v)
-        AttackAura = v
+        States.FeatureA = v
     end
 })
 
+Tabs.Main:Toggle({
+    Title = "Feature B",
+    Value = false,
+
+    Callback = function(v)
+        States.FeatureB = v
+    end
+})
+
+Tabs.Main:Toggle({
+    Title = "Feature C",
+    Value = false,
+
+    Callback = function(v)
+        States.FeatureC = v
+    end
+})
+
+--------------------------------------------------
+-- PLAYER
+--------------------------------------------------
+
+Tabs.Player:Slider({
+    Title = "WalkSpeed",
+    Value = {
+        Min = 16,
+        Max = 200,
+        Default = 16
+    },
+
+    Callback = function(v)
+
+        pcall(function()
+
+            local Character =
+                LocalPlayer.Character
+
+            if Character and
+            Character:FindFirstChild("Humanoid") then
+
+                Character.Humanoid.WalkSpeed = v
+            end
+
+        end)
+    end
+})
+
+--------------------------------------------------
+-- ANTI AFK
+--------------------------------------------------
+
+LocalPlayer.Idled:Connect(function()
+
+    Services.VirtualUser:CaptureController()
+
+    Services.VirtualUser:ClickButton2(
+        Vector2.new(0,0)
+    )
+end)
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+
 task.spawn(function()
 
-    while task.wait(0.08) do
+    while task.wait(0.3) do
 
-        if AttackAura then
+        --------------------------------------------------
+        -- FEATURE A
+        --------------------------------------------------
 
-            pcall(function()
+        if States.FeatureA then
+
+            local ok, err = pcall(function()
 
                 local Character =
                     LocalPlayer.Character
@@ -82,141 +163,54 @@ task.spawn(function()
 
                 local Tool =
                     Character:
-                    FindFirstChildOfClass(
-                        "Tool"
-                    )
+                    FindFirstChildOfClass("Tool")
 
                 if Tool then
-
                     Tool:Activate()
-
-                    VirtualUser:Button1Down(
-                        Vector2.new(0,0),
-                        workspace.CurrentCamera.CFrame
-                    )
                 end
 
             end)
+
+            if not ok then
+                warn(err)
+            end
+        end
+
+        --------------------------------------------------
+        -- FEATURE B
+        --------------------------------------------------
+
+        if States.FeatureB then
+
+            local ok, err = pcall(function()
+
+                -- Your logic here
+
+            end)
+
+            if not ok then
+                warn(err)
+            end
+        end
+
+        --------------------------------------------------
+        -- FEATURE C
+        --------------------------------------------------
+
+        if States.FeatureC then
+
+            local ok, err = pcall(function()
+
+                -- Your logic here
+
+            end)
+
+            if not ok then
+                warn(err)
+            end
         end
     end
 end)
-
---------------------------------------------------
--- AUTO V3
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "Auto V3",
-    Value = false,
-
-    Callback = function(v)
-        AutoV3 = v
-    end
-})
-
-task.spawn(function()
-
-    while task.wait(0.5) do
-
-        if AutoV3 then
-
-            pcall(function()
-
-                local Remotes =
-                    ReplicatedStorage:
-                    FindFirstChild("Remotes")
-
-                if Remotes and
-                Remotes:FindFirstChild("CommE") then
-
-                    Remotes.CommE:
-                    FireServer(
-                        "ActivateAbility"
-                    )
-                end
-
-            end)
-        end
-    end
-end)
-
---------------------------------------------------
--- AUTO V4
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "Auto V4",
-    Value = false,
-
-    Callback = function(v)
-        AutoV4 = v
-    end
-})
-
-task.spawn(function()
-
-    while task.wait(0.5) do
-
-        if AutoV4 then
-
-            pcall(function()
-
-                local Remotes =
-                    ReplicatedStorage:
-                    FindFirstChild("Remotes")
-
-                if Remotes and
-                Remotes:FindFirstChild("CommF_") then
-
-                    Remotes.CommF_:
-                    InvokeServer(
-                        "ActivateRace"
-                    )
-                end
-
-            end)
-        end
-    end
-end)
-
---------------------------------------------------
--- AUTO HAKI
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "Auto Haki",
-    Value = false,
-
-    Callback = function(v)
-
-        if v and not HakiEnabled then
-
-            HakiEnabled = true
-
-            pcall(function()
-
-                local Remotes =
-                    ReplicatedStorage:
-                    FindFirstChild("Remotes")
-
-                if Remotes and
-                Remotes:FindFirstChild("CommF_") then
-
-                    Remotes.CommF_:
-                    InvokeServer(
-                        "Buso"
-                    )
-                end
-
-            end)
-
-        end
-
-        if not v then
-            HakiEnabled = false
-        end
-    end
-})
 
 --------------------------------------------------
 -- KEYBIND
