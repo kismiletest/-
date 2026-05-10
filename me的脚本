@@ -1,7 +1,19 @@
---// WIND UI
-local WindUI = loadstring(game:HttpGet(
-"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
-))()
+repeat task.wait() until game:IsLoaded()
+
+--------------------------------------------------
+-- LOAD WIND UI
+--------------------------------------------------
+
+local success, WindUI = pcall(function()
+    return loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
+    ))()
+end)
+
+if not success then
+    warn("WindUI Load Failed")
+    return
+end
 
 --------------------------------------------------
 -- SERVICES
@@ -55,7 +67,7 @@ local Tabs = {
 }
 
 --------------------------------------------------
--- FULL PLAYER ESP
+-- REMOVE ESP
 --------------------------------------------------
 
 local ESPConnections = {}
@@ -94,6 +106,10 @@ local function RemoveESP(Player)
         end
     end
 end
+
+--------------------------------------------------
+-- PLAYER ESP
+--------------------------------------------------
 
 local function AddESP(Player)
 
@@ -169,7 +185,7 @@ local function AddESP(Player)
     Text.Parent = Billboard
 
     --------------------------------------------------
-    -- UPDATE LOOP
+    -- UPDATE
     --------------------------------------------------
 
     ESPConnections[Player] =
@@ -343,10 +359,22 @@ Tabs.Combat:Toggle({
 
             pcall(function()
 
-                ReplicatedStorage.Remotes
-                .CommF_:InvokeServer(
-                    "Buso"
-                )
+                local Remotes =
+                    ReplicatedStorage:
+                    FindFirstChild("Remotes")
+
+                if Remotes then
+
+                    local CommF =
+                        Remotes:
+                        FindFirstChild("CommF_")
+
+                    if CommF then
+                        CommF:InvokeServer(
+                            "Buso"
+                        )
+                    end
+                end
 
             end)
 
