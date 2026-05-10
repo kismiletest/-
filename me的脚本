@@ -1,28 +1,32 @@
-# Roblox WindUI Combat Hub Template
+--// WindUI
+local WindUI = loadstring(game:HttpGet(
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+))()
 
-```lua
--- WindUI
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-
+--// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 
--- Variables
-local ESPEnabled = false
+---------------------------------------------------
+-- VARIABLES
+---------------------------------------------------
+
 local AutoM1 = false
 local AutoV3 = false
 local AutoV4 = false
+local ESP = false
 
---------------------------------------------------
+---------------------------------------------------
 -- WINDOW
---------------------------------------------------
+---------------------------------------------------
 
 local Window = WindUI:CreateWindow({
     Title = "Iron Hub",
-    Icon = "eye",
+    Icon = "swords",
     Author = "by Iron",
     Folder = "IronHub",
     Size = UDim2.fromOffset(580, 420),
@@ -32,144 +36,202 @@ local Window = WindUI:CreateWindow({
 })
 
 local Tabs = {
-    Combat = Window:Tab({ Title = "Combat", Icon = "sword" }),
-    Visual = Window:Tab({ Title = "Visual", Icon = "eye" }),
-    Settings = Window:Tab({ Title = "Settings", Icon = "settings" }),
+    Combat = Window:Tab({
+        Title = "Combat",
+        Icon = "sword"
+    }),
+
+    Visual = Window:Tab({
+        Title = "Visual",
+        Icon = "eye"
+    }),
+
+    Settings = Window:Tab({
+        Title = "Settings",
+        Icon = "settings"
+    })
 }
 
---------------------------------------------------
--- ESP
---------------------------------------------------
+---------------------------------------------------
+-- PLAYER ESP
+---------------------------------------------------
 
-local ESPFolder = Instance.new("Folder")
-ESPFolder.Name = "ESPFolder"
-ESPFolder.Parent = game.CoreGui
+local function AddESP(Player)
+    if Player == LocalPlayer then return end
 
-local function CreateESP(player)
-    if player == LocalPlayer then return end
+    local function Create(Character)
+        if Character:FindFirstChild("IronESP") then
+            Character.IronESP:Destroy()
+        end
 
-    local function AddHighlight(char)
-        if not ESPEnabled then return end
-        if char:FindFirstChild("IronESP") then return end
+        if not ESP then return end
 
         local Highlight = Instance.new("Highlight")
         Highlight.Name = "IronESP"
         Highlight.FillTransparency = 0.5
         Highlight.OutlineTransparency = 0
-        Highlight.Parent = char
+        Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        Highlight.Parent = Character
     end
 
-    if player.Character then
-        AddHighlight(player.Character)
+    if Player.Character then
+        Create(Player.Character)
     end
 
-    player.CharacterAdded:Connect(function(char)
-        task.wait(1)
-        AddHighlight(char)
-    end)
+    Player.CharacterAdded:Connect(Create)
 end
 
-for _, plr in ipairs(Players:GetPlayers()) do
-    CreateESP(plr)
+for _, Player in pairs(Players:GetPlayers()) do
+    AddESP(Player)
 end
 
-Players.PlayerAdded:Connect(CreateESP)
+Players.PlayerAdded:Connect(AddESP)
 
 Tabs.Visual:Toggle({
     Title = "Player ESP",
     Value = false,
-    Callback = function(state)
-        ESPEnabled = state
+    Callback = function(v)
+        ESP = v
 
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr.Character then
-                local old = plr.Character:FindFirstChild("IronESP")
-                if old then
-                    old:Destroy()
+        for _, Player in pairs(Players:GetPlayers()) do
+            if Player.Character then
+                local Old = Player.Character:FindFirstChild("IronESP")
+
+                if Old then
+                    Old:Destroy()
                 end
 
-                if state then
-                    CreateESP(plr)
+                if v then
+                    AddESP(Player)
                 end
             end
         end
     end
 })
 
---------------------------------------------------
+---------------------------------------------------
 -- AUTO M1
---------------------------------------------------
+---------------------------------------------------
 
 Tabs.Combat:Toggle({
     Title = "Auto M1",
     Value = false,
-    Callback = function(state)
-        AutoM1 = state
+    Callback = function(v)
+        AutoM1 = v
     end
 })
 
-RunService.RenderStepped:Connect(function()
-    if AutoM1 then
-        VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,0)
+task.spawn(function()
+    while true do
         task.wait(0.1)
-        VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,0)
+
+        if AutoM1 then
+            VirtualInputManager:SendMouseButtonEvent(
+                0,
+                0,
+                0,
+                true,
+                game,
+                0
+            )
+
+            VirtualInputManager:SendMouseButtonEvent(
+                0,
+                0,
+                0,
+                false,
+                game,
+                0
+            )
+        end
     end
 end)
 
---------------------------------------------------
+---------------------------------------------------
 -- AUTO V3
---------------------------------------------------
+---------------------------------------------------
 
 Tabs.Combat:Toggle({
     Title = "Auto V3",
     Value = false,
-    Callback = function(state)
-        AutoV3 = state
+    Callback = function(v)
+        AutoV3 = v
     end
 })
 
-RunService.Heartbeat:Connect(function()
-    if AutoV3 then
-        pcall(function()
-            game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("ActivateAbility")
-        end)
+task.spawn(function()
+    while true do
+        task.wait(1)
+
+        if AutoV3 then
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer(
+                    "ActivateAbility"
+                )
+            end)
+        end
     end
 end)
 
---------------------------------------------------
+---------------------------------------------------
 -- AUTO V4
---------------------------------------------------
+---------------------------------------------------
 
 Tabs.Combat:Toggle({
     Title = "Auto V4",
     Value = false,
-    Callback = function(state)
-        AutoV4 = state
+    Callback = function(v)
+        AutoV4 = v
     end
 })
 
-RunService.Heartbeat:Connect(function()
-    if AutoV4 then
-        pcall(function()
-            game:GetService("VirtualInputManager"):SendKeyEvent(true,"Y",false,game)
+task.spawn(function()
+    while true do
+        task.wait(1)
+
+        if AutoV4 then
+            VirtualInputManager:SendKeyEvent(
+                true,
+                "Y",
+                false,
+                game
+            )
+
             task.wait(0.2)
-            game:GetService("VirtualInputManager"):SendKeyEvent(false,"Y",false,game)
-        end)
+
+            VirtualInputManager:SendKeyEvent(
+                false,
+                "Y",
+                false,
+                game
+            )
+        end
     end
 end)
 
---------------------------------------------------
+---------------------------------------------------
 -- SETTINGS
---------------------------------------------------
+---------------------------------------------------
 
 Tabs.Settings:Button({
     Title = "Destroy UI",
     Callback = function()
-        game.CoreGui:FindFirstChild("WindUI")
         Window:Destroy()
     end
 })
 
-Window:SetToggleKey(Enum.KeyCode.RightControl)
-```
+Tabs.Settings:Button({
+    Title = "Rejoin",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(
+            game.PlaceId,
+            LocalPlayer
+        )
+    end
+})
 
+---------------------------------------------------
+-- KEYBIND
+---------------------------------------------------
+
+Window:SetToggleKey(Enum.KeyCode.RightControl)
