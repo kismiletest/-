@@ -18,8 +18,8 @@ local LocalPlayer = Players.LocalPlayer
 --------------------------------------------------
 
 local KillAura = false
-local AutoHaki = false
 local ESPEnabled = false
+local AutoHaki = false
 
 --------------------------------------------------
 -- WINDOW
@@ -51,19 +51,32 @@ local Tabs = {
     Visual = Window:Tab({
         Title = "Visual",
         Icon = "eye"
-    }),
-
-    Mobile = Window:Tab({
-        Title = "Mobile",
-        Icon = "smartphone"
     })
 }
 
 --------------------------------------------------
--- PLAYER ESP
+-- ESP FIX
 --------------------------------------------------
 
-local function CreateESP(Player)
+local function RemoveESP(Character)
+
+    local ESP = Character:FindFirstChild("1enESP")
+    if ESP then
+        ESP:Destroy()
+    end
+
+    local Head = Character:FindFirstChild("Head")
+
+    if Head then
+        local Billboard = Head:FindFirstChild("1enBillboard")
+
+        if Billboard then
+            Billboard:Destroy()
+        end
+    end
+end
+
+local function AddESP(Player)
 
     if Player == LocalPlayer then
         return
@@ -71,11 +84,16 @@ local function CreateESP(Player)
 
     local function Setup(Character)
 
-        if Character:FindFirstChild("1enESP") then
-            Character:FindFirstChild("1enESP"):Destroy()
-        end
+        RemoveESP(Character)
 
         if not ESPEnabled then
+            return
+        end
+
+        local Humanoid = Character:FindFirstChild("Humanoid")
+        local Head = Character:FindFirstChild("Head")
+
+        if not Humanoid or not Head then
             return
         end
 
@@ -94,43 +112,38 @@ local function CreateESP(Player)
         -- NAME + HP
         --------------------------------------------------
 
-        local Head = Character:FindFirstChild("Head")
+        local Billboard = Instance.new("BillboardGui")
+        Billboard.Name = "1enBillboard"
+        Billboard.Size = UDim2.new(0,200,0,50)
+        Billboard.AlwaysOnTop = true
+        Billboard.StudsOffset = Vector3.new(0,3,0)
+        Billboard.Parent = Head
 
-        if Head then
+        local Text = Instance.new("TextLabel")
+        Text.Size = UDim2.new(1,0,1,0)
+        Text.BackgroundTransparency = 1
+        Text.TextScaled = true
+        Text.Font = Enum.Font.GothamBold
+        Text.TextColor3 = Color3.new(1,0,0)
+        Text.TextStrokeTransparency = 0
+        Text.Parent = Billboard
 
-            local Billboard = Instance.new("BillboardGui")
-            Billboard.Name = "1enBillboard"
-            Billboard.Size = UDim2.new(0,200,0,50)
-            Billboard.AlwaysOnTop = true
-            Billboard.StudsOffset = Vector3.new(0,3,0)
-            Billboard.Parent = Head
+        task.spawn(function()
 
-            local Text = Instance.new("TextLabel")
-            Text.Size = UDim2.new(1,0,1,0)
-            Text.BackgroundTransparency = 1
-            Text.TextScaled = true
-            Text.Font = Enum.Font.GothamBold
-            Text.TextColor3 = Color3.new(1,0,0)
-            Text.TextStrokeTransparency = 0
-            Text.Parent = Billboard
+            while Character.Parent and Billboard.Parent and ESPEnabled do
+                task.wait(0.2)
 
-            task.spawn(function()
-
-                while Billboard.Parent and ESPEnabled do
-                    task.wait(0.1)
-
-                    local Humanoid = Character:FindFirstChild("Humanoid")
-
-                    if Humanoid then
-                        Text.Text =
-                            Player.Name ..
-                            "\nHP : " ..
-                            math.floor(Humanoid.Health)
-                    end
+                if Humanoid.Health <= 0 then
+                    break
                 end
 
-            end)
-        end
+                Text.Text =
+                    Player.Name ..
+                    "\nHP : " ..
+                    math.floor(Humanoid.Health)
+            end
+
+        end)
     end
 
     if Player.Character then
@@ -144,10 +157,10 @@ local function CreateESP(Player)
 end
 
 for _,Player in pairs(Players:GetPlayers()) do
-    CreateESP(Player)
+    AddESP(Player)
 end
 
-Players.PlayerAdded:Connect(CreateESP)
+Players.PlayerAdded:Connect(AddESP)
 
 Tabs.Visual:Toggle({
     Title = "Player ESP",
@@ -160,20 +173,12 @@ Tabs.Visual:Toggle({
 
             if Player.Character then
 
-                local ESP = Player.Character:FindFirstChild("1enESP")
-                local Head = Player.Character:FindFirstChild("Head")
-
-                if ESP then
-                    ESP:Destroy()
-                end
-
-                if Head and Head:FindFirstChild("1enBillboard") then
-                    Head:FindFirstChild("1enBillboard"):Destroy()
-                end
-
                 if v then
-                    CreateESP(Player)
+                    AddESP(Player)
+                else
+                    RemoveESP(Player.Character)
                 end
+
             end
         end
     end
@@ -198,7 +203,6 @@ task.spawn(function()
         if KillAura then
 
             VirtualUser:CaptureController()
-
             VirtualUser:Button1Down(Vector2.new(0,0))
 
         end
@@ -206,22 +210,17 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- AUTO HAKI
+-- AUTO HAKI FIX
 --------------------------------------------------
 
 Tabs.Combat:Toggle({
     Title = "Auto Haki",
     Value = false,
     Callback = function(v)
+
         AutoHaki = v
-    end
-})
 
-task.spawn(function()
-
-    while task.wait(1) do
-
-        if AutoHaki then
+        if v then
 
             pcall(function()
 
@@ -230,18 +229,8 @@ task.spawn(function()
                 )
 
             end)
+
         end
-    end
-end)
-
---------------------------------------------------
--- MOBILE BUTTON
---------------------------------------------------
-
-Tabs.Mobile:Button({
-    Title = "Open / Close UI",
-    Callback = function()
-        Window:Toggle()
     end
 })
 
