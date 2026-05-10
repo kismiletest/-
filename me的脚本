@@ -1,12 +1,14 @@
 --// WIND UI
 local WindUI = loadstring(game:HttpGet(
-"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
 ))()
 
---// SERVICES
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
@@ -15,9 +17,8 @@ local LocalPlayer = Players.LocalPlayer
 -- VARIABLES
 --------------------------------------------------
 
-local AutoM1 = false
-local AutoV3 = false
-local AutoV4 = false
+local KillAura = false
+local AutoHaki = false
 local ESPEnabled = false
 
 --------------------------------------------------
@@ -25,14 +26,20 @@ local ESPEnabled = false
 --------------------------------------------------
 
 local Window = WindUI:CreateWindow({
-    Title = "Iron Hub",
+    Title = "1.en Hub",
     Icon = "swords",
-    Author = "by Iron",
-    Folder = "IronHub",
-    Size = UDim2.fromOffset(600, 420),
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(540, 420),
     Transparent = true,
     Theme = "Dark",
-    SideBarWidth = 180,
+    SideBarWidth = 170,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
 })
 
 local Tabs = {
@@ -46,9 +53,9 @@ local Tabs = {
         Icon = "eye"
     }),
 
-    Settings = Window:Tab({
-        Title = "Settings",
-        Icon = "settings"
+    Mobile = Window:Tab({
+        Title = "Mobile",
+        Icon = "smartphone"
     })
 }
 
@@ -56,122 +63,170 @@ local Tabs = {
 -- PLAYER ESP
 --------------------------------------------------
 
-local function CreateESP(Character)
-    if Character:FindFirstChild("IronESP") then
-        Character.IronESP:Destroy()
+local function CreateESP(Player)
+
+    if Player == LocalPlayer then
+        return
     end
 
-    local Highlight = Instance.new("Highlight")
-    Highlight.Name = "IronESP"
-    Highlight.FillColor = Color3.fromRGB(255,0,0)
-    Highlight.OutlineColor = Color3.fromRGB(255,255,255)
-    Highlight.FillTransparency = 0.5
-    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    Highlight.Parent = Character
-end
+    local function Setup(Character)
 
-local function RemoveESP(Character)
-    local ESP = Character:FindFirstChild("IronESP")
+        if Character:FindFirstChild("1enESP") then
+            Character:FindFirstChild("1enESP"):Destroy()
+        end
 
-    if ESP then
-        ESP:Destroy()
-    end
-end
+        if not ESPEnabled then
+            return
+        end
 
-local function RefreshESP()
-    for _, Player in pairs(Players:GetPlayers()) do
-        if Player ~= LocalPlayer and Player.Character then
+        --------------------------------------------------
+        -- HIGHLIGHT
+        --------------------------------------------------
 
-            if ESPEnabled then
-                CreateESP(Player.Character)
-            else
-                RemoveESP(Player.Character)
-            end
+        local Highlight = Instance.new("Highlight")
+        Highlight.Name = "1enESP"
+        Highlight.FillTransparency = 0.5
+        Highlight.OutlineTransparency = 0
+        Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        Highlight.Parent = Character
 
+        --------------------------------------------------
+        -- NAME + HP
+        --------------------------------------------------
+
+        local Head = Character:FindFirstChild("Head")
+
+        if Head then
+
+            local Billboard = Instance.new("BillboardGui")
+            Billboard.Name = "1enBillboard"
+            Billboard.Size = UDim2.new(0,200,0,50)
+            Billboard.AlwaysOnTop = true
+            Billboard.StudsOffset = Vector3.new(0,3,0)
+            Billboard.Parent = Head
+
+            local Text = Instance.new("TextLabel")
+            Text.Size = UDim2.new(1,0,1,0)
+            Text.BackgroundTransparency = 1
+            Text.TextScaled = true
+            Text.Font = Enum.Font.GothamBold
+            Text.TextColor3 = Color3.new(1,0,0)
+            Text.TextStrokeTransparency = 0
+            Text.Parent = Billboard
+
+            task.spawn(function()
+
+                while Billboard.Parent and ESPEnabled do
+                    task.wait(0.1)
+
+                    local Humanoid = Character:FindFirstChild("Humanoid")
+
+                    if Humanoid then
+                        Text.Text =
+                            Player.Name ..
+                            "\nHP : " ..
+                            math.floor(Humanoid.Health)
+                    end
+                end
+
+            end)
         end
     end
-end
 
-Players.PlayerAdded:Connect(function(Player)
-    Player.CharacterAdded:Connect(function(Character)
+    if Player.Character then
+        Setup(Player.Character)
+    end
+
+    Player.CharacterAdded:Connect(function(Char)
         task.wait(1)
-
-        if ESPEnabled then
-            CreateESP(Character)
-        end
+        Setup(Char)
     end)
-end)
+end
+
+for _,Player in pairs(Players:GetPlayers()) do
+    CreateESP(Player)
+end
+
+Players.PlayerAdded:Connect(CreateESP)
 
 Tabs.Visual:Toggle({
     Title = "Player ESP",
     Value = false,
     Callback = function(v)
+
         ESPEnabled = v
-        RefreshESP()
+
+        for _,Player in pairs(Players:GetPlayers()) do
+
+            if Player.Character then
+
+                local ESP = Player.Character:FindFirstChild("1enESP")
+                local Head = Player.Character:FindFirstChild("Head")
+
+                if ESP then
+                    ESP:Destroy()
+                end
+
+                if Head and Head:FindFirstChild("1enBillboard") then
+                    Head:FindFirstChild("1enBillboard"):Destroy()
+                end
+
+                if v then
+                    CreateESP(Player)
+                end
+            end
+        end
     end
 })
 
 --------------------------------------------------
--- AUTO M1
+-- KILL AURA
 --------------------------------------------------
 
 Tabs.Combat:Toggle({
-    Title = "Auto Attack",
+    Title = "Kill Aura",
     Value = false,
     Callback = function(v)
-        AutoM1 = v
+        KillAura = v
     end
 })
 
 task.spawn(function()
-    while true do
-        task.wait(0.1)
 
-        if AutoM1 then
+    while task.wait(0.1) do
 
-            VirtualInputManager:SendMouseButtonEvent(
-                0,
-                0,
-                0,
-                true,
-                game,
-                0
-            )
+        if KillAura then
 
-            VirtualInputManager:SendMouseButtonEvent(
-                0,
-                0,
-                0,
-                false,
-                game,
-                0
-            )
+            VirtualUser:CaptureController()
+
+            VirtualUser:Button1Down(Vector2.new(0,0))
 
         end
     end
 end)
 
 --------------------------------------------------
--- AUTO V3
+-- AUTO HAKI
 --------------------------------------------------
 
 Tabs.Combat:Toggle({
-    Title = "Auto V3",
+    Title = "Auto Haki",
     Value = false,
     Callback = function(v)
-        AutoV3 = v
+        AutoHaki = v
     end
 })
 
 task.spawn(function()
-    while true do
-        task.wait(1)
 
-        if AutoV3 then
+    while task.wait(1) do
+
+        if AutoHaki then
+
             pcall(function()
 
                 ReplicatedStorage.Remotes.CommF_:InvokeServer(
-                    "ActivateAbility"
+                    "Buso"
                 )
 
             end)
@@ -180,63 +235,13 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- AUTO V4
+-- MOBILE BUTTON
 --------------------------------------------------
 
-Tabs.Combat:Toggle({
-    Title = "Auto V4",
-    Value = false,
-    Callback = function(v)
-        AutoV4 = v
-    end
-})
-
-task.spawn(function()
-    while true do
-        task.wait(1)
-
-        if AutoV4 then
-
-            VirtualInputManager:SendKeyEvent(
-                true,
-                "Y",
-                false,
-                game
-            )
-
-            task.wait(0.2)
-
-            VirtualInputManager:SendKeyEvent(
-                false,
-                "Y",
-                false,
-                game
-            )
-
-        end
-    end
-end)
-
---------------------------------------------------
--- SETTINGS
---------------------------------------------------
-
-Tabs.Settings:Button({
-    Title = "Destroy UI",
+Tabs.Mobile:Button({
+    Title = "Open / Close UI",
     Callback = function()
-        Window:Destroy()
-    end
-})
-
-Tabs.Settings:Button({
-    Title = "Rejoin Server",
-    Callback = function()
-
-        game:GetService("TeleportService"):Teleport(
-            game.PlaceId,
-            LocalPlayer
-        )
-
+        Window:Toggle()
     end
 })
 
