@@ -79,7 +79,7 @@ local function RemoveESP(Character)
 end
 
 --------------------------------------------------
--- PLAYER ESP ONLY
+-- CREATE PLAYER ESP
 --------------------------------------------------
 
 local function CreateESP(Player)
@@ -88,128 +88,136 @@ local function CreateESP(Player)
         return
     end
 
-    local function Setup(Character)
+    local Character = Player.Character
 
-        if not ESPEnabled then
-            return
-        end
+    if not Character then
+        return
+    end
 
-        local Humanoid =
-            Character:WaitForChild("Humanoid",5)
+    local Humanoid =
+        Character:FindFirstChild("Humanoid")
 
-        local Head =
-            Character:WaitForChild("Head",5)
+    local Head =
+        Character:FindFirstChild("Head")
 
-        local HRP =
-            Character:WaitForChild(
-                "HumanoidRootPart",5
-            )
+    local HRP =
+        Character:FindFirstChild(
+            "HumanoidRootPart"
+        )
 
-        if not Humanoid or not Head or not HRP then
-            return
-        end
+    if not Humanoid or not Head or not HRP then
+        return
+    end
 
-        RemoveESP(Character)
+    RemoveESP(Character)
 
-        --------------------------------------------------
-        -- HIGHLIGHT
-        --------------------------------------------------
+    --------------------------------------------------
+    -- HIGHLIGHT
+    --------------------------------------------------
 
-        local Highlight = Instance.new("Highlight")
-        Highlight.Name = "1enESP"
-        Highlight.FillTransparency = 1
-        Highlight.OutlineTransparency = 0
-        Highlight.DepthMode =
-            Enum.HighlightDepthMode.AlwaysOnTop
-        Highlight.Parent = Character
+    local Highlight = Instance.new("Highlight")
+    Highlight.Name = "1enESP"
+    Highlight.FillTransparency = 1
+    Highlight.OutlineTransparency = 0
+    Highlight.DepthMode =
+        Enum.HighlightDepthMode.AlwaysOnTop
+    Highlight.Parent = Character
 
-        --------------------------------------------------
-        -- BILLBOARD
-        --------------------------------------------------
+    --------------------------------------------------
+    -- BILLBOARD
+    --------------------------------------------------
 
-        local Billboard = Instance.new("BillboardGui")
-        Billboard.Name = "1enBillboard"
-        Billboard.Size = UDim2.new(0,200,0,50)
-        Billboard.AlwaysOnTop = true
-        Billboard.StudsOffset =
-            Vector3.new(0,2.5,0)
-        Billboard.Parent = Head
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = "1enBillboard"
+    Billboard.Size = UDim2.new(0,200,0,50)
+    Billboard.AlwaysOnTop = true
+    Billboard.StudsOffset =
+        Vector3.new(0,2.5,0)
+    Billboard.Parent = Head
 
-        local Text = Instance.new("TextLabel")
-        Text.Size = UDim2.new(1,0,1,0)
-        Text.BackgroundTransparency = 1
-        Text.TextScaled = true
-        Text.Font = Enum.Font.GothamBold
-        Text.TextColor3 = Color3.new(1,1,1)
-        Text.TextStrokeTransparency = 0
-        Text.Parent = Billboard
+    local Text = Instance.new("TextLabel")
+    Text.Size = UDim2.new(1,0,1,0)
+    Text.BackgroundTransparency = 1
+    Text.TextScaled = true
+    Text.Font = Enum.Font.GothamBold
+    Text.TextColor3 = Color3.new(1,1,1)
+    Text.TextStrokeTransparency = 0
+    Text.Parent = Billboard
 
-        --------------------------------------------------
-        -- UPDATE
-        --------------------------------------------------
+    --------------------------------------------------
+    -- UPDATE
+    --------------------------------------------------
 
-        task.spawn(function()
+    task.spawn(function()
 
-            while ESPEnabled
-            and Character.Parent
-            and Billboard.Parent do
+        while ESPEnabled
+        and Character.Parent
+        and Billboard.Parent do
 
-                task.wait(0.2)
+            task.wait(0.2)
 
-                local MyHRP =
-                    LocalPlayer.Character and
-                    LocalPlayer.Character:
-                    FindFirstChild(
-                        "HumanoidRootPart"
-                    )
+            local MyHRP =
+                LocalPlayer.Character and
+                LocalPlayer.Character:
+                FindFirstChild(
+                    "HumanoidRootPart"
+                )
 
-                if not MyHRP then
-                    continue
-                end
-
-                local Distance =
-                    math.floor(
-                        (
-                            MyHRP.Position
-                            - HRP.Position
-                        ).Magnitude
-                    )
-
-                Text.Text =
-                    Player.Name ..
-                    "\nHP : " ..
-                    math.floor(Humanoid.Health) ..
-                    "\nDistance : " ..
-                    Distance
+            if not MyHRP then
+                continue
             end
-        end)
-    end
 
-    if Player.Character then
-        Setup(Player.Character)
-    end
+            local Distance =
+                math.floor(
+                    (
+                        MyHRP.Position
+                        - HRP.Position
+                    ).Magnitude
+                )
 
-    Player.CharacterAdded:Connect(function(Char)
-
-        task.wait(1)
-
-        if ESPEnabled then
-            Setup(Char)
+            Text.Text =
+                Player.Name ..
+                "\nHP : " ..
+                math.floor(Humanoid.Health) ..
+                "\nDistance : " ..
+                Distance
         end
     end)
 end
 
 --------------------------------------------------
--- LOAD PLAYERS
+-- PLAYER JOIN
 --------------------------------------------------
+
+local function SetupPlayer(Player)
+
+    if Player == LocalPlayer then
+        return
+    end
+
+    if Player.Character then
+        CreateESP(Player)
+    end
+
+    Player.CharacterAdded:Connect(function()
+
+        task.wait(1)
+
+        if ESPEnabled then
+            CreateESP(Player)
+        end
+    end)
+end
 
 for _,Player in pairs(
     Players:GetPlayers()
 ) do
-    CreateESP(Player)
+    SetupPlayer(Player)
 end
 
-Players.PlayerAdded:Connect(CreateESP)
+Players.PlayerAdded:Connect(
+    SetupPlayer
+)
 
 --------------------------------------------------
 -- ESP TOGGLE
@@ -217,7 +225,7 @@ Players.PlayerAdded:Connect(CreateESP)
 
 Tabs.Visual:Toggle({
 
-    Title = "Player ESP",
+    Title = "player esp",
     Value = false,
 
     Callback = function(v)
@@ -230,9 +238,7 @@ Tabs.Visual:Toggle({
                 Players:GetPlayers()
             ) do
 
-                if Player ~= LocalPlayer
-                and Player.Character then
-
+                if Player ~= LocalPlayer then
                     CreateESP(Player)
                 end
             end
