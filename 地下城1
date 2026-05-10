@@ -29,13 +29,14 @@ local MainFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
 local ToggleButton = Instance.new("TextButton")
 local StatusLabel = Instance.new("TextLabel")
+local DungeonLabel = Instance.new("TextLabel")
 
 ScreenGui.Parent = game.CoreGui
 ScreenGui.Name = "TeleporterUI"
 
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 220, 0, 140)
-MainFrame.Position = UDim2.new(0.5, -110, 0.5, -70)
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -80)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -51,7 +52,7 @@ Title.TextSize = 18
 
 ToggleButton.Parent = MainFrame
 ToggleButton.Size = UDim2.new(0.8,0,0,40)
-ToggleButton.Position = UDim2.new(0.1,0,0.4,0)
+ToggleButton.Position = UDim2.new(0.1,0,0.35,0)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(170,0,0)
 ToggleButton.Text = "START"
 ToggleButton.TextColor3 = Color3.new(1,1,1)
@@ -60,18 +61,48 @@ ToggleButton.TextSize = 20
 
 StatusLabel.Parent = MainFrame
 StatusLabel.Size = UDim2.new(1,0,0,25)
-StatusLabel.Position = UDim2.new(0,0,0.78,0)
+StatusLabel.Position = UDim2.new(0,0,0.70,0)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Text = "Status : OFF"
 StatusLabel.TextColor3 = Color3.new(1,1,1)
 StatusLabel.Font = Enum.Font.Gotham
 StatusLabel.TextSize = 16
 
+DungeonLabel.Parent = MainFrame
+DungeonLabel.Size = UDim2.new(1,0,0,25)
+DungeonLabel.Position = UDim2.new(0,0,0.84,0)
+DungeonLabel.BackgroundTransparency = 1
+DungeonLabel.Text = "Dungeon : None"
+DungeonLabel.TextColor3 = Color3.fromRGB(0,255,150)
+DungeonLabel.Font = Enum.Font.GothamBold
+DungeonLabel.TextSize = 15
+
 -- Character Update
 local function updateCharacterReferences()
     character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
     humanoidRootPart = character:WaitForChild("HumanoidRootPart")
     humanoid = character:WaitForChild("Humanoid")
+end
+
+-- 获取地下城关卡
+local function getCurrentDungeon()
+    local map = Workspace:FindFirstChild("Map")
+    if not map then
+        return "None"
+    end
+
+    local dungeonFolder = map:FindFirstChild("Dungeon")
+    if not dungeonFolder then
+        return "None"
+    end
+
+    for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
+        if levelFolder:FindFirstChild(CONFIG.TargetTeleporterName) then
+            return levelFolder.Name
+        end
+    end
+
+    return "Unknown"
 end
 
 -- Get Teleporters
@@ -148,6 +179,8 @@ end
 local function mainLoop()
     while true do
         task.wait(CONFIG.CheckInterval)
+
+        DungeonLabel.Text = "Dungeon : " .. getCurrentDungeon()
 
         if isDetecting then
             if humanoid.Health > 0 then
