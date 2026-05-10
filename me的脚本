@@ -23,6 +23,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local AutoDungeon = false
 local AutoV3 = false
+local AutoHaki = false
 
 --------------------------------------------------
 -- WINDOW
@@ -173,6 +174,42 @@ Tabs.Main:Toggle({
                             end
 
                             task.wait(1.5)
+                        end
+                    end)
+                end
+            end)
+        end
+    end
+})
+
+--------------------------------------------------
+-- 自动霸气
+--------------------------------------------------
+
+Tabs.Main:Toggle({
+    Title = "自动霸气",
+    Value = false,
+
+    Callback = function(v)
+        AutoHaki = v
+
+        if v then
+            task.spawn(function()
+
+                while AutoHaki do
+                    task.wait(1)
+
+                    pcall(function()
+
+                        local Remotes =
+                            ReplicatedStorage:
+                            FindFirstChild("Remotes")
+
+                        if Remotes and
+                        Remotes:FindFirstChild("CommF_") then
+
+                            Remotes.CommF_:
+                            InvokeServer("Buso")
                         end
                     end)
                 end
