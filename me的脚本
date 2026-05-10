@@ -6,6 +6,22 @@ local WindUI = loadstring(game:HttpGet(
 ))()
 
 --------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- VARIABLES
+--------------------------------------------------
+
+local AutoDungeon = false
+
+--------------------------------------------------
 -- WINDOW
 --------------------------------------------------
 
@@ -26,23 +42,62 @@ local Window = WindUI:CreateWindow({
     }
 })
 
+local Tabs = {
+    Main = Window:Tab({
+        Title = "Main",
+        Icon = "home"
+    })
+}
+
 --------------------------------------------------
--- TAB
+-- 自动地下城
 --------------------------------------------------
 
-local MainTab = Window:Tab({
-    Title = "Main",
-    Icon = "home"
+Tabs.Main:Toggle({
+    Title = "自动地下城",
+    Value = false,
+
+    Callback = function(v)
+        AutoDungeon = v
+    end
 })
 
---------------------------------------------------
--- LABEL
---------------------------------------------------
+task.spawn(function()
+    while task.wait(1) do
+        if AutoDungeon then
+            pcall(function()
 
-MainTab:Paragraph({
-    Title = "1.en Hub",
-    Desc = "UI Loaded Successfully"
-})
+                -- 自动攻击
+                local Character = LocalPlayer.Character
+                if Character then
+                    local Tool = Character:FindFirstChildOfClass("Tool")
+
+                    if Tool then
+                        Tool:Activate()
+
+                        VirtualUser:Button1Down(
+                            Vector2.new(0,0),
+                            workspace.CurrentCamera.CFrame
+                        )
+                    end
+                end
+
+                -- 自动霸气
+                local Remotes =
+                    ReplicatedStorage:
+                    FindFirstChild("Remotes")
+
+                if Remotes and
+                Remotes:FindFirstChild("CommF_") then
+
+                    Remotes.CommF_:
+                    InvokeServer("Buso")
+                end
+
+            end)
+        end
+    end
+end)
 
 --------------------------------------------------
 -- KEYBIND
