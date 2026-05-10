@@ -19,7 +19,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local KillAura = false
 local ESPEnabled = false
-local AutoHaki = false
+local HakiEnabled = false
 
 --------------------------------------------------
 -- WINDOW
@@ -55,19 +55,21 @@ local Tabs = {
 }
 
 --------------------------------------------------
--- ESP FIX
+-- REMOVE ESP
 --------------------------------------------------
 
 local function RemoveESP(Character)
 
-    local ESP = Character:FindFirstChild("1enESP")
-    if ESP then
-        ESP:Destroy()
+    local Highlight = Character:FindFirstChild("1enESP")
+
+    if Highlight then
+        Highlight:Destroy()
     end
 
     local Head = Character:FindFirstChild("Head")
 
     if Head then
+
         local Billboard = Head:FindFirstChild("1enBillboard")
 
         if Billboard then
@@ -75,6 +77,10 @@ local function RemoveESP(Character)
         end
     end
 end
+
+--------------------------------------------------
+-- ADD ESP
+--------------------------------------------------
 
 local function AddESP(Player)
 
@@ -92,31 +98,32 @@ local function AddESP(Player)
 
         local Humanoid = Character:FindFirstChild("Humanoid")
         local Head = Character:FindFirstChild("Head")
+        local HRP = Character:FindFirstChild("HumanoidRootPart")
 
-        if not Humanoid or not Head then
+        if not Humanoid or not Head or not HRP then
             return
         end
 
         --------------------------------------------------
-        -- HIGHLIGHT
+        -- OUTLINE ESP
         --------------------------------------------------
 
         local Highlight = Instance.new("Highlight")
         Highlight.Name = "1enESP"
-        Highlight.FillTransparency = 0.5
+        Highlight.FillTransparency = 1
         Highlight.OutlineTransparency = 0
         Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         Highlight.Parent = Character
 
         --------------------------------------------------
-        -- NAME + HP
+        -- NAME + HP + DISTANCE
         --------------------------------------------------
 
         local Billboard = Instance.new("BillboardGui")
         Billboard.Name = "1enBillboard"
         Billboard.Size = UDim2.new(0,200,0,50)
         Billboard.AlwaysOnTop = true
-        Billboard.StudsOffset = Vector3.new(0,3,0)
+        Billboard.StudsOffset = Vector3.new(0,2.5,0)
         Billboard.Parent = Head
 
         local Text = Instance.new("TextLabel")
@@ -124,7 +131,7 @@ local function AddESP(Player)
         Text.BackgroundTransparency = 1
         Text.TextScaled = true
         Text.Font = Enum.Font.GothamBold
-        Text.TextColor3 = Color3.new(1,0,0)
+        Text.TextColor3 = Color3.new(1,1,1)
         Text.TextStrokeTransparency = 0
         Text.Parent = Billboard
 
@@ -133,16 +140,27 @@ local function AddESP(Player)
             while Character.Parent and Billboard.Parent and ESPEnabled do
                 task.wait(0.2)
 
-                if Humanoid.Health <= 0 then
-                    break
+                local MyHRP =
+                    LocalPlayer.Character and
+                    LocalPlayer.Character:FindFirstChild(
+                        "HumanoidRootPart"
+                    )
+
+                if not MyHRP then
+                    continue
                 end
+
+                local Distance = math.floor(
+                    (MyHRP.Position - HRP.Position).Magnitude
+                )
 
                 Text.Text =
                     Player.Name ..
                     "\nHP : " ..
-                    math.floor(Humanoid.Health)
+                    math.floor(Humanoid.Health) ..
+                    "\nDistance : " ..
+                    Distance
             end
-
         end)
     end
 
@@ -162,9 +180,14 @@ end
 
 Players.PlayerAdded:Connect(AddESP)
 
+--------------------------------------------------
+-- ESP TOGGLE
+--------------------------------------------------
+
 Tabs.Visual:Toggle({
     Title = "Player ESP",
     Value = false,
+
     Callback = function(v)
 
         ESPEnabled = v
@@ -178,7 +201,6 @@ Tabs.Visual:Toggle({
                 else
                     RemoveESP(Player.Character)
                 end
-
             end
         end
     end
@@ -191,6 +213,7 @@ Tabs.Visual:Toggle({
 Tabs.Combat:Toggle({
     Title = "Kill Aura",
     Value = false,
+
     Callback = function(v)
         KillAura = v
     end
@@ -203,24 +226,27 @@ task.spawn(function()
         if KillAura then
 
             VirtualUser:CaptureController()
-            VirtualUser:Button1Down(Vector2.new(0,0))
 
+            VirtualUser:Button1Down(
+                Vector2.new(0,0)
+            )
         end
     end
 end)
 
 --------------------------------------------------
--- AUTO HAKI FIX
+-- AUTO HAKI
 --------------------------------------------------
 
 Tabs.Combat:Toggle({
     Title = "Auto Haki",
     Value = false,
+
     Callback = function(v)
 
-        AutoHaki = v
+        if v and not HakiEnabled then
 
-        if v then
+            HakiEnabled = true
 
             pcall(function()
 
@@ -231,6 +257,10 @@ Tabs.Combat:Toggle({
             end)
 
         end
+
+        if not v then
+            HakiEnabled = false
+        end
     end
 })
 
@@ -238,4 +268,6 @@ Tabs.Combat:Toggle({
 -- KEYBIND
 --------------------------------------------------
 
-Window:SetToggleKey(Enum.KeyCode.RightControl)
+Window:SetToggleKey(
+    Enum.KeyCode.RightControl
+)
