@@ -1,0 +1,192 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+local localPlayer = Players.LocalPlayer
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+-- CONFIG
+local CONFIG = {
+    TargetTeleporterName = "ExitTeleporter",
+    CheckInterval = 1,
+    TweenTime = 0.8,
+    EasingStyle = Enum.EasingStyle.Quad,
+    EasingDirection = Enum.EasingDirection.Out,
+    DisableMovement = true,
+    DetectionRadius = 1000,
+    CooldownAfterTeleport = 3
+}
+
+local isTeleporting = false
+local isDetecting = false
+local lastTeleportTime = 0
+
+-- UI
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local ToggleButton = Instance.new("TextButton")
+local StatusLabel = Instance.new("TextLabel")
+
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "TeleporterUI"
+
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 220, 0, 140)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -70)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+Title.Parent = MainFrame
+Title.Size = UDim2.new(1,0,0,35)
+Title.BackgroundTransparency = 1
+Title.Text = "Auto Exit Teleporter"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+
+ToggleButton.Parent = MainFrame
+ToggleButton.Size = UDim2.new(0.8,0,0,40)
+ToggleButton.Position = UDim2.new(0.1,0,0.4,0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(170,0,0)
+ToggleButton.Text = "START"
+ToggleButton.TextColor3 = Color3.new(1,1,1)
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.TextSize = 20
+
+StatusLabel.Parent = MainFrame
+StatusLabel.Size = UDim2.new(1,0,0,25)
+StatusLabel.Position = UDim2.new(0,0,0.78,0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Status : OFF"
+StatusLabel.TextColor3 = Color3.new(1,1,1)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 16
+
+-- Character Update
+local function updateCharacterReferences()
+    character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+end
+
+-- Get Teleporters
+local function getAllExitTeleporters()
+    local teleporters = {}
+
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return teleporters end
+
+    local dungeonFolder = map:FindFirstChild("Dungeon")
+    if not dungeonFolder then return teleporters end
+
+    for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
+        local teleporter = levelFolder:FindFirstChild(CONFIG.TargetTeleporterName)
+
+        if teleporter then
+            local rootPart = teleporter:FindFirstChild("Root")
+
+            if rootPart then
+                table.insert(teleporters, {
+                    rootPart = rootPart,
+                    position = rootPart.Position
+                })
+            end
+        end
+    end
+
+    return teleporters
+end
+
+-- Teleport Function
+local function teleportToTarget(rootPart)
+    if isTeleporting then return end
+
+    local currentTime = tick()
+    if currentTime - lastTeleportTime < CONFIG.CooldownAfterTeleport then
+        return
+    end
+
+    isTeleporting = true
+    lastTeleportTime = currentTime
+
+    if CONFIG.DisableMovement then
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+    end
+
+    local tweenInfo = TweenInfo.new(
+        CONFIG.TweenTime,
+        CONFIG.EasingStyle,
+        CONFIG.EasingDirection
+    )
+
+    local tween = TweenService:Create(
+        humanoidRootPart,
+        tweenInfo,
+        {CFrame = rootPart.CFrame}
+    )
+
+    tween:Play()
+
+    tween.Completed:Connect(function()
+        if CONFIG.DisableMovement then
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+        end
+
+        task.wait(0.5)
+        isTeleporting = false
+    end)
+end
+
+-- Main Loop
+local function mainLoop()
+    while true do
+        task.wait(CONFIG.CheckInterval)
+
+        if isDetecting then
+            if humanoid.Health > 0 then
+                local teleporters = getAllExitTeleporters()
+
+                for _, tp in ipairs(teleporters) do
+                    local distance = (humanoidRootPart.Position - tp.position).Magnitude
+
+                    if distance <= CONFIG.DetectionRadius then
+                        teleportToTarget(tp.rootPart)
+                        break
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Toggle Button
+ToggleButton.MouseButton1Click:Connect(function()
+    isDetecting = not isDetecting
+
+    if isDetecting then
+        ToggleButton.Text = "STOP"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
+        StatusLabel.Text = "Status : ON"
+    else
+        ToggleButton.Text = "START"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(170,0,0)
+        StatusLabel.Text = "Status : OFF"
+    end
+end)
+
+-- Character Respawn
+localPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    updateCharacterReferences()
+end)
+
+updateCharacterReferences()
+
+task.spawn(mainLoop)
