@@ -1,88 +1,53 @@
---// WIND UI
-local WindUI = loadstring(game:HttpGet(
-"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
-))()
-
 --------------------------------------------------
--- SERVICES
+-- FULL PLAYER ESP (NO BUG)
 --------------------------------------------------
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "1enESPFolder"
+ESPFolder.Parent = game.CoreGui
 
-local LocalPlayer = Players.LocalPlayer
+local ESPConnections = {}
 
---------------------------------------------------
--- VARIABLES
---------------------------------------------------
+local function RemoveESP(Player)
 
-local KillAura = false
-local ESPEnabled = false
-local HakiEnabled = false
-
---------------------------------------------------
--- WINDOW
---------------------------------------------------
-
-local Window = WindUI:CreateWindow({
-    Title = "1.en Hub",
-    Icon = "swords",
-    Author = "by 1.en",
-    Folder = "1enHub",
-    Size = UDim2.fromOffset(540, 420),
-    Transparent = true,
-    Theme = "Dark",
-    SideBarWidth = 170,
-
-    OpenButton = {
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false
-    }
-})
-
-local Tabs = {
-    Combat = Window:Tab({
-        Title = "Combat",
-        Icon = "sword"
-    }),
-
-    Visual = Window:Tab({
-        Title = "Visual",
-        Icon = "eye"
-    })
-}
-
---------------------------------------------------
--- REMOVE ESP
---------------------------------------------------
-
-local function RemoveESP(Character)
-
-    local ESP = Character:FindFirstChild("1enESP")
-
-    if ESP then
-        ESP:Destroy()
+    if ESPConnections[Player] then
+        ESPConnections[Player]:Disconnect()
+        ESPConnections[Player] = nil
     end
 
-    local Head = Character:FindFirstChild("Head")
+    if Player.Character then
 
-    if Head then
+        local Char = Player.Character
 
-        local Billboard =
-            Head:FindFirstChild("1enBillboard")
+        local ESP =
+            Char:FindFirstChild("1enESP")
 
-        if Billboard then
-            Billboard:Destroy()
+        if ESP then
+            ESP:Destroy()
+        end
+
+        local Head =
+            Char:FindFirstChild("Head")
+
+        if Head then
+
+            local Billboard =
+                Head:FindFirstChild(
+                    "1enBillboard"
+                )
+
+            if Billboard then
+                Billboard:Destroy()
+            end
         end
     end
 end
 
---------------------------------------------------
--- CREATE PLAYER ESP
---------------------------------------------------
+local function AddESP(Player)
 
-local function CreateESP(Player)
+    if not ESPEnabled then
+        return
+    end
 
     if Player == LocalPlayer then
         return
@@ -94,9 +59,6 @@ local function CreateESP(Player)
         return
     end
 
-    local Humanoid =
-        Character:FindFirstChild("Humanoid")
-
     local Head =
         Character:FindFirstChild("Head")
 
@@ -105,11 +67,14 @@ local function CreateESP(Player)
             "HumanoidRootPart"
         )
 
-    if not Humanoid or not Head or not HRP then
+    local Humanoid =
+        Character:FindFirstChild("Humanoid")
+
+    if not Head or not HRP or not Humanoid then
         return
     end
 
-    RemoveESP(Character)
+    RemoveESP(Player)
 
     --------------------------------------------------
     -- HIGHLIGHT
@@ -118,9 +83,12 @@ local function CreateESP(Player)
     local Highlight = Instance.new("Highlight")
     Highlight.Name = "1enESP"
     Highlight.FillTransparency = 1
-    Highlight.OutlineTransparency = 0
+    Highlight.OutlineColor =
+        Color3.fromRGB(255,255,255)
+
     Highlight.DepthMode =
         Enum.HighlightDepthMode.AlwaysOnTop
+
     Highlight.Parent = Character
 
     --------------------------------------------------
@@ -132,61 +100,73 @@ local function CreateESP(Player)
     Billboard.Size = UDim2.new(0,200,0,50)
     Billboard.AlwaysOnTop = true
     Billboard.StudsOffset =
-        Vector3.new(0,2.5,0)
+        Vector3.new(0,3,0)
+
     Billboard.Parent = Head
 
     local Text = Instance.new("TextLabel")
     Text.Size = UDim2.new(1,0,1,0)
     Text.BackgroundTransparency = 1
+    Text.TextColor3 =
+        Color3.fromRGB(255,255,255)
+
+    Text.TextStrokeTransparency = 0
     Text.TextScaled = true
     Text.Font = Enum.Font.GothamBold
-    Text.TextColor3 = Color3.new(1,1,1)
-    Text.TextStrokeTransparency = 0
+
     Text.Parent = Billboard
 
     --------------------------------------------------
-    -- UPDATE
+    -- UPDATE LOOP
     --------------------------------------------------
 
-    task.spawn(function()
+    ESPConnections[Player] =
+        game:GetService("RunService")
+        .RenderStepped:Connect(function()
 
-        while ESPEnabled
-        and Character.Parent
-        and Billboard.Parent do
-
-            task.wait(0.2)
-
-            local MyHRP =
-                LocalPlayer.Character and
-                LocalPlayer.Character:
-                FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            if not MyHRP then
-                continue
-            end
-
-            local Distance =
-                math.floor(
-                    (
-                        MyHRP.Position
-                        - HRP.Position
-                    ).Magnitude
-                )
-
-            Text.Text =
-                Player.Name ..
-                "\nHP : " ..
-                math.floor(Humanoid.Health) ..
-                "\nDistance : " ..
-                Distance
+        if not ESPEnabled then
+            return
         end
+
+        if not Character.Parent then
+            return
+        end
+
+        local MyChar =
+            LocalPlayer.Character
+
+        if not MyChar then
+            return
+        end
+
+        local MyHRP =
+            MyChar:FindFirstChild(
+                "HumanoidRootPart"
+            )
+
+        if not MyHRP then
+            return
+        end
+
+        local Distance =
+            math.floor(
+                (
+                    MyHRP.Position
+                    - HRP.Position
+                ).Magnitude
+            )
+
+        Text.Text =
+            Player.Name ..
+            "\nHP : " ..
+            math.floor(Humanoid.Health) ..
+            "\nDistance : " ..
+            Distance
     end)
 end
 
 --------------------------------------------------
--- PLAYER JOIN
+-- LOAD PLAYERS
 --------------------------------------------------
 
 local function SetupPlayer(Player)
@@ -196,7 +176,7 @@ local function SetupPlayer(Player)
     end
 
     if Player.Character then
-        CreateESP(Player)
+        AddESP(Player)
     end
 
     Player.CharacterAdded:Connect(function()
@@ -204,7 +184,7 @@ local function SetupPlayer(Player)
         task.wait(1)
 
         if ESPEnabled then
-            CreateESP(Player)
+            AddESP(Player)
         end
     end)
 end
@@ -220,7 +200,7 @@ Players.PlayerAdded:Connect(
 )
 
 --------------------------------------------------
--- ESP TOGGLE
+-- TOGGLE
 --------------------------------------------------
 
 Tabs.Visual:Toggle({
@@ -239,7 +219,7 @@ Tabs.Visual:Toggle({
             ) do
 
                 if Player ~= LocalPlayer then
-                    CreateESP(Player)
+                    AddESP(Player)
                 end
             end
 
@@ -248,91 +228,8 @@ Tabs.Visual:Toggle({
             for _,Player in pairs(
                 Players:GetPlayers()
             ) do
-
-                if Player.Character then
-                    RemoveESP(Player.Character)
-                end
+                RemoveESP(Player)
             end
         end
     end
 })
-
---------------------------------------------------
--- KILL AURA FIX
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "Kill Aura",
-    Value = false,
-
-    Callback = function(v)
-        KillAura = v
-    end
-})
-
-task.spawn(function()
-
-    while task.wait(0.1) do
-
-        if KillAura then
-
-            pcall(function()
-
-                local Character =
-                    LocalPlayer.Character
-
-                if not Character then
-                    return
-                end
-
-                local Tool =
-                    Character:FindFirstChildOfClass(
-                        "Tool"
-                    )
-
-                if Tool then
-                    Tool:Activate()
-                end
-
-            end)
-        end
-    end
-end)
-
---------------------------------------------------
--- AUTO HAKI
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "Auto Haki",
-    Value = false,
-
-    Callback = function(v)
-
-        if v and not HakiEnabled then
-
-            HakiEnabled = true
-
-            pcall(function()
-
-                ReplicatedStorage.Remotes.CommF_:InvokeServer(
-                    "Buso"
-                )
-
-            end)
-
-        end
-
-        if not v then
-            HakiEnabled = false
-        end
-    end
-})
-
---------------------------------------------------
--- KEYBIND
---------------------------------------------------
-
-Window:SetToggleKey(
-    Enum.KeyCode.RightControl
-)
