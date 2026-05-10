@@ -9,6 +9,8 @@ local WindUI = loadstring(game:HttpGet(
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager =
+    game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -16,7 +18,9 @@ local LocalPlayer = Players.LocalPlayer
 -- VARIABLES
 --------------------------------------------------
 
-local KillAura = false
+local AutoV3 = false
+local AutoV4 = false
+local AttackAura = false
 local HakiEnabled = false
 
 --------------------------------------------------
@@ -48,15 +52,15 @@ local Tabs = {
 }
 
 --------------------------------------------------
--- KILL AURA
+-- ATTACK AURA
 --------------------------------------------------
 
 Tabs.Combat:Toggle({
-    Title = "Kill Aura",
+    Title = "Attack Aura",
     Value = false,
 
     Callback = function(v)
-        KillAura = v
+        AttackAura = v
     end
 })
 
@@ -64,7 +68,7 @@ task.spawn(function()
 
     while task.wait(0.1) do
 
-        if KillAura then
+        if AttackAura then
 
             pcall(function()
 
@@ -76,13 +80,82 @@ task.spawn(function()
                 end
 
                 local Tool =
-                    Character:FindFirstChildOfClass(
+                    Character:
+                    FindFirstChildOfClass(
                         "Tool"
                     )
 
                 if Tool then
                     Tool:Activate()
                 end
+
+            end)
+        end
+    end
+end)
+
+--------------------------------------------------
+-- AUTO V3
+--------------------------------------------------
+
+Tabs.Combat:Toggle({
+    Title = "Auto V3",
+    Value = false,
+
+    Callback = function(v)
+        AutoV3 = v
+    end
+})
+
+task.spawn(function()
+
+    while task.wait(1) do
+
+        if AutoV3 then
+
+            pcall(function()
+
+                VirtualInputManager:
+                SendKeyEvent(
+                    true,
+                    Enum.KeyCode.T,
+                    false,
+                    game
+                )
+
+            end)
+        end
+    end
+end)
+
+--------------------------------------------------
+-- AUTO V4
+--------------------------------------------------
+
+Tabs.Combat:Toggle({
+    Title = "Auto V4",
+    Value = false,
+
+    Callback = function(v)
+        AutoV4 = v
+    end
+})
+
+task.spawn(function()
+
+    while task.wait(1) do
+
+        if AutoV4 then
+
+            pcall(function()
+
+                VirtualInputManager:
+                SendKeyEvent(
+                    true,
+                    Enum.KeyCode.Y,
+                    false,
+                    game
+                )
 
             end)
         end
