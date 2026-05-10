@@ -1,3 +1,5 @@
+repeat task.wait() until game:IsLoaded()
+
 --// WIND UI
 local WindUI = loadstring(game:HttpGet(
 "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
@@ -9,8 +11,7 @@ local WindUI = loadstring(game:HttpGet(
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager =
-    game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -18,9 +19,9 @@ local LocalPlayer = Players.LocalPlayer
 -- VARIABLES
 --------------------------------------------------
 
+local AttackAura = false
 local AutoV3 = false
 local AutoV4 = false
-local AttackAura = false
 local HakiEnabled = false
 
 --------------------------------------------------
@@ -66,7 +67,7 @@ Tabs.Combat:Toggle({
 
 task.spawn(function()
 
-    while task.wait(0.1) do
+    while task.wait(0.08) do
 
         if AttackAura then
 
@@ -86,7 +87,13 @@ task.spawn(function()
                     )
 
                 if Tool then
+
                     Tool:Activate()
+
+                    VirtualUser:Button1Down(
+                        Vector2.new(0,0),
+                        workspace.CurrentCamera.CFrame
+                    )
                 end
 
             end)
@@ -109,19 +116,24 @@ Tabs.Combat:Toggle({
 
 task.spawn(function()
 
-    while task.wait(1) do
+    while task.wait(0.5) do
 
         if AutoV3 then
 
             pcall(function()
 
-                VirtualInputManager:
-                SendKeyEvent(
-                    true,
-                    Enum.KeyCode.T,
-                    false,
-                    game
-                )
+                local Remotes =
+                    ReplicatedStorage:
+                    FindFirstChild("Remotes")
+
+                if Remotes and
+                Remotes:FindFirstChild("CommE") then
+
+                    Remotes.CommE:
+                    FireServer(
+                        "ActivateAbility"
+                    )
+                end
 
             end)
         end
@@ -143,19 +155,24 @@ Tabs.Combat:Toggle({
 
 task.spawn(function()
 
-    while task.wait(1) do
+    while task.wait(0.5) do
 
         if AutoV4 then
 
             pcall(function()
 
-                VirtualInputManager:
-                SendKeyEvent(
-                    true,
-                    Enum.KeyCode.Y,
-                    false,
-                    game
-                )
+                local Remotes =
+                    ReplicatedStorage:
+                    FindFirstChild("Remotes")
+
+                if Remotes and
+                Remotes:FindFirstChild("CommF_") then
+
+                    Remotes.CommF_:
+                    InvokeServer(
+                        "ActivateRace"
+                    )
+                end
 
             end)
         end
@@ -182,17 +199,13 @@ Tabs.Combat:Toggle({
                     ReplicatedStorage:
                     FindFirstChild("Remotes")
 
-                if Remotes then
+                if Remotes and
+                Remotes:FindFirstChild("CommF_") then
 
-                    local CommF =
-                        Remotes:
-                        FindFirstChild("CommF_")
-
-                    if CommF then
-                        CommF:InvokeServer(
-                            "Buso"
-                        )
-                    end
+                    Remotes.CommF_:
+                    InvokeServer(
+                        "Buso"
+                    )
                 end
 
             end)
