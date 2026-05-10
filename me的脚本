@@ -22,7 +22,7 @@ local LocalPlayer = Players.LocalPlayer
 --------------------------------------------------
 
 local AutoDungeon = false
-local DungeonConnection
+local AutoV3 = false
 
 --------------------------------------------------
 -- WINDOW
@@ -113,6 +113,66 @@ Tabs.Main:Toggle({
                                     break
                                 end
                             end
+                        end
+                    end)
+                end
+            end)
+        end
+    end
+})
+
+--------------------------------------------------
+-- 自动V3
+--------------------------------------------------
+
+Tabs.Main:Toggle({
+    Title = "自动V3",
+    Value = false,
+
+    Callback = function(v)
+        AutoV3 = v
+
+        if v then
+            task.spawn(function()
+
+                while AutoV3 do
+                    task.wait(0.5)
+
+                    pcall(function()
+
+                        local Character =
+                            LocalPlayer.Character or
+                            LocalPlayer.CharacterAdded:Wait()
+
+                        local Humanoid =
+                            Character:WaitForChild("Humanoid")
+
+                        if Humanoid.Health <= 0 then
+                            return
+                        end
+
+                        local success, ready =
+                            pcall(function()
+
+                                return
+                                    LocalPlayer.PlayerData.RaceV3.Unlocked
+                                    and
+                                    LocalPlayer.PlayerData.RaceV3.Ready
+                            end)
+
+                        if success and ready then
+
+                            local Remotes =
+                                ReplicatedStorage:
+                                FindFirstChild("Remotes")
+
+                            if Remotes and
+                            Remotes:FindFirstChild("RaceV3Activate") then
+
+                                Remotes.RaceV3Activate:FireServer()
+                            end
+
+                            task.wait(1.5)
                         end
                     end)
                 end
