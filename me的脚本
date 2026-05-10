@@ -1,227 +1,51 @@
-repeat task.wait() until game:IsLoaded()
-
---// WIND UI
-local WindUI = loadstring(game:HttpGet(
-"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
-))()
-
---------------------------------------------------
--- SERVICES
---------------------------------------------------
-
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
-local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
-
-local LocalPlayer = Players.LocalPlayer
-
---------------------------------------------------
--- VARIABLES
---------------------------------------------------
-
-local AutoDungeon = false
-local AutoV3 = false
-local AutoHaki = false
-
---------------------------------------------------
--- WINDOW
---------------------------------------------------
+-- GUI 視窗建立 --
 
 local Window = WindUI:CreateWindow({
-    Title = "1.en Hub",
-    Icon = "swords",
-    Author = "by 1.en",
-    Folder = "1enHub",
-    Size = UDim2.fromOffset(540,420),
-    Transparent = true,
-    Theme = "Dark",
-    SideBarWidth = 170,
+        Title       = "1.en Hub",
+        Icon        = "user-check",
+        Author      = "by 1.en",
+        Folder      = "1enHub",
+        Size        = UDim2.fromOffset(600, 400),
+        Transparent = true,
+        Theme       = "Dark",
+        User = {
+            Enabled   = true,
+            Anonymous = false,
+            Callback  = function()
+                WindUI:Notify({
+                    Title = LocalPlayer.Name,
+                    Content = "ID: " .. LocalPlayer.UserId,
+                    Duration = 3
+                })
+            end
+        },
+        Acrylic       = false,
+        HideSearchBar = false,
+        SideBarWidth  = 200,
 
-    OpenButton = {
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false
-    }
+        OpenButton = {
+            Title           = "1.en Hub",
+            CornerRadius    = UDim.new(1, 0),
+            StrokeThickness = 3,
+            Enabled         = true,
+            OnlyMobile      = false,
+            Draggable       = true,
+            OnlyIcon        = false,
+            Color           = ColorSequence.new(
+                Color3.fromHex("#7F00FF"),
+                Color3.fromHex("#00C6FF")
+            ),
+      }
 })
 
 local Tabs = {
-    Main = Window:Tab({
-        Title = "Main",
-        Icon = "home"
-    })
+    BoatKill = Window:Tab({
+        Title = "Boat kill",
+        Icon = "ship"
+    }),
+
+    Settings = Window:Tab({
+        Title = "設定",
+        Icon = "settings"
+    }),
 }
-
---------------------------------------------------
--- 自动地下城
---------------------------------------------------
-
-Tabs.Main:Toggle({
-    Title = "自动地下城",
-    Value = false,
-
-    Callback = function(v)
-        AutoDungeon = v
-
-        if v then
-            task.spawn(function()
-
-                while AutoDungeon do
-                    task.wait(1)
-
-                    pcall(function()
-
-                        local character =
-                            LocalPlayer.Character or
-                            LocalPlayer.CharacterAdded:Wait()
-
-                        local humanoidRootPart =
-                            character:WaitForChild("HumanoidRootPart")
-
-                        local map = Workspace:FindFirstChild("Map")
-                        if not map then return end
-
-                        local dungeonFolder =
-                            map:FindFirstChild("Dungeon")
-
-                        if not dungeonFolder then return end
-
-                        for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
-
-                            local teleporter =
-                                levelFolder:FindFirstChild("ExitTeleporter")
-
-                            if teleporter and teleporter:FindFirstChild("Root") then
-
-                                local rootPart = teleporter.Root
-
-                                local distance =
-                                    (humanoidRootPart.Position - rootPart.Position).Magnitude
-
-                                if distance <= 1000 then
-
-                                    local tween =
-                                        TweenService:Create(
-                                            humanoidRootPart,
-                                            TweenInfo.new(0.8),
-                                            {CFrame = rootPart.CFrame}
-                                        )
-
-                                    tween:Play()
-                                    tween.Completed:Wait()
-
-                                    break
-                                end
-                            end
-                        end
-                    end)
-                end
-            end)
-        end
-    end
-})
-
---------------------------------------------------
--- 自动V3
---------------------------------------------------
-
-Tabs.Main:Toggle({
-    Title = "自动V3",
-    Value = false,
-
-    Callback = function(v)
-        AutoV3 = v
-
-        if v then
-            task.spawn(function()
-
-                while AutoV3 do
-                    task.wait(0.5)
-
-                    pcall(function()
-
-                        local Character =
-                            LocalPlayer.Character or
-                            LocalPlayer.CharacterAdded:Wait()
-
-                        local Humanoid =
-                            Character:WaitForChild("Humanoid")
-
-                        if Humanoid.Health <= 0 then
-                            return
-                        end
-
-                        local success, ready =
-                            pcall(function()
-
-                                return
-                                    LocalPlayer.PlayerData.RaceV3.Unlocked
-                                    and
-                                    LocalPlayer.PlayerData.RaceV3.Ready
-                            end)
-
-                        if success and ready then
-
-                            local Remotes =
-                                ReplicatedStorage:
-                                FindFirstChild("Remotes")
-
-                            if Remotes and
-                            Remotes:FindFirstChild("RaceV3Activate") then
-
-                                Remotes.RaceV3Activate:FireServer()
-                            end
-
-                            task.wait(1.5)
-                        end
-                    end)
-                end
-            end)
-        end
-    end
-})
-
---------------------------------------------------
--- 自动霸气
---------------------------------------------------
-
-Tabs.Main:Toggle({
-    Title = "自动霸气",
-    Value = false,
-
-    Callback = function(v)
-        AutoHaki = v
-
-        if v then
-            task.spawn(function()
-
-                while AutoHaki do
-                    task.wait(1)
-
-                    pcall(function()
-
-                        local Remotes =
-                            ReplicatedStorage:
-                            FindFirstChild("Remotes")
-
-                        if Remotes and
-                        Remotes:FindFirstChild("CommF_") then
-
-                            Remotes.CommF_:
-                            InvokeServer("Buso")
-                        end
-                    end)
-                end
-            end)
-        end
-    end
-})
-
---------------------------------------------------
--- KEYBIND
---------------------------------------------------
-
-Window:SetToggleKey(
-    Enum.KeyCode.RightControl
-)
