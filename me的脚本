@@ -1,8 +1,13 @@
 repeat task.wait() until game:IsLoaded()
 
+--// WIND UI
 local WindUI = loadstring(game:HttpGet(
 "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
 ))()
+
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
@@ -12,5 +17,37 @@ local Window = WindUI:CreateWindow({
     Size = UDim2.fromOffset(540,420),
     Transparent = true,
     Theme = "Dark",
-    SideBarWidth = 170
+    SideBarWidth = 170,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
 })
+
+--------------------------------------------------
+-- TAB
+--------------------------------------------------
+
+local MainTab = Window:Tab({
+    Title = "Main",
+    Icon = "home"
+})
+
+--------------------------------------------------
+-- LABEL
+--------------------------------------------------
+
+MainTab:Paragraph({
+    Title = "1.en Hub",
+    Desc = "UI Loaded Successfully"
+})
+
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(
+    Enum.KeyCode.RightControl
+)
