@@ -1,10 +1,85 @@
+-- WindUI 載入
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+-- 取得服務與玩家
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+-- 世界檢測變數
+local World2 = game.PlaceId == 4442272183 or game.PlaceId == 79091703265657
+
+local CurrentKey = "G"
+local KeyDisabled = false
+
+-- 核心變數
+local TargetPlayer = nil
+local shipTpToggle = false
+
+--------------------
+-- 核心邏輯函數 --
+--------------------
+
+local function getMyShip()
+    local myChar = LocalPlayer.Character
+    if myChar and myChar:FindFirstChild("Humanoid") and myChar.Humanoid.SeatPart then
+        local current = myChar.Humanoid.SeatPart
+        local seat = myChar.Humanoid.SeatPart
+        while current.Parent and not current:IsA("Model") do
+            current = current.Parent
+        end
+        return current, seat
+    end
+    return nil, nil
+end
+
+local function getTargetSeat(ship, mySeat)
+    for _, part in pairs(ship:GetDescendants()) do
+        if (part:IsA("Seat") or part:IsA("VehicleSeat")) and part ~= mySeat and not part.Occupant then
+            return part
+        end
+    end
+    return nil
+end
+
+local function teleportToPos(pos)
+    local myShip, _ = getMyShip()
+    local myChar = LocalPlayer.Character
+    if myShip then
+        myShip:SetPrimaryPartCFrame(CFrame.new(pos + Vector3.new(0, 10, 0)))
+    elseif myChar and myChar:FindFirstChild("HumanoidRootPart") then
+        myChar.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+    end
+end
+
+-- 玩家列表獲取
+local function GetPlayerList()
+    local list = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then 
+            table.insert(list, plr.Name) 
+        end
+    end
+    return list
+end
+
+-- 檢測並傳送的封裝函數
+local function safeTeleport(pos, name)
+    if World2 then
+        teleportToPos(pos)
+        WindUI:Notify({ Title = "傳送中", Content = "正在前往: " .. name, Duration = 2 })
+    else
+        WindUI:Notify({ Title = "傳送失敗", Content = "此座標僅限特定海域使用", Duration = 3 })
+    end
+end
+
 -- GUI 視窗建立 --
 
 local Window = WindUI:CreateWindow({
-        Title       = "1.en Hub",
+        Title       = "Xu-hub",
         Icon        = "user-check",
-        Author      = "by 1.en",
-        Folder      = "1enHub",
+        Author      = "by xuez1025",
+        Folder      = "Xu-Hub",
         Size        = UDim2.fromOffset(600, 400),
         Transparent = true,
         Theme       = "Dark",
@@ -12,40 +87,175 @@ local Window = WindUI:CreateWindow({
             Enabled   = true,
             Anonymous = false,
             Callback  = function()
-                WindUI:Notify({
-                    Title = LocalPlayer.Name,
-                    Content = "ID: " .. LocalPlayer.UserId,
-                    Duration = 3
-                })
+                WindUI:Notify({ Title = LocalPlayer.Name, Content = "ID: " .. LocalPlayer.UserId, Duration = 3 })
             end
         },
         Acrylic       = false,
         HideSearchBar = false,
         SideBarWidth  = 200,
-
         OpenButton = {
-            Title           = "1.en Hub",
+            Title           = "Xu-hub",
             CornerRadius    = UDim.new(1, 0),
             StrokeThickness = 3,
             Enabled         = true,
             OnlyMobile      = false,
             Draggable       = true,
             OnlyIcon        = false,
-            Color           = ColorSequence.new(
-                Color3.fromHex("#7F00FF"),
-                Color3.fromHex("#00C6FF")
-            ),
+            Color           = ColorSequence.new(Color3.fromHex("#7F00FF"), Color3.fromHex("#00C6FF")),
       }
-})
+  })
 
 local Tabs = {
-    BoatKill = Window:Tab({
-        Title = "Boat kill",
-        Icon = "ship"
-    }),
-
-    Settings = Window:Tab({
-        Title = "設定",
-        Icon = "settings"
-    }),
+    BoatKill = Window:Tab({ Title = "Boat kill", Icon = "ship" }),
+    Settings = Window:Tab({ Title = "設定",     Icon = "settings" }),
 }
+
+--------------------
+-- Boat Kill 分頁 --
+--------------------
+
+Tabs.BoatKill:Section({ Title = "Boat Kill" })
+
+Tabs.BoatKill:Button({
+    Title = "移除鬼船傷害",
+    Desc = "移除鬼船傷害物件",
+    Callback = function()
+        local count = 0
+        for _, v in pairs(game:GetService("Workspace"):GetDescendants()) do
+            if v:IsA("TouchTransmitter") then
+                local p = v.Parent
+                if p and (p.Name:find("Damage") or p.Name:find("Death") or p.Name:find("Kill") or p.Name:find("Lava")) then
+                    v:Destroy()
+                    count = count + 1
+                end
+            elseif v.Name == "WaterDamage" or v.Name == "SeaDamage" then
+                v:Destroy()
+                count = count + 1
+            end
+        end
+        
+        WindUI:Notify({ Title = "清理完成", Content = "已移除 " .. count .. " 個危險物件", Duration = 3 })
+    end
+})
+
+Tabs.BoatKill:Button({
+    Title = "傳送到船",
+    Desc = "傳送到船隻駕駛座",
+    Callback = function()
+        local myShip, mySeat = getMyShip()
+        local targetSeat = nil
+        for _, v in pairs(game.Workspace:GetDescendants()) do
+            if v:IsA("VehicleSeat") and v ~= mySeat then
+                targetSeat = v
+                break 
+            end
+        end
+
+        if targetSeat then
+            teleportToPos(targetSeat.Position)
+            WindUI:Notify({ Title = "傳送成功", Content = "已傳送到船長位置", Duration = 2 })
+        end
+    end
+})
+
+local playerDropdown = Tabs.BoatKill:Dropdown({
+    Title = "選擇玩家",
+    Values = GetPlayerList(),
+    Value = nil,
+    Callback = function(option)
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Name == option then 
+                TargetPlayer = plr 
+                break 
+            end
+        end
+    end
+})
+
+Players.PlayerAdded:Connect(function() playerDropdown:Refresh(GetPlayerList()) end)
+Players.PlayerRemoving:Connect(function() playerDropdown:Refresh(GetPlayerList()) end)
+
+Tabs.BoatKill:Toggle({
+    Title = "帶船傳送玩家",
+    Value = false,
+    Callback = function(state)
+        shipTpToggle = state
+    end
+})
+
+Tabs.BoatKill:Section({ Title = "座標傳送 (僅限對應海域)" })
+
+Tabs.BoatKill:Button({ 
+    Title = "鬼船 (致命區)", 
+    Callback = function() safeTeleport(Vector3.new(941, 252, 32900), "鬼船 (致命區)") end 
+})
+
+Tabs.BoatKill:Button({ 
+    Title = "豪宅", 
+    Callback = function() safeTeleport(Vector3.new(2285, 15, 910), "豪宅") end 
+})
+
+Tabs.BoatKill:Button({ 
+    Title = "鬼船外", 
+    Callback = function() safeTeleport(Vector3.new(922, 125, 32843), "鬼船外") end 
+})
+
+--------------------
+-- 設定分頁 --
+--------------------
+
+Tabs.Settings:Section({ Title = "Boat Kill" })
+
+    Tabs.Settings:Keybind({ 
+        Title = "快捷鍵", 
+        Desc = "可更改", 
+        Value = CurrentKey,
+        Callback = function(v)
+            CurrentKey = v
+            if not KeyDisabled then
+                Window:SetToggleKey(Enum.KeyCode[v])
+            end
+        end
+    })
+
+    Tabs.Settings:Toggle({
+        Title = "停用快捷鍵",
+        Desc = "開啟後將禁用快捷鍵",
+        Value = false,
+        Callback = function(state)
+            KeyDisabled = state
+            if state then
+                Window:SetToggleKey(nil)
+            else
+                Window:SetToggleKey(Enum.KeyCode[CurrentKey])
+            end
+        end
+    })
+
+--------------------
+-- 背景循環邏輯 --
+--------------------
+
+RunService.Heartbeat:Connect(function()
+    if not shipTpToggle or not TargetPlayer then return end
+    
+    local myShip, mySeat = getMyShip()
+    if not myShip then return end
+
+    if TargetPlayer.Character then
+        local targetHum = TargetPlayer.Character:FindFirstChild("Humanoid")
+        local targetHRP = TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+        if targetHum and not targetHum.SeatPart and targetHRP then
+            local emptySeat = getTargetSeat(myShip, mySeat)
+            if emptySeat then
+                local seatOffset = myShip.PrimaryPart.CFrame:Inverse() * emptySeat.CFrame
+                myShip:SetPrimaryPartCFrame(targetHRP.CFrame * seatOffset:Inverse())
+            else
+                myShip:SetPrimaryPartCFrame(targetHRP.CFrame * CFrame.new(0, 5, 0))
+            end
+        end
+    end
+end)
+
+Window:SetToggleKey(Enum.KeyCode[CurrentKey])
