@@ -6,10 +6,11 @@ local WindUI = loadstring(game:HttpGet(
 -- Services
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
 
+--------------------------------------------------
 -- Variables
-local CurrentKey = "RightControl"
+--------------------------------------------------
+
 local AutoDungeon = false
 
 --------------------------------------------------
@@ -38,7 +39,7 @@ local Window = WindUI:CreateWindow({
 --------------------------------------------------
 
 local Tabs = {
-    Main = Window:Tab({
+    Dungeon = Window:Tab({
         Title = "Dungeon",
         Icon = "map"
     }),
@@ -54,23 +55,23 @@ local Tabs = {
 --------------------------------------------------
 
 Tabs.Info:Section({
-    Title = "公告内容"
+    Title = "公告"
 })
 
 Tabs.Info:Paragraph({
     Title = "1.en Hub",
-    Desc = "制作者1.en\n傻逼傻逼"
+    Desc = "制作者1.en"
 })
 
 --------------------------------------------------
--- 地下城功能
+-- Dungeon
 --------------------------------------------------
 
-Tabs.Main:Section({
+Tabs.Dungeon:Section({
     Title = "Auto Dungeon"
 })
 
-Tabs.Main:Toggle({
+Tabs.Dungeon:Toggle({
     Title = "自动地下城",
     Value = false,
 
@@ -89,7 +90,7 @@ Tabs.Main:Toggle({
 -- 地下城层数显示
 --------------------------------------------------
 
-local DungeonLabel = Tabs.Main:Paragraph({
+local DungeonLabel = Tabs.Dungeon:Paragraph({
     Title = "当前地下城",
     Desc = "等待检测..."
 })
@@ -121,7 +122,7 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- 自动地下城核心
+-- 自动地下城
 --------------------------------------------------
 
 task.spawn(function()
@@ -175,4 +176,4 @@ end)
 -- Keybind
 --------------------------------------------------
 
-Window:SetToggleKey(Enum.KeyCode[CurrentKey])
+Window:SetToggleKey(Enum.KeyCode.RightControl)
