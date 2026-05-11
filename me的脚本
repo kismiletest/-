@@ -2,40 +2,24 @@ repeat task.wait() until game:IsLoaded()
 
 -- WindUI
 local WindUI = loadstring(game:HttpGet(
-    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
 
---------------------------------------------------
 -- Services
---------------------------------------------------
-
 local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------
--- Character
---------------------------------------------------
-
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    Humanoid = char:WaitForChild("Humanoid")
-    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
-end)
-
---------------------------------------------------
--- Window
+-- WINDOW
 --------------------------------------------------
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
-    Icon = "rbxassetid://12974400353",
+    Icon = "rbxassetid://7733960981",
     Author = "by 1.en",
     Folder = "1enHub",
     Size = UDim2.fromOffset(580, 430),
@@ -51,23 +35,23 @@ local Window = WindUI:CreateWindow({
 })
 
 --------------------------------------------------
--- Tabs
+-- TABS
 --------------------------------------------------
 
 local Tabs = {
     Notice = Window:Tab({
         Title = "公告",
-        Icon = "info"
+        Icon = "book"
     }),
 
     Dungeon = Window:Tab({
         Title = "Dungeon",
-        Icon = "swords"
+        Icon = "map"
     }),
 
-    Aim = Window:Tab({
-        Title = "自瞄",
-        Icon = "crosshair"
+    Combat = Window:Tab({
+        Title = "自动攻击",
+        Icon = "sword"
     })
 }
 
@@ -75,52 +59,62 @@ local Tabs = {
 -- 公告
 --------------------------------------------------
 
-Tabs.Notice:Section({
-    Title = "公告内容"
-})
-
 Tabs.Notice:Paragraph({
-    Title = "制作者",
-    Desc = "1.en"
+    Title = "公告",
+    Desc = "制作者 1.en"
 })
 
 --------------------------------------------------
--- Dungeon
+-- DUNGEON
 --------------------------------------------------
+
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
 
 local CONFIG = {
     TargetTeleporterName = "ExitTeleporter",
     CheckInterval = 1,
     TweenTime = 0.8,
-    DetectionRadius = 1000
+    DetectionRadius = 1000,
+    CooldownAfterTeleport = 3
 }
 
-local DungeonEnabled = false
-local CurrentDungeon = "未检测"
+local isDetecting = false
+local isTeleporting = false
+local lastTeleportTime = 0
 
-local DungeonLabel = Tabs.Dungeon:Paragraph({
-    Title = "地下城层数",
-    Desc = CurrentDungeon
+local dungeonLabel = Tabs.Dungeon:Paragraph({
+    Title = "地下城关卡",
+    Desc = "当前: 未检测"
 })
 
 Tabs.Dungeon:Toggle({
     Title = "自动地下城",
     Value = false,
+
     Callback = function(v)
-        DungeonEnabled = v
+        isDetecting = v
     end
 })
 
+local function updateCharacter()
+    character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    updateCharacter()
+end)
+
 local function getDungeonLevel()
     local map = Workspace:FindFirstChild("Map")
-    if not map then
-        return "未检测"
-    end
+    if not map then return "未检测" end
 
     local dungeon = map:FindFirstChild("Dungeon")
-    if not dungeon then
-        return "未检测"
-    end
+    if not dungeon then return "未检测" end
 
     local highest = 0
 
@@ -132,78 +126,80 @@ local function getDungeonLevel()
     end
 
     if highest > 0 then
-        return tostring(highest) .. " 层"
+        return tostring(highest)
     end
 
     return "未检测"
 end
 
-local function getAllExitTeleporters()
-    local teleporters = {}
-
-    local map = Workspace:FindFirstChild("Map")
-    if not map then
-        return teleporters
-    end
-
-    local dungeonFolder = map:FindFirstChild("Dungeon")
-    if not dungeonFolder then
-        return teleporters
-    end
-
-    for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
-        local teleporter = levelFolder:FindFirstChild(CONFIG.TargetTeleporterName)
-
-        if teleporter then
-            local rootPart = teleporter:FindFirstChild("Root")
-
-            if rootPart then
-                table.insert(teleporters, rootPart)
-            end
-        end
-    end
-
-    return teleporters
-end
-
-local function tweenTeleport(target)
-    local tweenInfo = TweenInfo.new(
-        CONFIG.TweenTime,
-        Enum.EasingStyle.Linear
-    )
-
-    local tween = TweenService:Create(
-        HumanoidRootPart,
-        tweenInfo,
-        {CFrame = target.CFrame}
-    )
-
-    tween:Play()
-end
-
 task.spawn(function()
     while task.wait(1) do
-        local level = getDungeonLevel()
-
-        if level ~= CurrentDungeon then
-            CurrentDungeon = level
-
-            DungeonLabel:SetDesc(level)
-        end
+        dungeonLabel:SetDesc("当前: "..getDungeonLevel().." 城")
     end
 end)
 
+local function getTeleporters()
+    local list = {}
+
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return list end
+
+    local dungeon = map:FindFirstChild("Dungeon")
+    if not dungeon then return list end
+
+    for _, level in pairs(dungeon:GetChildren()) do
+        local tp = level:FindFirstChild(CONFIG.TargetTeleporterName)
+
+        if tp and tp:FindFirstChild("Root") then
+            table.insert(list, tp.Root)
+        end
+    end
+
+    return list
+end
+
+local function teleportTo(root)
+    if isTeleporting then return end
+
+    if tick() - lastTeleportTime < CONFIG.CooldownAfterTeleport then
+        return
+    end
+
+    isTeleporting = true
+    lastTeleportTime = tick()
+
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+
+    local tween = TweenService:Create(
+        humanoidRootPart,
+        TweenInfo.new(CONFIG.TweenTime),
+        {CFrame = root.CFrame}
+    )
+
+    tween:Play()
+
+    tween.Completed:Wait()
+
+    humanoid.WalkSpeed = 16
+    humanoid.JumpPower = 50
+
+    task.wait(0.5)
+
+    isTeleporting = false
+end
+
 task.spawn(function()
     while task.wait(CONFIG.CheckInterval) do
-        if DungeonEnabled then
+        if isDetecting and humanoid.Health > 0 then
 
-            local teleporters = getAllExitTeleporters()
+            local teleporters = getTeleporters()
 
-            for _, tp in pairs(teleporters) do
-                local distance = (HumanoidRootPart.Position - tp.Position).Magnitude
+            for _, root in pairs(teleporters) do
+                local dist = (humanoidRootPart.Position - root.Position).Magnitude
 
-                if distance <= CONFIG.DetectionRadius then
-                    tweenTeleport(tp)
+                if dist <= CONFIG.DetectionRadius then
+                    teleportTo(root)
                     break
                 end
             end
@@ -212,27 +208,46 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- 自瞄
+-- 自动攻击
 --------------------------------------------------
 
-Tabs.Aim:Section({
-    Title = "自瞄"
-})
+local AutoAttack = false
 
-Tabs.Aim:Button({
-    Title = "测试按钮",
-    Desc = "这是自瞄页面",
-    Callback = function()
-        WindUI:Notify({
-            Title = "1.en Hub",
-            Content = "自瞄按钮点击成功",
-            Duration = 3
-        })
+Tabs.Combat:Toggle({
+    Title = "自动攻击",
+    Value = false,
+
+    Callback = function(v)
+        AutoAttack = v
     end
 })
 
+task.spawn(function()
+    while task.wait(0.08) do
+        if AutoAttack then
+            pcall(function()
+
+                local Character = LocalPlayer.Character
+                if not Character then return end
+
+                local Tool = Character:FindFirstChildOfClass("Tool")
+
+                if Tool then
+                    Tool:Activate()
+
+                    VirtualUser:Button1Down(
+                        Vector2.new(0,0),
+                        workspace.CurrentCamera.CFrame
+                    )
+                end
+
+            end)
+        end
+    end
+end)
+
 --------------------------------------------------
--- Keybind
+-- KEYBIND
 --------------------------------------------------
 
 Window:SetToggleKey(Enum.KeyCode.RightControl)
