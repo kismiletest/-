@@ -1,117 +1,165 @@
--- 自动攻击核心
+repeat task.wait() until game:IsLoaded()
+
+-- WindUI
+local WindUI = loadstring(game:HttpGet(
+    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+))()
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
-local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 
--- 设置
+--------------------------------------------------
+-- CHARACTER
+--------------------------------------------------
+
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+end)
+
+--------------------------------------------------
+-- VARIABLES
+--------------------------------------------------
+
 local AttackAura = false
-local AttackDistance = 60
-local AttackDelay = 0.08
+local AutoDungeon = false
 
--- 检测角色
-local function GetCharacter()
-    return LocalPlayer.Character
-end
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
 
--- 获取武器
-local function GetTool()
-    local Character = GetCharacter()
-    if Character then
-        return Character:FindFirstChildOfClass("Tool")
+local Window = WindUI:CreateWindow({
+    Title = "1.en Hub",
+    Icon = "swords",
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(580,460),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 170,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
+})
+
+--------------------------------------------------
+-- TABS
+--------------------------------------------------
+
+local Tabs = {
+    Combat = Window:Tab({
+        Title = "Combat",
+        Icon = "sword"
+    }),
+
+    Dungeon = Window:Tab({
+        Title = "Dungeon",
+        Icon = "map"
+    })
+}
+
+--------------------------------------------------
+-- ATTACK AURA
+--------------------------------------------------
+
+Tabs.Combat:Section({
+    Title = "Auto Attack"
+})
+
+Tabs.Combat:Toggle({
+    Title = "Attack Aura",
+    Value = false,
+
+    Callback = function(v)
+        AttackAura = v
     end
-end
+})
 
--- 获取最近敌人
-local function GetClosestEnemy()
-    local Character = GetCharacter()
-    if not Character then return end
-
-    local HRP = Character:FindFirstChild("HumanoidRootPart")
-    if not HRP then return end
-
-    local Closest = nil
-    local Distance = AttackDistance
-
-    -- NPC
-    local Enemies = workspace:FindFirstChild("Enemies")
-
-    if Enemies then
-        for _, Enemy in pairs(Enemies:GetChildren()) do
-            local EnemyHRP = Enemy:FindFirstChild("HumanoidRootPart")
-            local Humanoid = Enemy:FindFirstChild("Humanoid")
-
-            if EnemyHRP and Humanoid and Humanoid.Health > 0 then
-                local Magnitude =
-                    (HRP.Position - EnemyHRP.Position).Magnitude
-
-                if Magnitude < Distance then
-                    Distance = Magnitude
-                    Closest = Enemy
-                end
-            end
-        end
-    end
-
-    return Closest
-end
-
--- 自动攻击
 task.spawn(function()
 
-    while task.wait(AttackDelay) do
+    while task.wait(0.08) do
 
         if AttackAura then
 
             pcall(function()
 
-                local Character = GetCharacter()
-                local Tool = GetTool()
-                local Enemy = GetClosestEnemy()
+                local Tool =
+                    Character:
+                    FindFirstChildOfClass("Tool")
 
-                if Character and Tool and Enemy then
+                if Tool then
 
-                    local EnemyHRP =
-                        Enemy:FindFirstChild("HumanoidRootPart")
+                    Tool:Activate()
 
-                    if EnemyHRP then
+                    VirtualUser:Button1Down(
+                        Vector2.new(0,0),
+                        workspace.CurrentCamera.CFrame
+                    )
 
-                        -- 激活武器
-                        Tool:Activate()
-
-                        -- 模拟点击
-                        VirtualUser:Button1Down(
-                            Vector2.new(0,0),
-                            workspace.CurrentCamera.CFrame
+                    local CombatFramework =
+                        require(
+                            LocalPlayer.PlayerScripts:
+                            WaitForChild("CombatFramework")
                         )
 
-                        -- 注册攻击
-                        local CombatFramework =
-                            require(
-                                LocalPlayer.PlayerScripts:
-                                WaitForChild("CombatFramework")
-                            )
+                    local activeController =
+                        CombatFramework.activeController
 
-                        local activeController =
-                            CombatFramework.activeController
+                    if activeController then
+                        activeController.hitboxMagnitude = 120
+                    end
 
-                        if activeController then
-                            activeController.hitboxMagnitude = 120
-                        end
+                    local RigController =
+                        ReplicatedStorage:
+                        FindFirstChild("RigControllerEvent")
 
-                        -- 远程攻击
-                        local RigController =
-                            ReplicatedStorage:
-                            FindFirstChild("RigControllerEvent")
+                    if RigController then
 
-                        if RigController then
-                            RigController:FireServer(
-                                "hit",
-                                EnemyHRP,
-                                EnemyHRP.Position
-                            )
+                        local Enemies =
+                            workspace:FindFirstChild("Enemies")
+
+                        if Enemies then
+
+                            for _, Enemy in pairs(Enemies:GetChildren()) do
+
+                                local EnemyHRP =
+                                    Enemy:FindFirstChild("HumanoidRootPart")
+
+                                local EnemyHum =
+                                    Enemy:FindFirstChild("Humanoid")
+
+                                if EnemyHRP and EnemyHum and EnemyHum.Health > 0 then
+
+                                    local Distance =
+                                        (HumanoidRootPart.Position - EnemyHRP.Position).Magnitude
+
+                                    if Distance <= 60 then
+
+                                        RigController:FireServer(
+                                            "hit",
+                                            EnemyHRP,
+                                            EnemyHRP.Position
+                                        )
+                                    end
+                                end
+                            end
                         end
                     end
                 end
@@ -120,7 +168,164 @@ task.spawn(function()
     end
 end)
 
--- 开关
-AttackAura = true
+--------------------------------------------------
+-- AUTO DUNGEON
+--------------------------------------------------
 
-print("自动攻击核心已启动")
+Tabs.Dungeon:Section({
+    Title = "Auto Dungeon"
+})
+
+local CONFIG = {
+    TargetTeleporterName = "ExitTeleporter",
+    CheckInterval = 1,
+    TweenTime = 0.8,
+    DetectionRadius = 1000
+}
+
+local CurrentDungeonLevel = "Unknown"
+
+local DungeonLabel = Tabs.Dungeon:Paragraph({
+    Title = "Current Level",
+    Desc = "Loading..."
+})
+
+local function getAllExitTeleporters()
+
+    local teleporters = {}
+
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return teleporters end
+
+    local dungeonFolder = map:FindFirstChild("Dungeon")
+    if not dungeonFolder then return teleporters end
+
+    for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
+
+        local levelNumber = tonumber(levelFolder.Name)
+
+        if levelNumber then
+
+            local teleporter =
+                levelFolder:FindFirstChild(CONFIG.TargetTeleporterName)
+
+            if teleporter then
+
+                local rootPart =
+                    teleporter:FindFirstChild("Root")
+
+                if rootPart then
+
+                    table.insert(teleporters,{
+                        level = levelNumber,
+                        rootPart = rootPart,
+                        position = rootPart.Position
+                    })
+                end
+            end
+        end
+    end
+
+    table.sort(teleporters,function(a,b)
+        return a.level < b.level
+    end)
+
+    return teleporters
+end
+
+local function getCurrentLevel()
+
+    local teleporters = getAllExitTeleporters()
+
+    local closestLevel = nil
+    local closestDistance = math.huge
+
+    for _, tp in pairs(teleporters) do
+
+        local Distance =
+            (HumanoidRootPart.Position - tp.position).Magnitude
+
+        if Distance < closestDistance then
+            closestDistance = Distance
+            closestLevel = tp.level
+        end
+    end
+
+    return closestLevel
+end
+
+Tabs.Dungeon:Toggle({
+    Title = "Auto Dungeon",
+    Value = false,
+
+    Callback = function(v)
+        AutoDungeon = v
+    end
+})
+
+task.spawn(function()
+
+    while task.wait(1) do
+
+        pcall(function()
+
+            local level = getCurrentLevel()
+
+            if level then
+                CurrentDungeonLevel = tostring(level)
+            else
+                CurrentDungeonLevel = "Unknown"
+            end
+
+            DungeonLabel:SetDesc(
+                "Current Dungeon : "..CurrentDungeonLevel
+            )
+        end)
+    end
+end)
+
+task.spawn(function()
+
+    while task.wait(CONFIG.CheckInterval) do
+
+        if AutoDungeon then
+
+            pcall(function()
+
+                local teleporters =
+                    getAllExitTeleporters()
+
+                for _, tp in pairs(teleporters) do
+
+                    local Distance =
+                        (HumanoidRootPart.Position - tp.position).Magnitude
+
+                    if Distance <= CONFIG.DetectionRadius then
+
+                        local tween =
+                            TweenService:Create(
+                                HumanoidRootPart,
+                                TweenInfo.new(
+                                    CONFIG.TweenTime,
+                                    Enum.EasingStyle.Linear
+                                ),
+                                {
+                                    CFrame = tp.rootPart.CFrame
+                                }
+                            )
+
+                        tween:Play()
+
+                        break
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(Enum.KeyCode.RightControl)
