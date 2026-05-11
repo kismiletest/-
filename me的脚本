@@ -1,51 +1,30 @@
-repeat task.wait() until game:IsLoaded()
-
 -- WindUI
 local WindUI = loadstring(game:HttpGet(
-    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
 
---------------------------------------------------
--- SERVICES
---------------------------------------------------
-
+-- Services
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
-
 local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 
---------------------------------------------------
--- CHARACTER
---------------------------------------------------
-
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
-end)
-
---------------------------------------------------
--- VARIABLES
---------------------------------------------------
-
+-- Variables
+local CurrentKey = "RightControl"
 local AutoDungeon = false
 
 --------------------------------------------------
--- WINDOW
+-- Window
 --------------------------------------------------
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
-    Icon = "map",
+    Icon = "swords",
     Author = "by 1.en",
     Folder = "1enHub",
-    Size = UDim2.fromOffset(560,420),
+    Size = UDim2.fromOffset(580,420),
     Transparent = true,
     Theme = "Dark",
-    SideBarWidth = 170,
+    SideBarWidth = 180,
 
     OpenButton = {
         Enabled = true,
@@ -55,198 +34,145 @@ local Window = WindUI:CreateWindow({
 })
 
 --------------------------------------------------
--- TAB
+-- Tabs
 --------------------------------------------------
 
-local DungeonTab = Window:Tab({
-    Title = "Dungeon",
-    Icon = "map"
-})
+local Tabs = {
+    Main = Window:Tab({
+        Title = "Dungeon",
+        Icon = "map"
+    }),
 
---------------------------------------------------
--- SECTION
---------------------------------------------------
-
-DungeonTab:Section({
-    Title = "Auto Dungeon"
-})
-
---------------------------------------------------
--- CONFIG
---------------------------------------------------
-
-local CONFIG = {
-    TargetTeleporterName = "ExitTeleporter",
-    CheckInterval = 1,
-    TweenTime = 0.8,
-    DetectionRadius = 1000
+    Info = Window:Tab({
+        Title = "公告",
+        Icon = "info"
+    })
 }
 
 --------------------------------------------------
--- LEVEL DISPLAY
+-- 公告
 --------------------------------------------------
 
-local DungeonLabel = DungeonTab:Paragraph({
-    Title = "Current Dungeon",
-    Desc = "Loading..."
+Tabs.Info:Section({
+    Title = "公告内容"
+})
+
+Tabs.Info:Paragraph({
+    Title = "1.en Hub",
+    Desc = "制作者1.en\n傻逼傻逼"
 })
 
 --------------------------------------------------
--- FUNCTIONS
+-- 地下城功能
 --------------------------------------------------
 
-local function getAllExitTeleporters()
+Tabs.Main:Section({
+    Title = "Auto Dungeon"
+})
 
-    local teleporters = {}
-
-    local map = Workspace:FindFirstChild("Map")
-    if not map then
-        return teleporters
-    end
-
-    local dungeonFolder = map:FindFirstChild("Dungeon")
-    if not dungeonFolder then
-        return teleporters
-    end
-
-    for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
-
-        local level = tonumber(levelFolder.Name)
-
-        if level then
-
-            local teleporter =
-                levelFolder:FindFirstChild(CONFIG.TargetTeleporterName)
-
-            if teleporter then
-
-                local root =
-                    teleporter:FindFirstChild("Root")
-
-                if root then
-
-                    table.insert(teleporters,{
-                        level = level,
-                        rootPart = root,
-                        position = root.Position
-                    })
-                end
-            end
-        end
-    end
-
-    table.sort(teleporters,function(a,b)
-        return a.level < b.level
-    end)
-
-    return teleporters
-end
-
-local function getCurrentDungeon()
-
-    local teleporters = getAllExitTeleporters()
-
-    local closestLevel = nil
-    local closestDistance = math.huge
-
-    for _, tp in pairs(teleporters) do
-
-        local distance =
-            (HumanoidRootPart.Position - tp.position).Magnitude
-
-        if distance < closestDistance then
-            closestDistance = distance
-            closestLevel = tp.level
-        end
-    end
-
-    return closestLevel
-end
-
---------------------------------------------------
--- TOGGLE
---------------------------------------------------
-
-DungeonTab:Toggle({
-    Title = "Auto Dungeon",
+Tabs.Main:Toggle({
+    Title = "自动地下城",
     Value = false,
 
     Callback = function(v)
         AutoDungeon = v
+
+        WindUI:Notify({
+            Title = "1.en Hub",
+            Content = v and "自动地下城已开启" or "自动地下城已关闭",
+            Duration = 3
+        })
     end
 })
 
 --------------------------------------------------
--- UPDATE LEVEL
+-- 地下城层数显示
+--------------------------------------------------
+
+local DungeonLabel = Tabs.Main:Paragraph({
+    Title = "当前地下城",
+    Desc = "等待检测..."
+})
+
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+
+            local map = workspace:FindFirstChild("Map")
+            if not map then return end
+
+            local dungeon = map:FindFirstChild("Dungeon")
+            if not dungeon then return end
+
+            local highest = 0
+
+            for _, v in pairs(dungeon:GetChildren()) do
+                local num = tonumber(v.Name)
+
+                if num and num > highest then
+                    highest = num
+                end
+            end
+
+            DungeonLabel:SetDesc("当前层数: "..highest)
+
+        end)
+    end
+end)
+
+--------------------------------------------------
+-- 自动地下城核心
 --------------------------------------------------
 
 task.spawn(function()
 
     while task.wait(1) do
 
-        pcall(function()
-
-            local level = getCurrentDungeon()
-
-            if level then
-                DungeonLabel:SetDesc(
-                    "Current Level : "..tostring(level)
-                )
-            else
-                DungeonLabel:SetDesc(
-                    "Current Level : Unknown"
-                )
-            end
-        end)
-    end
-end)
-
---------------------------------------------------
--- AUTO TELEPORT
---------------------------------------------------
-
-task.spawn(function()
-
-    while task.wait(CONFIG.CheckInterval) do
-
         if AutoDungeon then
 
             pcall(function()
 
-                local teleporters =
-                    getAllExitTeleporters()
+                local map = workspace:FindFirstChild("Map")
+                if not map then return end
 
-                for _, tp in pairs(teleporters) do
+                local dungeon = map:FindFirstChild("Dungeon")
+                if not dungeon then return end
 
-                    local distance =
-                        (HumanoidRootPart.Position - tp.position).Magnitude
+                local highest = nil
+                local highestNum = 0
 
-                    if distance <= CONFIG.DetectionRadius then
+                for _, v in pairs(dungeon:GetChildren()) do
+                    local num = tonumber(v.Name)
 
-                        local tween =
-                            TweenService:Create(
-                                HumanoidRootPart,
-                                TweenInfo.new(
-                                    CONFIG.TweenTime,
-                                    Enum.EasingStyle.Linear
-                                ),
-                                {
-                                    CFrame = tp.rootPart.CFrame
-                                }
-                            )
-
-                        tween:Play()
-
-                        break
+                    if num and num > highestNum then
+                        highestNum = num
+                        highest = v
                     end
                 end
+
+                if highest then
+
+                    local tp = highest:FindFirstChild("ExitTeleporter")
+
+                    if tp and tp:FindFirstChild("Root") then
+
+                        local char = LocalPlayer.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+
+                            char.HumanoidRootPart.CFrame =
+                                tp.Root.CFrame + Vector3.new(0,3,0)
+
+                        end
+                    end
+                end
+
             end)
         end
     end
 end)
 
 --------------------------------------------------
--- KEYBIND
+-- Keybind
 --------------------------------------------------
 
-Window:SetToggleKey(Enum.KeyCode.RightControl)
+Window:SetToggleKey(Enum.KeyCode[CurrentKey])
