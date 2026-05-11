@@ -18,6 +18,7 @@ local VirtualUser = game:GetService("VirtualUser")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 --------------------------------------------------
 -- VARIABLES
@@ -26,11 +27,7 @@ local LocalPlayer = Players.LocalPlayer
 local AttackAura = false
 local AutoV3 = false
 local AutoV4 = false
-local HakiEnabled = false
-
---------------------------------------------------
--- AIMLOCK
---------------------------------------------------
+local AutoHaki = false
 
 local AimlockEnabled = false
 local SelectedPlayer = nil
@@ -87,7 +84,7 @@ local Tabs = {
 --------------------------------------------------
 
 Tabs.Gonggao:Paragraph({
-    Title = "公告",
+    Title = "1.en Hub",
     Desc = "制作者 1.en"
 })
 
@@ -121,18 +118,11 @@ task.spawn(function()
 
             pcall(function()
 
-                local Character =
-                    LocalPlayer.Character
-
-                if not Character then
-                    return
-                end
+                local Character = LocalPlayer.Character
+                if not Character then return end
 
                 local Tool =
-                    Character:
-                    FindFirstChildOfClass(
-                        "Tool"
-                    )
+                    Character:FindFirstChildOfClass("Tool")
 
                 if Tool then
 
@@ -140,13 +130,17 @@ task.spawn(function()
 
                     VirtualUser:Button1Down(
                         Vector2.new(0,0),
-                        workspace.CurrentCamera.CFrame
+                        Camera.CFrame
                     )
+
                 end
 
             end)
+
         end
+
     end
+
 end)
 
 --------------------------------------------------
@@ -171,21 +165,22 @@ task.spawn(function()
             pcall(function()
 
                 local Remotes =
-                    ReplicatedStorage:
-                    FindFirstChild("Remotes")
+                    ReplicatedStorage:FindFirstChild("Remotes")
 
-                if Remotes and
-                Remotes:FindFirstChild("CommE") then
+                if Remotes and Remotes:FindFirstChild("CommE") then
 
-                    Remotes.CommE:
-                    FireServer(
+                    Remotes.CommE:FireServer(
                         "ActivateAbility"
                     )
+
                 end
 
             end)
+
         end
+
     end
+
 end)
 
 --------------------------------------------------
@@ -210,21 +205,22 @@ task.spawn(function()
             pcall(function()
 
                 local Remotes =
-                    ReplicatedStorage:
-                    FindFirstChild("Remotes")
+                    ReplicatedStorage:FindFirstChild("Remotes")
 
-                if Remotes and
-                Remotes:FindFirstChild("CommF_") then
+                if Remotes and Remotes:FindFirstChild("CommF_") then
 
-                    Remotes.CommF_:
-                    InvokeServer(
+                    Remotes.CommF_:InvokeServer(
                         "ActivateRace"
                     )
+
                 end
 
             end)
+
         end
+
     end
+
 end)
 
 --------------------------------------------------
@@ -236,55 +232,58 @@ Tabs.Combat:Toggle({
     Value = false,
 
     Callback = function(v)
+        AutoHaki = v
+    end
+})
 
-        if v and not HakiEnabled then
+task.spawn(function()
 
-            HakiEnabled = true
+    while task.wait(1) do
+
+        if AutoHaki then
 
             pcall(function()
 
                 local Remotes =
-                    ReplicatedStorage:
-                    FindFirstChild("Remotes")
+                    ReplicatedStorage:FindFirstChild("Remotes")
 
-                if Remotes and
-                Remotes:FindFirstChild("CommF_") then
+                if Remotes and Remotes:FindFirstChild("CommF_") then
 
-                    Remotes.CommF_:
-                    InvokeServer(
-                        "Buso"
-                    )
+                    Remotes.CommF_:InvokeServer("Buso")
+
                 end
 
             end)
 
         end
 
-        if not v then
-            HakiEnabled = false
-        end
     end
-})
+
+end)
 
 --------------------------------------------------
--- 锁人系统
+-- PLAYER LIST
 --------------------------------------------------
-
-Tabs.Combat:Section({
-    Title = "锁人系统"
-})
 
 local function GetPlayerList()
+
     local list = {}
 
     for _, plr in pairs(Players:GetPlayers()) do
+
         if plr ~= LocalPlayer then
             table.insert(list, plr.Name)
         end
+
     end
 
     return list
+
 end
+
+--------------------------------------------------
+-- AIMLOCK
+--------------------------------------------------
 
 local PlayerDropdown = Tabs.Combat:Dropdown({
     Title = "选择玩家",
@@ -294,10 +293,12 @@ local PlayerDropdown = Tabs.Combat:Dropdown({
     Callback = function(value)
 
         for _, plr in pairs(Players:GetPlayers()) do
+
             if plr.Name == value then
                 SelectedPlayer = plr
                 break
             end
+
         end
 
     end
@@ -335,13 +336,13 @@ RunService.RenderStepped:Connect(function()
     end
 
     local Character = SelectedPlayer.Character
+    if not Character then return end
 
-    if not Character then
-        return
-    end
+    local HRP =
+        Character:FindFirstChild("HumanoidRootPart")
 
-    local HRP = Character:FindFirstChild("HumanoidRootPart")
-    local Humanoid = Character:FindFirstChild("Humanoid")
+    local Humanoid =
+        Character:FindFirstChild("Humanoid")
 
     if not HRP or not Humanoid then
         return
@@ -351,8 +352,8 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
-    workspace.CurrentCamera.CFrame = CFrame.new(
-        workspace.CurrentCamera.CFrame.Position,
+    Camera.CFrame = CFrame.lookAt(
+        Camera.CFrame.Position,
         HRP.Position
     )
 
@@ -362,6 +363,4 @@ end)
 -- KEYBIND
 --------------------------------------------------
 
-Window:SetToggleKey(
-    Enum.KeyCode.RightControl
-)
+Window:SetToggleKey(Enum.KeyCode.RightControl)
