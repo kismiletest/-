@@ -1,3 +1,7 @@
+pcall(function()
+    game.CoreGui:FindFirstChild("WindUI"):Destroy()
+end)
+
 repeat task.wait() until game:IsLoaded()
 
 --------------------------------------------------
@@ -5,7 +9,7 @@ repeat task.wait() until game:IsLoaded()
 --------------------------------------------------
 
 local WindUI = loadstring(game:HttpGet(
-"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
 
 --------------------------------------------------
@@ -13,24 +17,12 @@ local WindUI = loadstring(game:HttpGet(
 --------------------------------------------------
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-
---------------------------------------------------
--- VARIABLES
---------------------------------------------------
-
-local AttackAura = false
-local AutoV3 = false
-local AutoV4 = false
-local AutoHaki = false
-
-local AimlockEnabled = false
-local SelectedPlayer = nil
 
 --------------------------------------------------
 -- WINDOW
@@ -38,13 +30,13 @@ local SelectedPlayer = nil
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
-    Icon = "swords",
+    Icon = "rbxassetid://7733960981",
     Author = "by 1.en",
     Folder = "1enHub",
-    Size = UDim2.fromOffset(540,420),
+    Size = UDim2.fromOffset(600, 430),
     Transparent = true,
     Theme = "Dark",
-    SideBarWidth = 170,
+    SideBarWidth = 180,
 
     OpenButton = {
         Enabled = true,
@@ -58,9 +50,9 @@ local Window = WindUI:CreateWindow({
 --------------------------------------------------
 
 local Tabs = {
-    Gonggao = Window:Tab({
+    Notice = Window:Tab({
         Title = "公告",
-        Icon = "bell"
+        Icon = "book"
     }),
 
     Dungeon = Window:Tab({
@@ -68,14 +60,14 @@ local Tabs = {
         Icon = "map"
     }),
 
-    Combat = Window:Tab({
-        Title = "Combat",
-        Icon = "sword"
+    ESP = Window:Tab({
+        Title = "ESP",
+        Icon = "eye"
     }),
 
-    ESP = Window:Tab({
-        Title = "透视",
-        Icon = "eye"
+    Settings = Window:Tab({
+        Title = "设置",
+        Icon = "settings"
     })
 }
 
@@ -83,8 +75,8 @@ local Tabs = {
 -- 公告
 --------------------------------------------------
 
-Tabs.Gonggao:Paragraph({
-    Title = "1.en Hub",
+Tabs.Notice:Paragraph({
+    Title = "公告",
     Desc = "制作者 1.en"
 })
 
@@ -92,275 +84,284 @@ Tabs.Gonggao:Paragraph({
 -- DUNGEON
 --------------------------------------------------
 
-Tabs.Dungeon:Paragraph({
-    Title = "Dungeon",
-    Desc = "自动地下城已加载"
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+local CONFIG = {
+    TargetTeleporterName = "ExitTeleporter",
+    CheckInterval = 1,
+    TweenTime = 0.8,
+    DetectionRadius = 1000,
+    CooldownAfterTeleport = 3
+}
+
+local isDetecting = false
+local isTeleporting = false
+local lastTeleportTime = 0
+
+local dungeonLabel = Tabs.Dungeon:Paragraph({
+    Title = "地下城关卡",
+    Desc = "当前: 未检测"
 })
 
---------------------------------------------------
--- ATTACK AURA
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "Attack Aura",
+Tabs.Dungeon:Toggle({
+    Title = "自动地下城",
     Value = false,
 
     Callback = function(v)
-        AttackAura = v
+        isDetecting = v
     end
 })
 
-task.spawn(function()
+local function updateCharacter()
+    character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+end
 
-    while task.wait(0.08) do
-
-        if AttackAura then
-
-            pcall(function()
-
-                local Character = LocalPlayer.Character
-                if not Character then return end
-
-                local Tool =
-                    Character:FindFirstChildOfClass("Tool")
-
-                if Tool then
-
-                    Tool:Activate()
-
-                    VirtualUser:Button1Down(
-                        Vector2.new(0,0),
-                        Camera.CFrame
-                    )
-
-                end
-
-            end)
-
-        end
-
-    end
-
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    updateCharacter()
 end)
 
---------------------------------------------------
--- AUTO V3
---------------------------------------------------
+local function getDungeonLevel()
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return "未检测" end
 
-Tabs.Combat:Toggle({
-    Title = "Auto V3",
-    Value = false,
+    local dungeon = map:FindFirstChild("Dungeon")
+    if not dungeon then return "未检测" end
 
-    Callback = function(v)
-        AutoV3 = v
-    end
-})
+    local highest = 0
 
-task.spawn(function()
+    for _, v in pairs(dungeon:GetChildren()) do
+        local num = tonumber(v.Name:match("%d+"))
 
-    while task.wait(0.5) do
-
-        if AutoV3 then
-
-            pcall(function()
-
-                local Remotes =
-                    ReplicatedStorage:FindFirstChild("Remotes")
-
-                if Remotes and Remotes:FindFirstChild("CommE") then
-
-                    Remotes.CommE:FireServer(
-                        "ActivateAbility"
-                    )
-
-                end
-
-            end)
-
+        if num and num > highest then
+            highest = num
         end
-
     end
 
-end)
-
---------------------------------------------------
--- AUTO V4
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "Auto V4",
-    Value = false,
-
-    Callback = function(v)
-        AutoV4 = v
+    if highest > 0 then
+        return tostring(highest)
     end
-})
+
+    return "未检测"
+end
 
 task.spawn(function()
-
-    while task.wait(0.5) do
-
-        if AutoV4 then
-
-            pcall(function()
-
-                local Remotes =
-                    ReplicatedStorage:FindFirstChild("Remotes")
-
-                if Remotes and Remotes:FindFirstChild("CommF_") then
-
-                    Remotes.CommF_:InvokeServer(
-                        "ActivateRace"
-                    )
-
-                end
-
-            end)
-
-        end
-
-    end
-
-end)
-
---------------------------------------------------
--- AUTO HAKI
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "Auto Haki",
-    Value = false,
-
-    Callback = function(v)
-        AutoHaki = v
-    end
-})
-
-task.spawn(function()
-
     while task.wait(1) do
-
-        if AutoHaki then
-
-            pcall(function()
-
-                local Remotes =
-                    ReplicatedStorage:FindFirstChild("Remotes")
-
-                if Remotes and Remotes:FindFirstChild("CommF_") then
-
-                    Remotes.CommF_:InvokeServer("Buso")
-
-                end
-
-            end)
-
-        end
-
+        dungeonLabel:SetDesc("当前: "..getDungeonLevel().." 城")
     end
-
 end)
 
---------------------------------------------------
--- PLAYER LIST
---------------------------------------------------
-
-local function GetPlayerList()
-
+local function getTeleporters()
     local list = {}
 
-    for _, plr in pairs(Players:GetPlayers()) do
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return list end
 
-        if plr ~= LocalPlayer then
-            table.insert(list, plr.Name)
+    local dungeon = map:FindFirstChild("Dungeon")
+    if not dungeon then return list end
+
+    for _, level in pairs(dungeon:GetChildren()) do
+        local tp = level:FindFirstChild(CONFIG.TargetTeleporterName)
+
+        if tp and tp:FindFirstChild("Root") then
+            table.insert(list, tp.Root)
         end
-
     end
 
     return list
-
 end
 
---------------------------------------------------
--- AIMLOCK
---------------------------------------------------
+local function teleportTo(root)
+    if isTeleporting then return end
 
-local PlayerDropdown = Tabs.Combat:Dropdown({
-    Title = "选择玩家",
-    Values = GetPlayerList(),
-    Value = nil,
+    if tick() - lastTeleportTime < CONFIG.CooldownAfterTeleport then
+        return
+    end
 
-    Callback = function(value)
+    isTeleporting = true
+    lastTeleportTime = tick()
 
-        for _, plr in pairs(Players:GetPlayers()) do
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
 
-            if plr.Name == value then
-                SelectedPlayer = plr
-                break
+    local tween = TweenService:Create(
+        humanoidRootPart,
+        TweenInfo.new(CONFIG.TweenTime),
+        {CFrame = root.CFrame}
+    )
+
+    tween:Play()
+
+    tween.Completed:Wait()
+
+    humanoid.WalkSpeed = 16
+    humanoid.JumpPower = 50
+
+    task.wait(0.5)
+
+    isTeleporting = false
+end
+
+task.spawn(function()
+    while task.wait(CONFIG.CheckInterval) do
+        if isDetecting and humanoid.Health > 0 then
+
+            local teleporters = getTeleporters()
+
+            for _, root in pairs(teleporters) do
+                local dist = (humanoidRootPart.Position - root.Position).Magnitude
+
+                if dist <= CONFIG.DetectionRadius then
+                    teleportTo(root)
+                    break
+                end
             end
+        end
+    end
+end)
 
+--------------------------------------------------
+-- ESP
+--------------------------------------------------
+
+local ESPEnabled = false
+local ESPObjects = {}
+
+local function removeESP(player)
+    if ESPObjects[player] then
+        if ESPObjects[player].Gui then
+            ESPObjects[player].Gui:Destroy()
         end
 
+        if ESPObjects[player].Connection then
+            ESPObjects[player].Connection:Disconnect()
+        end
+
+        ESPObjects[player] = nil
     end
-})
+end
 
-Players.PlayerAdded:Connect(function()
-    PlayerDropdown:Refresh(GetPlayerList())
-end)
+local function createESP(player)
+    if player == LocalPlayer then
+        return
+    end
 
-Players.PlayerRemoving:Connect(function()
-    PlayerDropdown:Refresh(GetPlayerList())
-end)
+    removeESP(player)
 
-Tabs.Combat:Toggle({
-    Title = "开启锁人",
+    local char = player.Character
+    if not char then return end
+
+    local head = char:FindFirstChild("Head")
+    local hum = char:FindFirstChild("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+
+    if not head or not hum or not hrp then
+        return
+    end
+
+    local bill = Instance.new("BillboardGui")
+    bill.Name = "ESP"
+    bill.Size = UDim2.new(0,200,0,50)
+    bill.AlwaysOnTop = true
+    bill.StudsOffset = Vector3.new(0,3,0)
+    bill.Adornee = head
+    bill.Parent = head
+
+    local text = Instance.new("TextLabel")
+    text.Parent = bill
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = Color3.new(1,1,1)
+    text.TextStrokeTransparency = 0
+    text.Font = Enum.Font.GothamBold
+    text.TextScaled = true
+
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+
+        if not ESPEnabled then
+            bill.Enabled = false
+            return
+        end
+
+        bill.Enabled = true
+
+        local myChar = LocalPlayer.Character
+        if not myChar then return end
+
+        local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return end
+
+        local dist = math.floor(
+            (myHRP.Position - hrp.Position).Magnitude
+        )
+
+        text.Text =
+            player.Name ..
+            "\n距离: "..dist ..
+            "\n血量: "..math.floor(hum.Health)
+    end)
+
+    ESPObjects[player] = {
+        Gui = bill,
+        Connection = connection
+    }
+end
+
+local function refreshESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            createESP(player)
+        end
+    end
+end
+
+Tabs.ESP:Toggle({
+    Title = "玩家透视",
     Value = false,
 
     Callback = function(v)
-        AimlockEnabled = v
+        ESPEnabled = v
+
+        if v then
+            refreshESP()
+        else
+            for _, player in pairs(Players:GetPlayers()) do
+                removeESP(player)
+            end
+        end
     end
 })
 
---------------------------------------------------
--- AIMLOCK CORE
---------------------------------------------------
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
 
-RunService.RenderStepped:Connect(function()
+        if ESPEnabled then
+            createESP(player)
+        end
+    end)
+end)
 
-    if not AimlockEnabled then
-        return
-    end
-
-    if not SelectedPlayer then
-        return
-    end
-
-    local Character = SelectedPlayer.Character
-    if not Character then return end
-
-    local HRP =
-        Character:FindFirstChild("HumanoidRootPart")
-
-    local Humanoid =
-        Character:FindFirstChild("Humanoid")
-
-    if not HRP or not Humanoid then
-        return
-    end
-
-    if Humanoid.Health <= 0 then
-        return
-    end
-
-    Camera.CFrame = CFrame.lookAt(
-        Camera.CFrame.Position,
-        HRP.Position
-    )
-
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
 end)
 
 --------------------------------------------------
--- KEYBIND
+-- SETTINGS
 --------------------------------------------------
+
+Tabs.Settings:Keybind({
+    Title = "UI快捷键",
+    Value = "RightControl",
+
+    Callback = function(v)
+        Window:SetToggleKey(Enum.KeyCode[v])
+    end
+})
 
 Window:SetToggleKey(Enum.KeyCode.RightControl)
