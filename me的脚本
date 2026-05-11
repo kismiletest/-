@@ -1,13 +1,238 @@
+repeat task.wait() until game:IsLoaded()
+
+-- WindUI
+local WindUI = loadstring(game:HttpGet(
+    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+))()
+
+--------------------------------------------------
+-- Services
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- Character
+--------------------------------------------------
+
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+end)
+
+--------------------------------------------------
+-- Window
+--------------------------------------------------
+
+local Window = WindUI:CreateWindow({
+    Title = "1.en Hub",
+    Icon = "rbxassetid://12974400353",
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(580, 430),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 180,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
+})
+
+--------------------------------------------------
+-- Tabs
+--------------------------------------------------
+
 local Tabs = {
-    -- 公告放第一個
-    Info = Window:Tab({
+    Notice = Window:Tab({
         Title = "公告",
         Icon = "info"
     }),
 
-    -- Dungeon 放第二個
     Dungeon = Window:Tab({
         Title = "Dungeon",
-        Icon = "map"
+        Icon = "swords"
+    }),
+
+    Aim = Window:Tab({
+        Title = "自瞄",
+        Icon = "crosshair"
     })
 }
+
+--------------------------------------------------
+-- 公告
+--------------------------------------------------
+
+Tabs.Notice:Section({
+    Title = "公告内容"
+})
+
+Tabs.Notice:Paragraph({
+    Title = "制作者",
+    Desc = "1.en"
+})
+
+--------------------------------------------------
+-- Dungeon
+--------------------------------------------------
+
+local CONFIG = {
+    TargetTeleporterName = "ExitTeleporter",
+    CheckInterval = 1,
+    TweenTime = 0.8,
+    DetectionRadius = 1000
+}
+
+local DungeonEnabled = false
+local CurrentDungeon = "未检测"
+
+local DungeonLabel = Tabs.Dungeon:Paragraph({
+    Title = "地下城层数",
+    Desc = CurrentDungeon
+})
+
+Tabs.Dungeon:Toggle({
+    Title = "自动地下城",
+    Value = false,
+    Callback = function(v)
+        DungeonEnabled = v
+    end
+})
+
+local function getDungeonLevel()
+    local map = Workspace:FindFirstChild("Map")
+    if not map then
+        return "未检测"
+    end
+
+    local dungeon = map:FindFirstChild("Dungeon")
+    if not dungeon then
+        return "未检测"
+    end
+
+    local highest = 0
+
+    for _, v in pairs(dungeon:GetChildren()) do
+        local num = tonumber(v.Name:match("%d+"))
+        if num and num > highest then
+            highest = num
+        end
+    end
+
+    if highest > 0 then
+        return tostring(highest) .. " 层"
+    end
+
+    return "未检测"
+end
+
+local function getAllExitTeleporters()
+    local teleporters = {}
+
+    local map = Workspace:FindFirstChild("Map")
+    if not map then
+        return teleporters
+    end
+
+    local dungeonFolder = map:FindFirstChild("Dungeon")
+    if not dungeonFolder then
+        return teleporters
+    end
+
+    for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
+        local teleporter = levelFolder:FindFirstChild(CONFIG.TargetTeleporterName)
+
+        if teleporter then
+            local rootPart = teleporter:FindFirstChild("Root")
+
+            if rootPart then
+                table.insert(teleporters, rootPart)
+            end
+        end
+    end
+
+    return teleporters
+end
+
+local function tweenTeleport(target)
+    local tweenInfo = TweenInfo.new(
+        CONFIG.TweenTime,
+        Enum.EasingStyle.Linear
+    )
+
+    local tween = TweenService:Create(
+        HumanoidRootPart,
+        tweenInfo,
+        {CFrame = target.CFrame}
+    )
+
+    tween:Play()
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        local level = getDungeonLevel()
+
+        if level ~= CurrentDungeon then
+            CurrentDungeon = level
+
+            DungeonLabel:SetDesc(level)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(CONFIG.CheckInterval) do
+        if DungeonEnabled then
+
+            local teleporters = getAllExitTeleporters()
+
+            for _, tp in pairs(teleporters) do
+                local distance = (HumanoidRootPart.Position - tp.Position).Magnitude
+
+                if distance <= CONFIG.DetectionRadius then
+                    tweenTeleport(tp)
+                    break
+                end
+            end
+        end
+    end
+end)
+
+--------------------------------------------------
+-- 自瞄
+--------------------------------------------------
+
+Tabs.Aim:Section({
+    Title = "自瞄"
+})
+
+Tabs.Aim:Button({
+    Title = "测试按钮",
+    Desc = "这是自瞄页面",
+    Callback = function()
+        WindUI:Notify({
+            Title = "1.en Hub",
+            Content = "自瞄按钮点击成功",
+            Duration = 3
+        })
+    end
+})
+
+--------------------------------------------------
+-- Keybind
+--------------------------------------------------
+
+Window:SetToggleKey(Enum.KeyCode.RightControl)
