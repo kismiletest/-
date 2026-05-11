@@ -2,23 +2,27 @@ pcall(function()
     game.CoreGui:FindFirstChild("WindUI"):Destroy()
 end)
 
-pcall(function()
-    game.CoreGui:FindFirstChild("1enHub"):Destroy()
-end)
-
 repeat task.wait() until game:IsLoaded()
 
--- WindUI
+--------------------------------------------------
+-- WIND UI
+--------------------------------------------------
+
 local WindUI = loadstring(game:HttpGet(
 "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
 
--- Services
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 --------------------------------------------------
 -- WINDOW
@@ -29,7 +33,7 @@ local Window = WindUI:CreateWindow({
     Icon = "rbxassetid://7733960981",
     Author = "by 1.en",
     Folder = "1enHub",
-    Size = UDim2.fromOffset(580, 430),
+    Size = UDim2.fromOffset(600, 430),
     Transparent = true,
     Theme = "Dark",
     SideBarWidth = 180,
@@ -54,6 +58,16 @@ local Tabs = {
     Dungeon = Window:Tab({
         Title = "Dungeon",
         Icon = "map"
+    }),
+
+    ESP = Window:Tab({
+        Title = "ESP",
+        Icon = "eye"
+    }),
+
+    Settings = Window:Tab({
+        Title = "设置",
+        Icon = "settings"
     })
 }
 
@@ -211,7 +225,143 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- KEYBIND
+-- ESP
 --------------------------------------------------
+
+local ESPEnabled = false
+local ESPObjects = {}
+
+local function removeESP(player)
+    if ESPObjects[player] then
+        if ESPObjects[player].Gui then
+            ESPObjects[player].Gui:Destroy()
+        end
+
+        if ESPObjects[player].Connection then
+            ESPObjects[player].Connection:Disconnect()
+        end
+
+        ESPObjects[player] = nil
+    end
+end
+
+local function createESP(player)
+    if player == LocalPlayer then
+        return
+    end
+
+    removeESP(player)
+
+    local char = player.Character
+    if not char then return end
+
+    local head = char:FindFirstChild("Head")
+    local hum = char:FindFirstChild("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+
+    if not head or not hum or not hrp then
+        return
+    end
+
+    local bill = Instance.new("BillboardGui")
+    bill.Name = "ESP"
+    bill.Size = UDim2.new(0,200,0,50)
+    bill.AlwaysOnTop = true
+    bill.StudsOffset = Vector3.new(0,3,0)
+    bill.Adornee = head
+    bill.Parent = head
+
+    local text = Instance.new("TextLabel")
+    text.Parent = bill
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = Color3.new(1,1,1)
+    text.TextStrokeTransparency = 0
+    text.Font = Enum.Font.GothamBold
+    text.TextScaled = true
+
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+
+        if not ESPEnabled then
+            bill.Enabled = false
+            return
+        end
+
+        bill.Enabled = true
+
+        local myChar = LocalPlayer.Character
+        if not myChar then return end
+
+        local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return end
+
+        local dist = math.floor(
+            (myHRP.Position - hrp.Position).Magnitude
+        )
+
+        text.Text =
+            player.Name ..
+            "\n距离: "..dist ..
+            "\n血量: "..math.floor(hum.Health)
+    end)
+
+    ESPObjects[player] = {
+        Gui = bill,
+        Connection = connection
+    }
+end
+
+local function refreshESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            createESP(player)
+        end
+    end
+end
+
+Tabs.ESP:Toggle({
+    Title = "玩家透视",
+    Value = false,
+
+    Callback = function(v)
+        ESPEnabled = v
+
+        if v then
+            refreshESP()
+        else
+            for _, player in pairs(Players:GetPlayers()) do
+                removeESP(player)
+            end
+        end
+    end
+})
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+
+        if ESPEnabled then
+            createESP(player)
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+end)
+
+--------------------------------------------------
+-- SETTINGS
+--------------------------------------------------
+
+Tabs.Settings:Keybind({
+    Title = "UI快捷键",
+    Value = "RightControl",
+
+    Callback = function(v)
+        Window:SetToggleKey(Enum.KeyCode[v])
+    end
+})
 
 Window:SetToggleKey(Enum.KeyCode.RightControl)
