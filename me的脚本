@@ -1,20 +1,278 @@
+repeat task.wait() until game:IsLoaded()
+
 --------------------------------------------------
--- TAB5 锁人
+-- WIND UI
+--------------------------------------------------
+
+local WindUI = loadstring(game:HttpGet(
+"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
+))()
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- VARIABLES
+--------------------------------------------------
+
+local AttackAura = false
+local AutoV3 = false
+local AutoV4 = false
+local HakiEnabled = false
+
+--------------------------------------------------
+-- AIMLOCK
+--------------------------------------------------
+
+local AimlockEnabled = false
+local SelectedPlayer = nil
+
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
+
+local Window = WindUI:CreateWindow({
+    Title = "1.en Hub",
+    Icon = "swords",
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(540,420),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 170,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
+})
+
+--------------------------------------------------
+-- TABS
 --------------------------------------------------
 
 local Tabs = {
-    Gonggao = Window:Tab({ Title = "公告", Icon = "bell" }),
-    Dungeon = Window:Tab({ Title = "Dungeon", Icon = "map" }),
-    ESP = Window:Tab({ Title = "透视", Icon = "eye" }),
-    Aimlock = Window:Tab({ Title = "锁人", Icon = "crosshair" })
+    Gonggao = Window:Tab({
+        Title = "公告",
+        Icon = "bell"
+    }),
+
+    Dungeon = Window:Tab({
+        Title = "Dungeon",
+        Icon = "map"
+    }),
+
+    Combat = Window:Tab({
+        Title = "Combat",
+        Icon = "sword"
+    }),
+
+    ESP = Window:Tab({
+        Title = "透视",
+        Icon = "eye"
+    })
 }
+
+--------------------------------------------------
+-- 公告
+--------------------------------------------------
+
+Tabs.Gonggao:Paragraph({
+    Title = "公告",
+    Desc = "制作者 1.en"
+})
+
+--------------------------------------------------
+-- DUNGEON
+--------------------------------------------------
+
+Tabs.Dungeon:Paragraph({
+    Title = "Dungeon",
+    Desc = "自动地下城已加载"
+})
+
+--------------------------------------------------
+-- ATTACK AURA
+--------------------------------------------------
+
+Tabs.Combat:Toggle({
+    Title = "Attack Aura",
+    Value = false,
+
+    Callback = function(v)
+        AttackAura = v
+    end
+})
+
+task.spawn(function()
+
+    while task.wait(0.08) do
+
+        if AttackAura then
+
+            pcall(function()
+
+                local Character =
+                    LocalPlayer.Character
+
+                if not Character then
+                    return
+                end
+
+                local Tool =
+                    Character:
+                    FindFirstChildOfClass(
+                        "Tool"
+                    )
+
+                if Tool then
+
+                    Tool:Activate()
+
+                    VirtualUser:Button1Down(
+                        Vector2.new(0,0),
+                        workspace.CurrentCamera.CFrame
+                    )
+                end
+
+            end)
+        end
+    end
+end)
+
+--------------------------------------------------
+-- AUTO V3
+--------------------------------------------------
+
+Tabs.Combat:Toggle({
+    Title = "Auto V3",
+    Value = false,
+
+    Callback = function(v)
+        AutoV3 = v
+    end
+})
+
+task.spawn(function()
+
+    while task.wait(0.5) do
+
+        if AutoV3 then
+
+            pcall(function()
+
+                local Remotes =
+                    ReplicatedStorage:
+                    FindFirstChild("Remotes")
+
+                if Remotes and
+                Remotes:FindFirstChild("CommE") then
+
+                    Remotes.CommE:
+                    FireServer(
+                        "ActivateAbility"
+                    )
+                end
+
+            end)
+        end
+    end
+end)
+
+--------------------------------------------------
+-- AUTO V4
+--------------------------------------------------
+
+Tabs.Combat:Toggle({
+    Title = "Auto V4",
+    Value = false,
+
+    Callback = function(v)
+        AutoV4 = v
+    end
+})
+
+task.spawn(function()
+
+    while task.wait(0.5) do
+
+        if AutoV4 then
+
+            pcall(function()
+
+                local Remotes =
+                    ReplicatedStorage:
+                    FindFirstChild("Remotes")
+
+                if Remotes and
+                Remotes:FindFirstChild("CommF_") then
+
+                    Remotes.CommF_:
+                    InvokeServer(
+                        "ActivateRace"
+                    )
+                end
+
+            end)
+        end
+    end
+end)
+
+--------------------------------------------------
+-- AUTO HAKI
+--------------------------------------------------
+
+Tabs.Combat:Toggle({
+    Title = "Auto Haki",
+    Value = false,
+
+    Callback = function(v)
+
+        if v and not HakiEnabled then
+
+            HakiEnabled = true
+
+            pcall(function()
+
+                local Remotes =
+                    ReplicatedStorage:
+                    FindFirstChild("Remotes")
+
+                if Remotes and
+                Remotes:FindFirstChild("CommF_") then
+
+                    Remotes.CommF_:
+                    InvokeServer(
+                        "Buso"
+                    )
+                end
+
+            end)
+
+        end
+
+        if not v then
+            HakiEnabled = false
+        end
+    end
+})
 
 --------------------------------------------------
 -- 锁人系统
 --------------------------------------------------
 
-local AimlockEnabled = false
-local SelectedPlayer = nil
+Tabs.Combat:Section({
+    Title = "锁人系统"
+})
 
 local function GetPlayerList()
     local list = {}
@@ -28,7 +286,7 @@ local function GetPlayerList()
     return list
 end
 
-local PlayerDropdown = Tabs.Aimlock:Dropdown({
+local PlayerDropdown = Tabs.Combat:Dropdown({
     Title = "选择玩家",
     Values = GetPlayerList(),
     Value = nil,
@@ -53,7 +311,7 @@ Players.PlayerRemoving:Connect(function()
     PlayerDropdown:Refresh(GetPlayerList())
 end)
 
-Tabs.Aimlock:Toggle({
+Tabs.Combat:Toggle({
     Title = "开启锁人",
     Value = false,
 
@@ -63,7 +321,7 @@ Tabs.Aimlock:Toggle({
 })
 
 --------------------------------------------------
--- 锁人核心
+-- AIMLOCK CORE
 --------------------------------------------------
 
 RunService.RenderStepped:Connect(function()
@@ -99,3 +357,11 @@ RunService.RenderStepped:Connect(function()
     )
 
 end)
+
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(
+    Enum.KeyCode.RightControl
+)
