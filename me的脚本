@@ -114,6 +114,7 @@ local function getDungeonLevel()
 
     for _, v in pairs(dungeon:GetChildren()) do
         local num = tonumber(v.Name:match("%d+"))
+
         if num and num > highest then
             highest = num
         end
