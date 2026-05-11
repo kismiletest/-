@@ -39,14 +39,14 @@ local Window = WindUI:CreateWindow({
 --------------------------------------------------
 
 local Tabs = {
-    Dungeon = Window:Tab({
-        Title = "Dungeon",
-        Icon = "map"
-    }),
-
     Info = Window:Tab({
         Title = "公告",
         Icon = "info"
+    }),
+
+    Dungeon = Window:Tab({
+        Title = "Dungeon",
+        Icon = "map"
     })
 }
 
