@@ -1,358 +1,126 @@
---// 基本設定
-_G.FastAttack = true
-
---// WindUI
-local WindUI = loadstring(game:HttpGet(
-"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-))()
-
---// Services
+-- 自动攻击核心
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
 
---// Player
-local Player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 
---// Remote
-local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
-local RegisterAttack = Net:WaitForChild("RE/RegisterAttack")
-local RegisterHit = Net:WaitForChild("RE/RegisterHit")
+-- 设置
+local AttackAura = false
+local AttackDistance = 60
+local AttackDelay = 0.08
 
---// Folder
-local EnemiesFolder = workspace:WaitForChild("Enemies")
-local CharactersFolder = workspace:WaitForChild("Characters")
-
---// 設定
-local Settings = {
-    AutoClick = true,
-    Distance = 100,
-    AttackInterval = 0.01,
-    MaxTargets = 20
-}
-
---------------------------------------------------
--- 判定存活
---------------------------------------------------
-
-local function IsAlive(char)
-    local hum = char:FindFirstChild("Humanoid")
-    return hum and hum.Health > 0
+-- 检测角色
+local function GetCharacter()
+    return LocalPlayer.Character
 end
 
---------------------------------------------------
--- 取得目標
---------------------------------------------------
+-- 获取武器
+local function GetTool()
+    local Character = GetCharacter()
+    if Character then
+        return Character:FindFirstChildOfClass("Tool")
+    end
+end
 
-local function GetValidTargets(root)
+-- 获取最近敌人
+local function GetClosestEnemy()
+    local Character = GetCharacter()
+    if not Character then return end
 
-    local targets = {}
+    local HRP = Character:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
 
-    for _, folder in ipairs({
-        EnemiesFolder,
-        CharactersFolder
-    }) do
+    local Closest = nil
+    local Distance = AttackDistance
 
-        for _, obj in ipairs(folder:GetChildren()) do
+    -- NPC
+    local Enemies = workspace:FindFirstChild("Enemies")
 
-            if obj ~= Player.Character then
+    if Enemies then
+        for _, Enemy in pairs(Enemies:GetChildren()) do
+            local EnemyHRP = Enemy:FindFirstChild("HumanoidRootPart")
+            local Humanoid = Enemy:FindFirstChild("Humanoid")
 
-                local head = obj:FindFirstChild("Head")
+            if EnemyHRP and Humanoid and Humanoid.Health > 0 then
+                local Magnitude =
+                    (HRP.Position - EnemyHRP.Position).Magnitude
 
-                if head and IsAlive(obj) then
-
-                    local dist =
-                        (head.Position - root.Position).Magnitude
-
-                    if dist <= Settings.Distance then
-
-                        table.insert(targets,{
-                            obj,
-                            head
-                        })
-
-                        if #targets >= Settings.MaxTargets then
-                            return targets
-                        end
-                    end
+                if Magnitude < Distance then
+                    Distance = Magnitude
+                    Closest = Enemy
                 end
             end
         end
     end
 
-    return targets
+    return Closest
 end
 
---------------------------------------------------
--- 攻擊
---------------------------------------------------
+-- 自动攻击
+task.spawn(function()
 
-local function PerformAttack()
+    while task.wait(AttackDelay) do
 
-    local root =
-        Player.Character and
-        Player.Character:FindFirstChild("HumanoidRootPart")
+        if AttackAura then
 
-    if not root then
-        return
-    end
+            pcall(function()
 
-    local targets = GetValidTargets(root)
+                local Character = GetCharacter()
+                local Tool = GetTool()
+                local Enemy = GetClosestEnemy()
 
-    if #targets > 0 then
+                if Character and Tool and Enemy then
 
-        pcall(function()
+                    local EnemyHRP =
+                        Enemy:FindFirstChild("HumanoidRootPart")
 
-            RegisterAttack:FireServer(0)
+                    if EnemyHRP then
 
-            RegisterHit:FireServer(
-                targets[1][2],
-                targets
-            )
+                        -- 激活武器
+                        Tool:Activate()
 
-        end)
-    end
-end
+                        -- 模拟点击
+                        VirtualUser:Button1Down(
+                            Vector2.new(0,0),
+                            workspace.CurrentCamera.CFrame
+                        )
 
---------------------------------------------------
--- 自動攻擊
---------------------------------------------------
+                        -- 注册攻击
+                        local CombatFramework =
+                            require(
+                                LocalPlayer.PlayerScripts:
+                                WaitForChild("CombatFramework")
+                            )
 
-local attacking = false
-local manualConnection
+                        local activeController =
+                            CombatFramework.activeController
 
-local function startAuto()
+                        if activeController then
+                            activeController.hitboxMagnitude = 120
+                        end
 
-    if attacking then
-        return
-    end
+                        -- 远程攻击
+                        local RigController =
+                            ReplicatedStorage:
+                            FindFirstChild("RigControllerEvent")
 
-    attacking = true
-
-    task.spawn(function()
-
-        while attacking do
-
-            if Settings.AutoClick then
-
-                pcall(function()
-                    PerformAttack()
-                end)
-            end
-
-            task.wait(Settings.AttackInterval)
-        end
-    end)
-end
-
-local function stopAuto()
-    attacking = false
-end
-
---------------------------------------------------
--- 手動模式
---------------------------------------------------
-
-local function startManual()
-
-    if manualConnection then
-        return
-    end
-
-    manualConnection =
-        UserInputService.InputBegan:Connect(function(
-            input,
-            gameProcessed
-        )
-
-        if gameProcessed then
-            return
-        end
-
-        if Settings.AutoClick then
-            return
-        end
-
-        if input.UserInputType ==
-            Enum.UserInputType.MouseButton1 then
-
-            PerformAttack()
-        end
-    end)
-end
-
-local function stopManual()
-
-    if manualConnection then
-        manualConnection:Disconnect()
-        manualConnection = nil
-    end
-end
-
---------------------------------------------------
--- Window
---------------------------------------------------
-
-local Window = WindUI:CreateWindow({
-    Title = "1.en Hub",
-    Icon = "swords",
-    Author = "by 1.en",
-    Folder = "1enHub",
-    Size = UDim2.fromOffset(520,380),
-    Transparent = true,
-    Theme = "Dark",
-    SideBarWidth = 170,
-
-    OpenButton = {
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false
-    }
-})
-
---------------------------------------------------
--- Tabs
---------------------------------------------------
-
-local Tabs = {
-    Combat = Window:Tab({
-        Title = "Combat",
-        Icon = "sword"
-    }),
-
-    Settings = Window:Tab({
-        Title = "Settings",
-        Icon = "settings"
-    })
-}
-
---------------------------------------------------
--- 自動攻擊
---------------------------------------------------
-
-Tabs.Combat:Toggle({
-    Title = "自動攻擊",
-    Value = Settings.AutoClick,
-
-    Callback = function(v)
-
-        Settings.AutoClick = v
-
-        if Settings.AutoClick then
-
-            stopManual()
-            startAuto()
-
-        else
-
-            stopAuto()
-            startManual()
+                        if RigController then
+                            RigController:FireServer(
+                                "hit",
+                                EnemyHRP,
+                                EnemyHRP.Position
+                            )
+                        end
+                    end
+                end
+            end)
         end
     end
-})
-
---------------------------------------------------
--- 攻擊距離
---------------------------------------------------
-
-Tabs.Combat:Slider({
-    Title = "攻擊距離",
-
-    Value = {
-        Min = 0,
-        Max = 1000,
-        Default = Settings.Distance
-    },
-
-    Callback = function(v)
-
-        Settings.Distance = math.floor(v)
-    end
-})
-
---------------------------------------------------
--- 攻速
---------------------------------------------------
-
-Tabs.Combat:Slider({
-    Title = "攻擊速度",
-
-    Value = {
-        Min = 0.01,
-        Max = 1,
-        Default = Settings.AttackInterval
-    },
-
-    Callback = function(v)
-
-        Settings.AttackInterval = v
-    end
-})
-
---------------------------------------------------
--- 最大目標
---------------------------------------------------
-
-Tabs.Combat:Slider({
-    Title = "最大目標數",
-
-    Value = {
-        Min = 1,
-        Max = 50,
-        Default = Settings.MaxTargets
-    },
-
-    Callback = function(v)
-
-        Settings.MaxTargets = math.floor(v)
-    end
-})
-
---------------------------------------------------
--- 測試攻擊
---------------------------------------------------
-
-Tabs.Combat:Button({
-    Title = "測試攻擊",
-
-    Callback = function()
-
-        PerformAttack()
-    end
-})
-
---------------------------------------------------
--- 通知
---------------------------------------------------
-
-WindUI:Notify({
-    Title = "1.en Hub",
-    Content = "Fast Attack 已載入",
-    Duration = 3
-})
-
---------------------------------------------------
--- 初始
---------------------------------------------------
-
-if Settings.AutoClick then
-    startAuto()
-else
-    startManual()
-end
-
---------------------------------------------------
--- 清理
---------------------------------------------------
-
-Player.CharacterRemoving:Connect(function()
-
-    stopAuto()
-    stopManual()
 end)
 
---------------------------------------------------
--- 快捷鍵
---------------------------------------------------
+-- 开关
+AttackAura = true
 
-Window:SetToggleKey(Enum.KeyCode.RightControl)
+print("自动攻击核心已启动")
