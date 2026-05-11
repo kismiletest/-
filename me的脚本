@@ -10,8 +10,6 @@ local WindUI = loadstring(game:HttpGet(
 --------------------------------------------------
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -35,7 +33,6 @@ end)
 -- VARIABLES
 --------------------------------------------------
 
-local AttackAura = false
 local AutoDungeon = false
 
 --------------------------------------------------
@@ -44,7 +41,7 @@ local AutoDungeon = false
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
-    Icon = "swords",
+    Icon = "map",
     Author = "by 1.en",
     Folder = "1enHub",
     Size = UDim2.fromOffset(580,460),
@@ -60,119 +57,19 @@ local Window = WindUI:CreateWindow({
 })
 
 --------------------------------------------------
--- TABS
+-- TAB
 --------------------------------------------------
 
-local Tabs = {
-    Combat = Window:Tab({
-        Title = "Combat",
-        Icon = "sword"
-    }),
-
-    Dungeon = Window:Tab({
-        Title = "Dungeon",
-        Icon = "map"
-    })
-}
-
---------------------------------------------------
--- ATTACK AURA
---------------------------------------------------
-
-Tabs.Combat:Section({
-    Title = "Auto Attack"
+local DungeonTab = Window:Tab({
+    Title = "Dungeon",
+    Icon = "map"
 })
 
-Tabs.Combat:Toggle({
-    Title = "Attack Aura",
-    Value = false,
-
-    Callback = function(v)
-        AttackAura = v
-    end
-})
-
-task.spawn(function()
-
-    while task.wait(0.08) do
-
-        if AttackAura then
-
-            pcall(function()
-
-                local Tool =
-                    Character:
-                    FindFirstChildOfClass("Tool")
-
-                if Tool then
-
-                    Tool:Activate()
-
-                    VirtualUser:Button1Down(
-                        Vector2.new(0,0),
-                        workspace.CurrentCamera.CFrame
-                    )
-
-                    local CombatFramework =
-                        require(
-                            LocalPlayer.PlayerScripts:
-                            WaitForChild("CombatFramework")
-                        )
-
-                    local activeController =
-                        CombatFramework.activeController
-
-                    if activeController then
-                        activeController.hitboxMagnitude = 120
-                    end
-
-                    local RigController =
-                        ReplicatedStorage:
-                        FindFirstChild("RigControllerEvent")
-
-                    if RigController then
-
-                        local Enemies =
-                            workspace:FindFirstChild("Enemies")
-
-                        if Enemies then
-
-                            for _, Enemy in pairs(Enemies:GetChildren()) do
-
-                                local EnemyHRP =
-                                    Enemy:FindFirstChild("HumanoidRootPart")
-
-                                local EnemyHum =
-                                    Enemy:FindFirstChild("Humanoid")
-
-                                if EnemyHRP and EnemyHum and EnemyHum.Health > 0 then
-
-                                    local Distance =
-                                        (HumanoidRootPart.Position - EnemyHRP.Position).Magnitude
-
-                                    if Distance <= 60 then
-
-                                        RigController:FireServer(
-                                            "hit",
-                                            EnemyHRP,
-                                            EnemyHRP.Position
-                                        )
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-    end
-end)
-
 --------------------------------------------------
--- AUTO DUNGEON
+-- DUNGEON
 --------------------------------------------------
 
-Tabs.Dungeon:Section({
+DungeonTab:Section({
     Title = "Auto Dungeon"
 })
 
@@ -185,10 +82,14 @@ local CONFIG = {
 
 local CurrentDungeonLevel = "Unknown"
 
-local DungeonLabel = Tabs.Dungeon:Paragraph({
+local DungeonLabel = DungeonTab:Paragraph({
     Title = "Current Level",
     Desc = "Loading..."
 })
+
+--------------------------------------------------
+-- FUNCTIONS
+--------------------------------------------------
 
 local function getAllExitTeleporters()
 
@@ -254,7 +155,11 @@ local function getCurrentLevel()
     return closestLevel
 end
 
-Tabs.Dungeon:Toggle({
+--------------------------------------------------
+-- TOGGLE
+--------------------------------------------------
+
+DungeonTab:Toggle({
     Title = "Auto Dungeon",
     Value = false,
 
@@ -262,6 +167,10 @@ Tabs.Dungeon:Toggle({
         AutoDungeon = v
     end
 })
+
+--------------------------------------------------
+-- LEVEL DISPLAY
+--------------------------------------------------
 
 task.spawn(function()
 
@@ -283,6 +192,10 @@ task.spawn(function()
         end)
     end
 end)
+
+--------------------------------------------------
+-- AUTO TELEPORT
+--------------------------------------------------
 
 task.spawn(function()
 
