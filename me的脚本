@@ -20,12 +20,10 @@ local LocalPlayer = Players.LocalPlayer
 --------------------------------------------------
 
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
-    Humanoid = char:WaitForChild("Humanoid")
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
@@ -44,7 +42,7 @@ local Window = WindUI:CreateWindow({
     Icon = "map",
     Author = "by 1.en",
     Folder = "1enHub",
-    Size = UDim2.fromOffset(580,460),
+    Size = UDim2.fromOffset(560,420),
     Transparent = true,
     Theme = "Dark",
     SideBarWidth = 170,
@@ -66,12 +64,16 @@ local DungeonTab = Window:Tab({
 })
 
 --------------------------------------------------
--- DUNGEON
+-- SECTION
 --------------------------------------------------
 
 DungeonTab:Section({
     Title = "Auto Dungeon"
 })
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
 
 local CONFIG = {
     TargetTeleporterName = "ExitTeleporter",
@@ -80,10 +82,12 @@ local CONFIG = {
     DetectionRadius = 1000
 }
 
-local CurrentDungeonLevel = "Unknown"
+--------------------------------------------------
+-- LEVEL DISPLAY
+--------------------------------------------------
 
 local DungeonLabel = DungeonTab:Paragraph({
-    Title = "Current Level",
+    Title = "Current Dungeon",
     Desc = "Loading..."
 })
 
@@ -96,31 +100,35 @@ local function getAllExitTeleporters()
     local teleporters = {}
 
     local map = Workspace:FindFirstChild("Map")
-    if not map then return teleporters end
+    if not map then
+        return teleporters
+    end
 
     local dungeonFolder = map:FindFirstChild("Dungeon")
-    if not dungeonFolder then return teleporters end
+    if not dungeonFolder then
+        return teleporters
+    end
 
     for _, levelFolder in pairs(dungeonFolder:GetChildren()) do
 
-        local levelNumber = tonumber(levelFolder.Name)
+        local level = tonumber(levelFolder.Name)
 
-        if levelNumber then
+        if level then
 
             local teleporter =
                 levelFolder:FindFirstChild(CONFIG.TargetTeleporterName)
 
             if teleporter then
 
-                local rootPart =
+                local root =
                     teleporter:FindFirstChild("Root")
 
-                if rootPart then
+                if root then
 
                     table.insert(teleporters,{
-                        level = levelNumber,
-                        rootPart = rootPart,
-                        position = rootPart.Position
+                        level = level,
+                        rootPart = root,
+                        position = root.Position
                     })
                 end
             end
@@ -134,7 +142,7 @@ local function getAllExitTeleporters()
     return teleporters
 end
 
-local function getCurrentLevel()
+local function getCurrentDungeon()
 
     local teleporters = getAllExitTeleporters()
 
@@ -143,11 +151,11 @@ local function getCurrentLevel()
 
     for _, tp in pairs(teleporters) do
 
-        local Distance =
+        local distance =
             (HumanoidRootPart.Position - tp.position).Magnitude
 
-        if Distance < closestDistance then
-            closestDistance = Distance
+        if distance < closestDistance then
+            closestDistance = distance
             closestLevel = tp.level
         end
     end
@@ -169,7 +177,7 @@ DungeonTab:Toggle({
 })
 
 --------------------------------------------------
--- LEVEL DISPLAY
+-- UPDATE LEVEL
 --------------------------------------------------
 
 task.spawn(function()
@@ -178,17 +186,17 @@ task.spawn(function()
 
         pcall(function()
 
-            local level = getCurrentLevel()
+            local level = getCurrentDungeon()
 
             if level then
-                CurrentDungeonLevel = tostring(level)
+                DungeonLabel:SetDesc(
+                    "Current Level : "..tostring(level)
+                )
             else
-                CurrentDungeonLevel = "Unknown"
+                DungeonLabel:SetDesc(
+                    "Current Level : Unknown"
+                )
             end
-
-            DungeonLabel:SetDesc(
-                "Current Dungeon : "..CurrentDungeonLevel
-            )
         end)
     end
 end)
@@ -210,10 +218,10 @@ task.spawn(function()
 
                 for _, tp in pairs(teleporters) do
 
-                    local Distance =
+                    local distance =
                         (HumanoidRootPart.Position - tp.position).Magnitude
 
-                    if Distance <= CONFIG.DetectionRadius then
+                    if distance <= CONFIG.DetectionRadius then
 
                         local tween =
                             TweenService:Create(
