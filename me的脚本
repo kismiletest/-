@@ -1,107 +1,494 @@
--- WindUI
-local WindUI = loadstring(game:HttpGet(
-"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-))()
+--// WindUI 載入
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+--// Services
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+--// 世界檢測
+local World2 = game.PlaceId == 4442272183 or game.PlaceId == 79091703265657
+
+--// 快捷鍵
+local CurrentKey = "G"
+local KeyDisabled = false
+
+--// 船功能
+local TargetPlayer = nil
+local shipTpToggle = false
+
+--// 地下城功能
+local AutoDungeon = false
+local CurrentDungeon = "未知"
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
+local CONFIG = {
+    TargetTeleporterName = "ExitTeleporter",
+    CheckInterval = 1,
+    TweenTime = 0.8,
+    EasingStyle = Enum.EasingStyle.Quad,
+    EasingDirection = Enum.EasingDirection.Out,
+    DisableMovement = true,
+    DetectionRadius = 1000,
+    CooldownAfterTeleport = 3
+}
+
+local isTeleporting = false
+local lastTeleportTime = 0
+
+--------------------------------------------------
+-- Character 更新
+--------------------------------------------------
+
+local function updateCharacter()
+    character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    updateCharacter()
+end)
+
+--------------------------------------------------
+-- 地下城關卡檢測
+--------------------------------------------------
+
+local function getDungeonLevel()
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return "未知" end
+
+    local dungeon = map:FindFirstChild("Dungeon")
+    if not dungeon then return "未知" end
+
+    local highest = 0
+
+    for _, v in pairs(dungeon:GetChildren()) do
+        local num = tonumber(v.Name:match("%d+"))
+        if num and num > highest then
+            highest = num
+        end
+    end
+
+    if highest > 0 then
+        return tostring(highest)
+    end
+
+    return "未知"
+end
+
+--------------------------------------------------
+-- 取得傳送器
+--------------------------------------------------
+
+local function getAllExitTeleporters()
+    local teleporters = {}
+
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return teleporters end
+
+    local dungeon = map:FindFirstChild("Dungeon")
+    if not dungeon then return teleporters end
+
+    for _, levelFolder in pairs(dungeon:GetChildren()) do
+        local teleporter = levelFolder:FindFirstChild(CONFIG.TargetTeleporterName)
+
+        if teleporter then
+            local root = teleporter:FindFirstChild("Root")
+
+            if root then
+                table.insert(teleporters,{
+                    rootPart = root,
+                    position = root.Position
+                })
+            end
+        end
+    end
+
+    return teleporters
+end
+
+--------------------------------------------------
+-- Tween 傳送
+--------------------------------------------------
+
+local function teleportToTarget(rootPart)
+    if isTeleporting then return end
+
+    local currentTime = tick()
+
+    if currentTime - lastTeleportTime < CONFIG.CooldownAfterTeleport then
+        return
+    end
+
+    isTeleporting = true
+    lastTeleportTime = currentTime
+
+    if CONFIG.DisableMovement then
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+    end
+
+    local tween = TweenService:Create(
+        humanoidRootPart,
+        TweenInfo.new(
+            CONFIG.TweenTime,
+            CONFIG.EasingStyle,
+            CONFIG.EasingDirection
+        ),
+        {
+            CFrame = rootPart.CFrame
+        }
+    )
+
+    tween:Play()
+
+    tween.Completed:Connect(function()
+
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+
+        task.wait(0.5)
+        isTeleporting = false
+    end)
+end
+
+--------------------------------------------------
+-- 船功能
+--------------------------------------------------
+
+local function getMyShip()
+    local myChar = LocalPlayer.Character
+
+    if myChar and myChar:FindFirstChild("Humanoid") and myChar.Humanoid.SeatPart then
+        local current = myChar.Humanoid.SeatPart
+        local seat = myChar.Humanoid.SeatPart
+
+        while current.Parent and not current:IsA("Model") do
+            current = current.Parent
+        end
+
+        return current, seat
+    end
+
+    return nil, nil
+end
+
+local function getTargetSeat(ship, mySeat)
+    for _, part in pairs(ship:GetDescendants()) do
+        if (part:IsA("Seat") or part:IsA("VehicleSeat")) and part ~= mySeat and not part.Occupant then
+            return part
+        end
+    end
+    return nil
+end
+
+local function teleportToPos(pos)
+    local myShip = getMyShip()
+
+    if myShip then
+        myShip:SetPrimaryPartCFrame(CFrame.new(pos + Vector3.new(0,10,0)))
+    elseif humanoidRootPart then
+        humanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0,5,0))
+    end
+end
+
+local function GetPlayerList()
+    local list = {}
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(list, plr.Name)
+        end
+    end
+
+    return list
+end
+
+--------------------------------------------------
+-- Window
+--------------------------------------------------
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
-    Icon = "swords",
-    Author = "by 1.en",
-    Folder = "1enHub",
-    Size = UDim2.fromOffset(520,380),
+    Icon = "user-check",
+    Author = "by dashouzi1077",
+    Folder = "1.en-Hub",
+    Size = UDim2.fromOffset(600,400),
     Transparent = true,
     Theme = "Dark",
-    SideBarWidth = 180,
+    SideBarWidth = 200,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
 })
 
+--------------------------------------------------
+-- Tabs
+--------------------------------------------------
+
 local Tabs = {
-    Main = Window:Tab({
-        Title = "Fast Attack",
-        Icon = "zap"
+    BoatKill = Window:Tab({
+        Title = "Boat Kill",
+        Icon = "ship"
+    }),
+
+    Dungeon = Window:Tab({
+        Title = "地下城",
+        Icon = "map"
+    }),
+
+    Settings = Window:Tab({
+        Title = "設定",
+        Icon = "settings"
     })
 }
 
-Tabs.Main:Section({
-    Title = "Fast Attack Settings"
+--------------------------------------------------
+-- 地下城 UI
+--------------------------------------------------
+
+Tabs.Dungeon:Section({
+    Title = "自動地下城"
 })
 
--- 自動攻擊開關
-Tabs.Main:Toggle({
-    Title = "自動攻擊",
-    Value = Settings.AutoClick,
+Tabs.Dungeon:Paragraph({
+    Title = "目前地下城",
+    Desc = "正在讀取..."
+})
+
+local DungeonLabel = Tabs.Dungeon:Paragraph({
+    Title = "地下城關卡",
+    Desc = "未知"
+})
+
+Tabs.Dungeon:Toggle({
+    Title = "自動地下城",
+    Value = false,
 
     Callback = function(v)
-        Settings.AutoClick = v
+        AutoDungeon = v
 
-        if v then
-            stopManual()
-            startAuto()
-        else
-            stopAuto()
-            startManual()
+        WindUI:Notify({
+            Title = "地下城",
+            Content = v and "已開啟" or "已關閉",
+            Duration = 2
+        })
+    end
+})
+
+--------------------------------------------------
+-- 地下城主循環
+--------------------------------------------------
+
+task.spawn(function()
+
+    while task.wait(CONFIG.CheckInterval) do
+
+        CurrentDungeon = getDungeonLevel()
+
+        pcall(function()
+            DungeonLabel:SetDesc("目前關卡 : "..CurrentDungeon)
+        end)
+
+        if AutoDungeon then
+
+            if humanoid.Health > 0 then
+
+                local teleporters = getAllExitTeleporters()
+
+                for _, tp in ipairs(teleporters) do
+
+                    local distance =
+                        (humanoidRootPart.Position - tp.position).Magnitude
+
+                    if distance <= CONFIG.DetectionRadius then
+                        teleportToTarget(tp.rootPart)
+                        break
+                    end
+                end
+            end
+        end
+    end
+end)
+
+--------------------------------------------------
+-- Boat Kill
+--------------------------------------------------
+
+Tabs.BoatKill:Section({
+    Title = "Boat Kill"
+})
+
+Tabs.BoatKill:Button({
+    Title = "移除鬼船傷害",
+
+    Callback = function()
+
+        local count = 0
+
+        for _, v in pairs(Workspace:GetDescendants()) do
+
+            if v:IsA("TouchTransmitter") then
+
+                local p = v.Parent
+
+                if p and (
+                    p.Name:find("Damage")
+                    or p.Name:find("Death")
+                    or p.Name:find("Kill")
+                    or p.Name:find("Lava")
+                ) then
+
+                    v:Destroy()
+                    count += 1
+                end
+            end
+        end
+
+        WindUI:Notify({
+            Title = "完成",
+            Content = "已移除 "..count.." 個危險物件",
+            Duration = 3
+        })
+    end
+})
+
+local playerDropdown = Tabs.BoatKill:Dropdown({
+    Title = "選擇玩家",
+    Values = GetPlayerList(),
+
+    Callback = function(option)
+
+        for _, plr in ipairs(Players:GetPlayers()) do
+
+            if plr.Name == option then
+                TargetPlayer = plr
+                break
+            end
         end
     end
 })
 
--- 距離滑桿
-Tabs.Main:Slider({
-    Title = "攻擊距離",
-    Step = 1,
-    Value = {
-        Min = 0,
-        Max = 1000,
-        Default = Settings.Distance
-    },
+Players.PlayerAdded:Connect(function()
+    playerDropdown:Refresh(GetPlayerList())
+end)
+
+Players.PlayerRemoving:Connect(function()
+    playerDropdown:Refresh(GetPlayerList())
+end)
+
+Tabs.BoatKill:Toggle({
+    Title = "帶船傳送玩家",
+    Value = false,
 
     Callback = function(v)
-        Settings.Distance = math.floor(v)
+        shipTpToggle = v
     end
 })
 
--- 攻速滑桿
-Tabs.Main:Slider({
-    Title = "攻擊速度",
-    Step = 0.01,
-    Value = {
-        Min = 0.01,
-        Max = 1,
-        Default = Settings.AttackInterval
-    },
+--------------------------------------------------
+-- Settings
+--------------------------------------------------
+
+Tabs.Settings:Section({
+    Title = "設定"
+})
+
+Tabs.Settings:Keybind({
+    Title = "快捷鍵",
+    Value = CurrentKey,
 
     Callback = function(v)
-        Settings.AttackInterval = v
+
+        CurrentKey = v
+
+        if not KeyDisabled then
+            Window:SetToggleKey(Enum.KeyCode[v])
+        end
     end
 })
 
--- 最大目標
-Tabs.Main:Slider({
-    Title = "最大目標數",
-    Step = 1,
-    Value = {
-        Min = 1,
-        Max = 50,
-        Default = Settings.MaxTargets
-    },
+Tabs.Settings:Toggle({
+    Title = "停用快捷鍵",
+    Value = false,
 
     Callback = function(v)
-        Settings.MaxTargets = math.floor(v)
+
+        KeyDisabled = v
+
+        if v then
+            Window:SetToggleKey(nil)
+        else
+            Window:SetToggleKey(Enum.KeyCode[CurrentKey])
+        end
     end
 })
 
--- 手動攻擊按鈕
-Tabs.Main:Button({
-    Title = "手動攻擊一次",
+--------------------------------------------------
+-- 帶船循環
+--------------------------------------------------
 
-    Callback = function()
-        PerformAttack()
+RunService.Heartbeat:Connect(function()
+
+    if not shipTpToggle or not TargetPlayer then
+        return
     end
-})
 
--- 通知
-WindUI:Notify({
-    Title = "1.en Hub",
-    Content = "Fast Attack 已載入",
-    Duration = 3
-})
+    local myShip, mySeat = getMyShip()
 
-Window:SetToggleKey(Enum.KeyCode.RightControl)
+    if not myShip then
+        return
+    end
+
+    if TargetPlayer.Character then
+
+        local targetHum =
+            TargetPlayer.Character:FindFirstChild("Humanoid")
+
+        local targetHRP =
+            TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+        if targetHum and not targetHum.SeatPart and targetHRP then
+
+            local emptySeat =
+                getTargetSeat(myShip,mySeat)
+
+            if emptySeat then
+
+                local seatOffset =
+                    myShip.PrimaryPart.CFrame:Inverse()
+                    * emptySeat.CFrame
+
+                myShip:SetPrimaryPartCFrame(
+                    targetHRP.CFrame * seatOffset:Inverse()
+                )
+
+            else
+
+                myShip:SetPrimaryPartCFrame(
+                    targetHRP.CFrame * CFrame.new(0,5,0)
+                )
+            end
+        end
+    end
+end)
+
+--------------------------------------------------
+-- Toggle Key
+--------------------------------------------------
+
+Window:SetToggleKey(Enum.KeyCode[CurrentKey])
