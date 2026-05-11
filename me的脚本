@@ -10,7 +10,6 @@ local WindUI = loadstring(game:HttpGet(
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 --// Player
 local Player = Players.LocalPlayer
@@ -102,51 +101,56 @@ local function PerformAttack()
 
     if #targets > 0 then
 
-        RegisterAttack:FireServer(0)
+        pcall(function()
 
-        RegisterHit:FireServer(
-            targets[1][2],
-            targets
-        )
+            RegisterAttack:FireServer(0)
+
+            RegisterHit:FireServer(
+                targets[1][2],
+                targets
+            )
+
+        end)
     end
 end
 
 --------------------------------------------------
--- Auto
+-- 自動攻擊
 --------------------------------------------------
 
-local autoConnection
+local attacking = false
 local manualConnection
 
 local function startAuto()
 
-    if autoConnection then
+    if attacking then
         return
     end
 
-    autoConnection =
-        RunService.Heartbeat:Connect(function()
+    attacking = true
 
-        if not Settings.AutoClick then
-            return
+    task.spawn(function()
+
+        while attacking do
+
+            if Settings.AutoClick then
+
+                pcall(function()
+                    PerformAttack()
+                end)
+            end
+
+            task.wait(Settings.AttackInterval)
         end
-
-        PerformAttack()
-
-        task.wait(Settings.AttackInterval)
     end)
 end
 
 local function stopAuto()
-
-    if autoConnection then
-        autoConnection:Disconnect()
-        autoConnection = nil
-    end
+    attacking = false
 end
 
 --------------------------------------------------
--- Manual
+-- 手動模式
 --------------------------------------------------
 
 local function startManual()
@@ -186,7 +190,7 @@ local function stopManual()
 end
 
 --------------------------------------------------
--- WindUI Window
+-- Window
 --------------------------------------------------
 
 local Window = WindUI:CreateWindow({
@@ -305,7 +309,7 @@ Tabs.Combat:Slider({
 })
 
 --------------------------------------------------
--- 測試按鈕
+-- 測試攻擊
 --------------------------------------------------
 
 Tabs.Combat:Button({
