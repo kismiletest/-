@@ -1,3 +1,11 @@
+pcall(function()
+    game.CoreGui:FindFirstChild("WindUI"):Destroy()
+end)
+
+pcall(function()
+    game.CoreGui:FindFirstChild("1enHub"):Destroy()
+end)
+
 repeat task.wait() until game:IsLoaded()
 
 -- WindUI
