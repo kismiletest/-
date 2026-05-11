@@ -76,10 +76,10 @@ end
 -- GUI 視窗建立 --
 
 local Window = WindUI:CreateWindow({
-        Title       = "Xu-hub",
+        Title       = "1.en Hub",
         Icon        = "user-check",
-        Author      = "by xuez1025",
-        Folder      = "Xu-Hub",
+        Author      = "by dashouzi1077",
+        Folder      = "1.en-Hub",
         Size        = UDim2.fromOffset(600, 400),
         Transparent = true,
         Theme       = "Dark",
