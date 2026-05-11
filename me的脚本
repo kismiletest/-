@@ -7,7 +7,6 @@ local WindUI = loadstring(game:HttpGet(
 
 -- Services
 local Players = game:GetService("Players")
-local VirtualUser = game:GetService("VirtualUser")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -47,11 +46,6 @@ local Tabs = {
     Dungeon = Window:Tab({
         Title = "Dungeon",
         Icon = "map"
-    }),
-
-    Combat = Window:Tab({
-        Title = "自动攻击",
-        Icon = "sword"
     })
 }
 
@@ -203,45 +197,6 @@ task.spawn(function()
                     break
                 end
             end
-        end
-    end
-end)
-
---------------------------------------------------
--- 自动攻击
---------------------------------------------------
-
-local AutoAttack = false
-
-Tabs.Combat:Toggle({
-    Title = "自动攻击",
-    Value = false,
-
-    Callback = function(v)
-        AutoAttack = v
-    end
-})
-
-task.spawn(function()
-    while task.wait(0.08) do
-        if AutoAttack then
-            pcall(function()
-
-                local Character = LocalPlayer.Character
-                if not Character then return end
-
-                local Tool = Character:FindFirstChildOfClass("Tool")
-
-                if Tool then
-                    Tool:Activate()
-
-                    VirtualUser:Button1Down(
-                        Vector2.new(0,0),
-                        workspace.CurrentCamera.CFrame
-                    )
-                end
-
-            end)
         end
     end
 end)
