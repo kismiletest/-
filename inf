@@ -17,7 +17,22 @@ local WindUI = loadstring(game:HttpGet(
 --------------------------------------------------
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
 local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- VARIABLES
+--------------------------------------------------
+
+local AutoV4 = false
+
+local AutoV3 = {
+    Enabled = false
+}
+
+local autoV4Connection = nil
 
 --------------------------------------------------
 -- WINDOW
@@ -72,6 +87,116 @@ Tabs.Main:Button({
             hrp.Position.Y + 795679695796326795679695796326,
             hrp.Position.Z
         )
+
+    end
+})
+
+--------------------------------------------------
+-- AUTO V3
+--------------------------------------------------
+
+local function StartAutoV3()
+
+    task.spawn(function()
+
+        while AutoV3.Enabled do
+
+            pcall(function()
+
+                local Remotes =
+                    ReplicatedStorage:FindFirstChild("Remotes")
+
+                if Remotes and Remotes:FindFirstChild("CommE") then
+
+                    Remotes.CommE:FireServer(
+                        "ActivateAbility"
+                    )
+
+                end
+
+            end)
+
+            task.wait(0.5)
+
+        end
+
+    end)
+
+end
+
+local function StopAutoV3()
+    AutoV3.Enabled = false
+end
+
+Tabs.Main:Toggle({ 
+    Title = "Auto V3",
+    Value = false,
+
+    Callback = function(state)
+
+        AutoV3.Enabled = state
+
+        if state then
+            StartAutoV3()
+        else
+            StopAutoV3()
+        end
+
+    end
+})
+
+--------------------------------------------------
+-- AUTO V4
+--------------------------------------------------
+
+local function startV4Loop()
+
+    if autoV4Connection then
+        autoV4Connection:Disconnect()
+    end
+
+    autoV4Connection =
+        RunService.Heartbeat:Connect(function()
+
+        if not AutoV4 then
+            return
+        end
+
+        pcall(function()
+
+            local Remotes =
+                ReplicatedStorage:FindFirstChild("Remotes")
+
+            if Remotes and Remotes:FindFirstChild("CommF_") then
+
+                Remotes.CommF_:InvokeServer(
+                    "ActivateRace"
+                )
+
+            end
+
+        end)
+
+    end)
+
+end
+
+Tabs.Main:Toggle({ 
+    Title = "Auto V4", 
+    Value = false,
+
+    Callback = function(state)
+
+        AutoV4 = state
+
+        if AutoV4 then
+            startV4Loop()
+        else
+            if autoV4Connection then
+                autoV4Connection:Disconnect()
+                autoV4Connection = nil
+            end
+        end
 
     end
 })
