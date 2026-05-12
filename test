@@ -606,3 +606,8 @@ Players.PlayerRemoving:Connect(function(player)
     end
 
 end)
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(Enum.KeyCode.RightControl)
