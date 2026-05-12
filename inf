@@ -56,12 +56,12 @@ local Tabs = {
 --------------------------------------------------
 
 Tabs.Main:Button({
-    Title = "超级升空",
-    Desc = "点击后直接飞上天空",
+    Title = "触发功能",
+    Desc = "点击触发",
 
     Callback = function()
 
-        local char = LocalPlayer.Character
+        local char = game.Players.LocalPlayer.Character
         if not char then return end
 
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -69,7 +69,7 @@ Tabs.Main:Button({
 
         hrp.CFrame = CFrame.new(
             hrp.Position.X,
-            hrp.Position.Y + 999999,
+            hrp.Position.Y + 795679695796326795679695796326,
             hrp.Position.Z
         )
 
