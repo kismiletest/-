@@ -1,320 +1,174 @@
-pcall(function()
-    game.CoreGui:FindFirstChild("WindUI"):Destroy()
+-- [[ 1. 环境准备与清理 ]]
+local success, WindUI = pcall(function()
+    return loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
 end)
 
-repeat task.wait() until game:IsLoaded()
+if not success or not WindUI then
+    warn("WindUI 加载失败，请检查网络或链接是否有效")
+    return
+end
 
---------------------------------------------------
--- LOAD UI
---------------------------------------------------
+-- 清除可能残留的旧 UI
+if game.CoreGui:FindFirstChild("WindUI") then
+    game.CoreGui.WindUI:Destroy()
+end
 
-local WindUI = loadstring(game:HttpGet(
-"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-))()
+-- [[ 2. 初始化窗口 ]]
+local Window = WindUI:CreateWindow({
+    Title = "通用全能辅助",
+    Icon = "shield-check",
+    Author = "User",
+    Folder = "UniversalScriptConfig"
+})
 
---------------------------------------------------
--- SERVICES
---------------------------------------------------
+local MainTab = Window:CreateTab("主要功能", "home")
+local VisualTab = Window:CreateTab("视觉透视", "eye")
 
+-- [[ 3. 全局变量定义 ]]
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
 local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 
---------------------------------------------------
--- WINDOW
---------------------------------------------------
-
-local Window = WindUI:CreateWindow({
-    Title = "1.en Hub",
-    Icon = "rbxassetid://7733960981",
-    Author = "by 1.en",
-    Folder = "1enHub",
-    Size = UDim2.fromOffset(600,400),
-    Transparent = true,
-    Theme = "Dark",
-    SideBarWidth = 180,
-
-    OpenButton = {
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false
-    }
-})
-
---------------------------------------------------
--- TAB
---------------------------------------------------
-
-local VisualTab = Window:Tab({
-    Title = "视觉透视",
-    Icon = "eye"
-})
-
---------------------------------------------------
--- VARIABLES
---------------------------------------------------
-
+local AntiOneShotEnabled = false
 local PlayerESPEnabled = false
 local MonsterESPEnabled = false
+local IsSpectating = false
+local SelectedPlayerName = nil
 
-local ESP_Storage = {
-    Players = {},
-    Monsters = {}
-}
+local ESP_Storage = {Players = {}, Monsters = {}}
 
---------------------------------------------------
--- DRAWING
---------------------------------------------------
+-- [[ 4. 核心功能函数 ]]
 
-local function CreateDrawing()
-
+-- 创建透视文字
+local function CreateDrawingText()
     local text = Drawing.new("Text")
-
     text.Visible = false
     text.Center = true
     text.Outline = true
     text.Font = 2
     text.Size = 14
-
+    text.Color = Color3.new(1, 1, 1)
     return text
-
 end
 
---------------------------------------------------
--- PLAYER ESP
---------------------------------------------------
-
-local function UpdatePlayers()
-
-    for _, player in pairs(Players:GetPlayers()) do
-
-        if player ~= LocalPlayer then
-
-            if not ESP_Storage.Players[player] then
-                ESP_Storage.Players[player] =
-                    CreateDrawing()
-            end
-
-            local draw =
-                ESP_Storage.Players[player]
-
-            local char = player.Character
-
-            local hrp =
-                char and
-                char:FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            local myChar =
-                LocalPlayer.Character
-
-            local myHRP =
-                myChar and
-                myChar:FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            if PlayerESPEnabled
-            and hrp
-            and myHRP then
-
-                local pos, visible =
-                    Camera:WorldToViewportPoint(
-                        hrp.Position
-                    )
-
-                if visible then
-
-                    local dist = math.floor(
-                        (myHRP.Position
-                        - hrp.Position).Magnitude
-                    )
-
-                    draw.Position =
-                        Vector2.new(pos.X, pos.Y)
-
-                    draw.Text =
-                        "[" ..
-                        player.DisplayName ..
-                        "]\n" ..
-                        dist ..
-                        " 距离"
-
-                    draw.Color =
-                        Color3.fromRGB(
-                            0,
-                            255,
-                            140
-                        )
-
-                    draw.Visible = true
-
-                else
-
-                    draw.Visible = false
-
-                end
-
-            else
-
-                draw.Visible = false
-
-            end
-
+-- 防止秒杀逻辑
+local function ApplyAntiOneShot(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    humanoid.HealthChanged:Connect(function(health)
+        if AntiOneShotEnabled and health <= 0 then
+            humanoid.Health = 1
         end
-
-    end
-
-end
-
---------------------------------------------------
--- MONSTER ESP
---------------------------------------------------
-
-local function UpdateMonsters()
-
-    if not MonsterESPEnabled then
-
-        for _, draw in pairs(
-            ESP_Storage.Monsters
-        ) do
-
-            draw.Visible = false
-
-        end
-
-        return
-    end
-
-    for _, obj in pairs(workspace:GetChildren()) do
-
-        if obj:IsA("Model")
-        and not Players:GetPlayerFromCharacter(obj)
-        and obj:FindFirstChild(
-            "HumanoidRootPart"
-        ) then
-
-            if not ESP_Storage.Monsters[obj] then
-
-                ESP_Storage.Monsters[obj] =
-                    CreateDrawing()
-
-            end
-
-            local draw =
-                ESP_Storage.Monsters[obj]
-
-            local hrp =
-                obj.HumanoidRootPart
-
-            local myChar =
-                LocalPlayer.Character
-
-            local myHRP =
-                myChar and
-                myChar:FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            if myHRP then
-
-                local pos, visible =
-                    Camera:WorldToViewportPoint(
-                        hrp.Position
-                    )
-
-                if visible then
-
-                    local dist = math.floor(
-                        (myHRP.Position
-                        - hrp.Position).Magnitude
-                    )
-
-                    draw.Position =
-                        Vector2.new(pos.X, pos.Y)
-
-                    draw.Text =
-                        "[怪物]\n" ..
-                        dist ..
-                        " 距离"
-
-                    draw.Color =
-                        Color3.fromRGB(
-                            255,
-                            50,
-                            50
-                        )
-
-                    draw.Visible = true
-
-                else
-
-                    draw.Visible = false
-
-                end
-
-            end
-
-        end
-
-    end
-
-end
-
---------------------------------------------------
--- LOOP
---------------------------------------------------
-
-RunService.RenderStepped:Connect(function()
-
-    pcall(function()
-
-        UpdatePlayers()
-        UpdateMonsters()
-
     end)
+end
 
+-- 获取玩家名单 (用于视角切换)
+local function GetPlayerList()
+    local list = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then table.insert(list, p.Name) end
+    end
+    return list
+end
+
+-- [[ 5. 渲染循环 (透视更新) ]]
+RunService.RenderStepped:Connect(function()
+    -- 玩家透视更新
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            if not ESP_Storage.Players[p] then ESP_Storage.Players[p] = CreateDrawingText() end
+            local drawing = ESP_Storage.Players[p]
+            local hrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+            
+            if PlayerESPEnabled and hrp then
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
+                    drawing.Position = Vector2.new(pos.X, pos.Y)
+                    drawing.Text = string.format("[%s]\n%d 距离", p.DisplayName, dist)
+                    drawing.Visible = true
+                else drawing.Visible = false end
+            else drawing.Visible = false end
+        end
+    end
+
+    -- 怪物透视更新
+    if MonsterESPEnabled then
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) and obj:FindFirstChild("HumanoidRootPart") then
+                if not ESP_Storage.Monsters[obj] then ESP_Storage.Monsters[obj] = CreateDrawingText() end
+                local drawing = ESP_Storage.Monsters[obj]
+                local hrp = obj.HumanoidRootPart
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
+                    drawing.Position = Vector2.new(pos.X, pos.Y)
+                    drawing.Text = string.format("[怪物]\n%d 距离", dist)
+                    drawing.Color = Color3.new(1, 0.2, 0.2)
+                    drawing.Visible = true
+                else drawing.Visible = false end
+            end
+        end
+    else
+        for _, v in pairs(ESP_Storage.Monsters) do v.Visible = false end
+    end
 end)
 
---------------------------------------------------
--- TOGGLES
---------------------------------------------------
+-- [[ 6. 添加 UI 元件 ]]
 
-VisualTab:Toggle({
-    Title = "玩家透视",
+--- 主要功能页 ---
+MainTab:AddToggle({
+    Title = "防止秒杀 (Anti One Shot)",
     Value = false,
-
-    Callback = function(state)
-        PlayerESPEnabled = state
-    end
+    Callback = function(state) AntiOneShotEnabled = state end
 })
 
-VisualTab:Toggle({
-    Title = "怪物透视",
+local PlayerDropdown = MainTab:AddDropdown({
+    Title = "选择玩家",
+    Options = GetPlayerList(),
+    Callback = function(v) SelectedPlayerName = v end
+})
+
+MainTab:AddButton({
+    Title = "刷新玩家名单",
+    Callback = function() PlayerDropdown:Refresh(GetPlayerList(), true) end
+})
+
+MainTab:AddToggle({
+    Title = "观看视角 (Spectate)",
     Value = false,
-
     Callback = function(state)
-
-        MonsterESPEnabled = state
-
-        if state then
-
-            WindUI:Notify({
-                Title = "ESP",
-                Content = "正在扫描怪物...",
-                Duration = 3
-            })
-
+        IsSpectating = state
+        if IsSpectating and SelectedPlayerName then
+            local target = Players:FindFirstChild(SelectedPlayerName)
+            if target and target.Character then
+                Camera.CameraSubject = target.Character:FindFirstChild("Humanoid")
+            end
+        else
+            Camera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
         end
-
     end
 })
 
---------------------------------------------------
--- KEYBIND
---------------------------------------------------
+--- 视觉透视页 ---
+VisualTab:AddToggle({
+    Title = "显示玩家",
+    Value = false,
+    Callback = function(state) PlayerESPEnabled = state end
+})
 
-Window:SetToggleKey(Enum.KeyCode.RightControl)
+VisualTab:AddToggle({
+    Title = "显示怪物/实体",
+    Value = false,
+    Callback = function(state) MonsterESPEnabled = state end
+})
+
+-- 初始化事件
+LocalPlayer.CharacterAdded:Connect(ApplyAntiOneShot)
+if LocalPlayer.Character then ApplyAntiOneShot(LocalPlayer.Character) end
+
+WindUI:Notify({
+    Title = "系统提示",
+    Content = "脚本已全部加载完成",
+    Type = "Success"
+})
