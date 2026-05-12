@@ -260,7 +260,7 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- ANTI ONE SHOT
+-- ANTI ONE SHOT / ANTI VOID
 --------------------------------------------------
 
 Tabs.Main:Toggle({
@@ -284,13 +284,22 @@ task.spawn(function()
                 local Character = LocalPlayer.Character
                 if not Character then return end
 
-                local Humanoid =
-                    Character:FindFirstChildOfClass("Humanoid")
+                local HRP =
+                    Character:FindFirstChild("HumanoidRootPart")
 
-                if not Humanoid then return end
+                if not HRP then
+                    return
+                end
 
-                if Humanoid.Health <= 1 then
-                    Humanoid.Health = Humanoid.MaxHealth
+                -- 防止被打進地下 / 虛空
+                if HRP.Position.Y <= -500 then
+
+                    HRP.CFrame = CFrame.new(
+                        HRP.Position.X,
+                        300,
+                        HRP.Position.Z
+                    )
+
                 end
 
             end)
