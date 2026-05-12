@@ -50,282 +50,380 @@ local Settings = {
     AutoFarm = false,
     AutoQuest = false,
     AutoStats = false,
-    AutoBuy = false,
+    BringMob = false,
 
-    SelectedWeapon = "Combat",
-    TargetItem = "Log Pose"
+    Weapon = "Combat",
+    StatTarget = "Melee"
 }
 
 --------------------------------------------------
--- TABS
+-- QUEST SYSTEM
 --------------------------------------------------
 
-local FarmTab = Window:Tab({
-    Title = "自动挂机",
-    Icon = "swords"
-})
+local function GetQuest()
 
-local ShopTab = Window:Tab({
-    Title = "自动商店",
-    Icon = "shopping-cart"
-})
+    local level = 1
 
-local MiscTab = Window:Tab({
-    Title = "杂项设置",
-    Icon = "settings"
-})
+    pcall(function()
+        level =
+            LocalPlayer.Data.Level.Value
+    end)
+
+    local questName = ""
+
+    if level >= 1 and level < 15 then
+
+        questName = "Bandit Quest"
+
+    elseif level >= 15 and level < 30 then
+
+        questName = "Pirate Quest"
+
+    end
+
+    return questName
+
+end
+
+--------------------------------------------------
+-- AUTO FARM LOOP
+--------------------------------------------------
+
+task.spawn(function()
+
+    while task.wait() do
+
+        if Settings.AutoFarm then
+
+            pcall(function()
+
+                local Character =
+                    LocalPlayer.Character
+
+                if not Character then
+                    return
+                end
+
+                local HRP =
+                    Character:FindFirstChild(
+                        "HumanoidRootPart"
+                    )
+
+                local Humanoid =
+                    Character:FindFirstChild(
+                        "Humanoid"
+                    )
+
+                if not HRP or not Humanoid then
+                    return
+                end
+
+                local Weapon =
+                    Character:FindFirstChild(
+                        Settings.Weapon
+                    )
+                    or
+                    LocalPlayer.Backpack
+                    :FindFirstChild(
+                        Settings.Weapon
+                    )
+
+                --------------------------------------------------
+                -- EQUIP
+                --------------------------------------------------
+
+                if Weapon
+                and not Character
+                :FindFirstChild(
+                    Settings.Weapon
+                ) then
+
+                    Humanoid:EquipTool(
+                        Weapon
+                    )
+
+                end
+
+                --------------------------------------------------
+                -- NPC CHECK
+                --------------------------------------------------
+
+                local NPCFolder =
+                    workspace:FindFirstChild(
+                        "NPCs"
+                    )
+
+                if not NPCFolder then
+                    return
+                end
+
+                for _, v in pairs(
+                    NPCFolder:GetChildren()
+                ) do
+
+                    if v:FindFirstChild(
+                        "Humanoid"
+                    )
+                    and v.Humanoid.Health > 0
+                    and v:FindFirstChild(
+                        "HumanoidRootPart"
+                    ) then
+
+                        --------------------------------------------------
+                        -- BRING MOB
+                        --------------------------------------------------
+
+                        if Settings.BringMob then
+
+                            v.HumanoidRootPart
+                            .CFrame =
+                                HRP.CFrame
+                                * CFrame.new(
+                                    0,
+                                    0,
+                                    -3
+                                )
+
+                            v.HumanoidRootPart
+                            .CanCollide = false
+
+                        end
+
+                        --------------------------------------------------
+                        -- TELEPORT
+                        --------------------------------------------------
+
+                        HRP.CFrame =
+                            v.HumanoidRootPart
+                            .CFrame
+                            * CFrame.new(
+                                0,
+                                5,
+                                0
+                            )
+
+                        --------------------------------------------------
+                        -- ATTACK
+                        --------------------------------------------------
+
+                        if Weapon then
+
+                            Weapon:Activate()
+
+                        end
+
+                    end
+
+                end
+
+            end)
+
+        end
+
+    end
+
+end)
 
 --------------------------------------------------
 -- AUTO QUEST
 --------------------------------------------------
 
-local function CheckQuest()
+task.spawn(function()
 
-    while Settings.AutoQuest do
+    while task.wait(1) do
 
-        pcall(function()
+        if Settings.AutoQuest then
 
-            -- 任务远程事件
-            -- 自行修改游戏路径
+            pcall(function()
 
-        end)
+                local quest =
+                    GetQuest()
 
-        task.wait(1)
+                print(
+                    "当前任务:",
+                    quest
+                )
+
+                -- FireServer 放这里
+
+            end)
+
+        end
 
     end
 
-end
+end)
 
 --------------------------------------------------
--- AUTO FARM
+-- AUTO STATS
 --------------------------------------------------
 
-local function StartFarm()
+task.spawn(function()
 
-    while Settings.AutoFarm do
+    while task.wait(1) do
 
-        pcall(function()
+        if Settings.AutoStats then
 
-            local Character =
-                LocalPlayer.Character
+            pcall(function()
 
-            local HRP =
-                Character
-                and Character:FindFirstChild(
-                    "HumanoidRootPart"
+                print(
+                    "自动加点:",
+                    Settings.StatTarget
                 )
 
-            if not HRP then
-                return
-            end
+                -- 加点逻辑
 
-            local NPCFolder =
-                workspace:FindFirstChild(
-                    "NPCs"
-                )
+            end)
 
-            if not NPCFolder then
-                return
-            end
-
-            local target =
-                NPCFolder
-                :FindFirstChildOfClass(
-                    "Model"
-                )
-
-            if target
-            and target:FindFirstChild(
-                "HumanoidRootPart"
-            ) then
-
-                HRP.CFrame =
-                    target.HumanoidRootPart
-                    .CFrame
-                    * CFrame.new(0,0,3)
-
-                local Tool =
-                    Character
-                    :FindFirstChildOfClass(
-                        "Tool"
-                    )
-
-                if Tool then
-
-                    Tool:Activate()
-
-                end
-
-            end
-
-        end)
-
-        task.wait()
+        end
 
     end
 
-end
+end)
 
 --------------------------------------------------
--- FARM TOGGLES
+-- TABS
 --------------------------------------------------
 
-FarmTab:Toggle({
-    Title = "全自动练级",
-    Desc = "自动寻找怪物并攻击",
+local MainTab = Window:Tab({
+    Title = "自动挂机",
+    Icon = "swords"
+})
+
+local StatTab = Window:Tab({
+    Title = "属性加点",
+    Icon = "plus-circle"
+})
+
+local TeleportTab = Window:Tab({
+    Title = "岛屿传送",
+    Icon = "map"
+})
+
+--------------------------------------------------
+-- MAIN TAB
+--------------------------------------------------
+
+MainTab:Toggle({
+    Title = "自动练级",
     Value = false,
 
     Callback = function(state)
 
         Settings.AutoFarm = state
 
-        if state then
-
-            WindUI:Notify({
-                Title = "Auto Farm",
-                Content = "已开启自动挂机",
-                Duration = 3
-            })
-
-            task.spawn(StartFarm)
-
-        end
+        WindUI:Notify({
+            Title = "Auto Farm",
+            Content = state
+                and "已开启"
+                or "已关闭",
+            Duration = 3
+        })
 
     end
 })
 
-FarmTab:Toggle({
+MainTab:Toggle({
     Title = "自动任务",
-    Desc = "自动接取与提交任务",
     Value = false,
 
     Callback = function(state)
 
         Settings.AutoQuest = state
 
-        if state then
+    end
+})
 
-            WindUI:Notify({
-                Title = "Quest",
-                Content = "已开启自动任务",
-                Duration = 3
-            })
+MainTab:Toggle({
+    Title = "吸怪",
+    Value = false,
 
-            task.spawn(CheckQuest)
+    Callback = function(state)
 
-        end
+        Settings.BringMob = state
 
     end
 })
 
---------------------------------------------------
--- WEAPON DROPDOWN
---------------------------------------------------
-
-FarmTab:Dropdown({
+MainTab:Dropdown({
     Title = "选择武器",
 
     Values = {
         "Combat",
-        "Sword",
-        "Fruit",
-        "Gun"
+        "Katana",
+        "Fruit"
     },
 
     Value = "Combat",
 
     Callback = function(v)
 
-        Settings.SelectedWeapon = v
+        Settings.Weapon = v
 
     end
 })
 
 --------------------------------------------------
--- SHOP DROPDOWN
+-- STAT TAB
 --------------------------------------------------
 
-ShopTab:Dropdown({
-    Title = "自动购买",
-
-    Values = {
-        "Log Pose",
-        "Black Leg",
-        "Katana",
-        "Fruit Box"
-    },
-
-    Value = "Log Pose",
-
-    Callback = function(v)
-
-        Settings.TargetItem = v
-
-    end
-})
-
---------------------------------------------------
--- AUTO BUY
---------------------------------------------------
-
-ShopTab:Button({
-    Title = "开启自动购买",
-    Desc = "自动购买已选择物品",
-
-    Callback = function()
-
-        WindUI:Notify({
-            Title = "自动购买",
-            Content =
-                "正在监控并尝试购买: "
-                .. Settings.TargetItem,
-            Duration = 4
-        })
-
-        -- FireServer 放这里
-
-    end
-})
-
---------------------------------------------------
--- UNLOCK BUTTON
---------------------------------------------------
-
-MiscTab:Button({
-    Title = "解锁所有内容",
-    Desc = "自动尝试交互",
-
-    Callback = function()
-
-        WindUI:Notify({
-            Title = "执行中",
-            Content =
-                "正在尝试自动解锁...",
-            Duration = 4
-        })
-
-    end
-})
-
---------------------------------------------------
--- AUTO STATS
---------------------------------------------------
-
-MiscTab:Toggle({
-    Title = "自动加点 (Melee)",
+StatTab:Toggle({
+    Title = "自动加点",
     Value = false,
 
     Callback = function(state)
 
         Settings.AutoStats = state
 
-        if state then
+    end
+})
 
-            WindUI:Notify({
-                Title = "Auto Stats",
-                Content = "已开启自动加点",
-                Duration = 3
-            })
+StatTab:Dropdown({
+    Title = "加点属性",
+
+    Values = {
+        "Melee",
+        "Defense",
+        "Sword",
+        "Fruit"
+    },
+
+    Value = "Melee",
+
+    Callback = function(v)
+
+        Settings.StatTarget = v
+
+    end
+})
+
+--------------------------------------------------
+-- TELEPORT TAB
+--------------------------------------------------
+
+TeleportTab:Button({
+    Title = "新手岛",
+
+    Callback = function()
+
+        local Character =
+            LocalPlayer.Character
+
+        local HRP =
+            Character
+            and Character
+            :FindFirstChild(
+                "HumanoidRootPart"
+            )
+
+        if HRP then
+
+            HRP.CFrame =
+                CFrame.new(
+                    100,
+                    20,
+                    100
+                )
 
         end
 
@@ -333,13 +431,13 @@ MiscTab:Toggle({
 })
 
 --------------------------------------------------
--- LOAD NOTIFY
+-- NOTIFY
 --------------------------------------------------
 
 WindUI:Notify({
     Title = "1.en Hub",
     Content =
-        "加载成功，请先选择武器",
+        "Sailor Piece 功能加载完成",
     Duration = 5
 })
 
