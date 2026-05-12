@@ -1,128 +1,352 @@
--- [[ 1. 初始化 WindUI ]]
-local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+pcall(function()
+    game.CoreGui:FindFirstChild("WindUI"):Destroy()
+end)
+
+repeat task.wait() until game:IsLoaded()
+
+--------------------------------------------------
+-- LOAD WIND UI
+--------------------------------------------------
+
+local WindUI = loadstring(game:HttpGet(
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+))()
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
+
 local Window = WindUI:CreateWindow({
-    Title = "Sailor Piece 全自动助手",
-    Icon = "anchor",
-    Author = "User",
-    Folder = "SailorPiece_Config"
+    Title = "1.en Hub",
+    Icon = "rbxassetid://7733960981",
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(600,400),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 180,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
 })
 
--- [[ 2. 核心状态控制 ]]
-local _G = {
+--------------------------------------------------
+-- VARIABLES
+--------------------------------------------------
+
+local Settings = {
     AutoFarm = false,
     AutoQuest = false,
     AutoStats = false,
     AutoBuy = false,
-    SelectedWeapon = "Combat", -- 默认武器
-    TargetItem = "Log Pose"    -- 默认购买物品
+
+    SelectedWeapon = "Combat",
+    TargetItem = "Log Pose"
 }
 
--- [[ 3. 游戏服务引用 ]]
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RS = game:GetService("RunService")
+--------------------------------------------------
+-- TABS
+--------------------------------------------------
 
--- [[ 4. 自动化逻辑函数 (简略框架) ]]
+local FarmTab = Window:Tab({
+    Title = "自动挂机",
+    Icon = "swords"
+})
 
--- 自动接任务逻辑
+local ShopTab = Window:Tab({
+    Title = "自动商店",
+    Icon = "shopping-cart"
+})
+
+local MiscTab = Window:Tab({
+    Title = "杂项设置",
+    Icon = "settings"
+})
+
+--------------------------------------------------
+-- AUTO QUEST
+--------------------------------------------------
+
 local function CheckQuest()
-    while _G.AutoQuest do
-        -- 这里需要根据 Sailor Piece 的具体任务 NPC 路径修改
-        -- 例如: game:GetService("ReplicatedStorage").Remotes.AcceptQuest:FireServer("QuestName")
-        task.wait(1)
-    end
-end
 
--- 自动战斗逻辑
-local function StartFarm()
-    while _G.AutoFarm do
+    while Settings.AutoQuest do
+
         pcall(function()
-            local target = workspace.NPCs:FindFirstChildOfClass("Model") -- 需改为游戏实际NPC路径
-            if target and target:FindFirstChild("HumanoidRootPart") then
-                -- 自动瞬移到怪物后方
-                LocalPlayer.Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
-                -- 自动攻击
-                local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                if tool then tool:Activate() end
-            end
+
+            -- 任务远程事件
+            -- 自行修改游戏路径
+
         end)
-        task.wait()
+
+        task.wait(1)
+
     end
+
 end
 
--- [[ 5. UI 标签页 ]]
-local FarmTab = Window:CreateTab("自动挂机", "swords")
-local ShopTab = Window:CreateTab("自动商店", "shopping-cart")
-local MiscTab = Window:CreateTab("杂项设置", "settings")
+--------------------------------------------------
+-- AUTO FARM
+--------------------------------------------------
 
--- [[ 6. UI 元件添加 ]]
+local function StartFarm()
 
--- --- 挂机页 ---
-FarmTab:AddToggle({
-    Title = "全自动练级 (Auto Farm)",
-    Desc = "自动瞬移至怪物并攻击",
+    while Settings.AutoFarm do
+
+        pcall(function()
+
+            local Character =
+                LocalPlayer.Character
+
+            local HRP =
+                Character
+                and Character:FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            if not HRP then
+                return
+            end
+
+            local NPCFolder =
+                workspace:FindFirstChild(
+                    "NPCs"
+                )
+
+            if not NPCFolder then
+                return
+            end
+
+            local target =
+                NPCFolder
+                :FindFirstChildOfClass(
+                    "Model"
+                )
+
+            if target
+            and target:FindFirstChild(
+                "HumanoidRootPart"
+            ) then
+
+                HRP.CFrame =
+                    target.HumanoidRootPart
+                    .CFrame
+                    * CFrame.new(0,0,3)
+
+                local Tool =
+                    Character
+                    :FindFirstChildOfClass(
+                        "Tool"
+                    )
+
+                if Tool then
+
+                    Tool:Activate()
+
+                end
+
+            end
+
+        end)
+
+        task.wait()
+
+    end
+
+end
+
+--------------------------------------------------
+-- FARM TOGGLES
+--------------------------------------------------
+
+FarmTab:Toggle({
+    Title = "全自动练级",
+    Desc = "自动寻找怪物并攻击",
     Value = false,
+
     Callback = function(state)
-        _G.AutoFarm = state
-        if state then task.spawn(StartFarm) end
+
+        Settings.AutoFarm = state
+
+        if state then
+
+            WindUI:Notify({
+                Title = "Auto Farm",
+                Content = "已开启自动挂机",
+                Duration = 3
+            })
+
+            task.spawn(StartFarm)
+
+        end
+
     end
 })
 
-FarmTab:AddToggle({
-    Title = "自动接取/提交任务",
-    Desc = "根据等级自动匹配对应任务",
+FarmTab:Toggle({
+    Title = "自动任务",
+    Desc = "自动接取与提交任务",
     Value = false,
+
     Callback = function(state)
-        _G.AutoQuest = state
-        if state then task.spawn(CheckQuest) end
+
+        Settings.AutoQuest = state
+
+        if state then
+
+            WindUI:Notify({
+                Title = "Quest",
+                Content = "已开启自动任务",
+                Duration = 3
+            })
+
+            task.spawn(CheckQuest)
+
+        end
+
     end
 })
 
-FarmTab:AddDropdown({
-    Title = "选择攻击武器",
-    Options = {"Combat", "Sword", "Fruit", "Gun"},
-    Callback = function(v) _G.SelectedWeapon = v end
+--------------------------------------------------
+-- WEAPON DROPDOWN
+--------------------------------------------------
+
+FarmTab:Dropdown({
+    Title = "选择武器",
+
+    Values = {
+        "Combat",
+        "Sword",
+        "Fruit",
+        "Gun"
+    },
+
+    Value = "Combat",
+
+    Callback = function(v)
+
+        Settings.SelectedWeapon = v
+
+    end
 })
 
--- --- 商店页 ---
-ShopTab:AddDropdown({
-    Title = "选择自动购买项",
-    Options = {"Log Pose", "Black Leg", "Katana", "Fruit Box"},
-    Callback = function(v) _G.TargetItem = v end
+--------------------------------------------------
+-- SHOP DROPDOWN
+--------------------------------------------------
+
+ShopTab:Dropdown({
+    Title = "自动购买",
+
+    Values = {
+        "Log Pose",
+        "Black Leg",
+        "Katana",
+        "Fruit Box"
+    },
+
+    Value = "Log Pose",
+
+    Callback = function(v)
+
+        Settings.TargetItem = v
+
+    end
 })
 
-ShopTab:AddButton({
-    Title = "开启全自动购买",
-    Desc = "满足金钱条件时自动购买所选物品",
+--------------------------------------------------
+-- AUTO BUY
+--------------------------------------------------
+
+ShopTab:Button({
+    Title = "开启自动购买",
+    Desc = "自动购买已选择物品",
+
     Callback = function()
+
         WindUI:Notify({
             Title = "自动购买",
-            Content = "已开始监控金钱并尝试购买: " .. _G.TargetItem,
-            Type = "Info"
+            Content =
+                "正在监控并尝试购买: "
+                .. Settings.TargetItem,
+            Duration = 4
         })
-        -- 这里放入购买远程事件 FireServer
+
+        -- FireServer 放这里
+
     end
 })
 
--- --- 杂项页 ---
-MiscTab:AddButton({
-    Title = "解锁所有东西 (Unlocks)",
-    Desc = "尝试执行一键解锁/对话逻辑",
+--------------------------------------------------
+-- UNLOCK BUTTON
+--------------------------------------------------
+
+MiscTab:Button({
+    Title = "解锁所有内容",
+    Desc = "自动尝试交互",
+
     Callback = function()
-        -- 遍历场景中所有可交互物品
-        WindUI:Notify({Title = "执行中", Content = "正在尝试自动交互所有解锁项", Type = "Success"})
+
+        WindUI:Notify({
+            Title = "执行中",
+            Content =
+                "正在尝试自动解锁...",
+            Duration = 4
+        })
+
     end
 })
 
-MiscTab:AddToggle({
+--------------------------------------------------
+-- AUTO STATS
+--------------------------------------------------
+
+MiscTab:Toggle({
     Title = "自动加点 (Melee)",
     Value = false,
-    Callback = function(state) _G.AutoStats = state end
+
+    Callback = function(state)
+
+        Settings.AutoStats = state
+
+        if state then
+
+            WindUI:Notify({
+                Title = "Auto Stats",
+                Content = "已开启自动加点",
+                Duration = 3
+            })
+
+        end
+
+    end
 })
 
--- [[ 7. 初始化运行 ]]
+--------------------------------------------------
+-- LOAD NOTIFY
+--------------------------------------------------
+
 WindUI:Notify({
-    Title = "Sailor Piece 加载成功",
-    Content = "请先选择武器后再开启自动练级",
-    Type = "Info"
+    Title = "1.en Hub",
+    Content =
+        "加载成功，请先选择武器",
+    Duration = 5
 })
+
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(
+    Enum.KeyCode.RightControl
+)
