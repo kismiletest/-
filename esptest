@@ -1,0 +1,525 @@
+pcall(function()
+    game.CoreGui:FindFirstChild("WindUI"):Destroy()
+end)
+
+repeat task.wait() until game:IsLoaded()
+
+--------------------------------------------------
+-- LOAD WIND UI
+--------------------------------------------------
+
+local WindUI = loadstring(game:HttpGet(
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+))()
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
+
+local Window = WindUI:CreateWindow({
+    Title = "智能视觉助手",
+    Icon = "scan-eye",
+    Author = "by 1.en",
+    Folder = "SmartESP",
+
+    Size = UDim2.fromOffset(600,400),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 180,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
+})
+
+--------------------------------------------------
+-- TAB
+--------------------------------------------------
+
+local VisualTab = Window:Tab({
+    Title = "视觉透视",
+    Icon = "eye"
+})
+
+--------------------------------------------------
+-- SETTINGS
+--------------------------------------------------
+
+local Settings = {
+    PlayerESP = false,
+    MonsterESP = false,
+    ShowDistance = true,
+    TextSize = 14,
+    OnlyActive = true
+}
+
+--------------------------------------------------
+-- STORAGE
+--------------------------------------------------
+
+local Storage = {
+    Players = {},
+    Monsters = {}
+}
+
+--------------------------------------------------
+-- CREATE DRAWING
+--------------------------------------------------
+
+local function CreateDrawing(isPlayer)
+
+    local text =
+        Drawing.new("Text")
+
+    text.Visible = false
+    text.Center = true
+    text.Outline = true
+    text.Font = 2
+    text.Size = Settings.TextSize
+
+    if isPlayer then
+
+        text.Color =
+            Color3.fromRGB(
+                0,
+                255,
+                150
+            )
+
+    else
+
+        text.Color =
+            Color3.fromRGB(
+                255,
+                50,
+                50
+            )
+
+    end
+
+    return text
+
+end
+
+--------------------------------------------------
+-- MONSTER FILTER
+--------------------------------------------------
+
+local function IsRealMonster(obj)
+
+    if not obj:IsA("Model") then
+        return false
+    end
+
+    if Players:GetPlayerFromCharacter(obj) then
+        return false
+    end
+
+    local Humanoid =
+        obj:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    local HRP =
+        obj:FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+    if Humanoid
+    and HRP
+    and Humanoid.Health > 0 then
+
+        if Settings.OnlyActive then
+
+            local moving =
+                (
+                    Humanoid.MoveDirection
+                    .Magnitude > 0
+                )
+                or
+                (
+                    Humanoid.WalkSpeed > 0
+                )
+
+            local name =
+                string.lower(
+                    obj.Name
+                )
+
+            local staticNPC =
+                name:find("shop")
+                or
+                name:find("npc")
+                or
+                name:find("quest")
+                or
+                name:find("merchant")
+
+            if not moving
+            or staticNPC then
+                return false
+            end
+
+        end
+
+        return true
+
+    end
+
+    return false
+
+end
+
+--------------------------------------------------
+-- PLAYER ESP
+--------------------------------------------------
+
+local function UpdatePlayers()
+
+    for _, p in pairs(
+        Players:GetPlayers()
+    ) do
+
+        if p ~= LocalPlayer then
+
+            if not Storage.Players[p] then
+
+                Storage.Players[p] =
+                    CreateDrawing(true)
+
+            end
+
+            local drawing =
+                Storage.Players[p]
+
+            local Character =
+                p.Character
+
+            local HRP =
+                Character
+                and Character
+                :FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            local myChar =
+                LocalPlayer.Character
+
+            local myHRP =
+                myChar
+                and myChar
+                :FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            if Settings.PlayerESP
+            and HRP
+            and myHRP then
+
+                local pos, visible =
+                    Camera
+                    :WorldToViewportPoint(
+                        HRP.Position
+                    )
+
+                if visible then
+
+                    local dist =
+                        math.floor(
+                            (
+                                myHRP.Position
+                                -
+                                HRP.Position
+                            ).Magnitude
+                        )
+
+                    drawing.Text =
+                        string.format(
+                            "[%s]\n%d m",
+                            p.DisplayName,
+                            dist
+                        )
+
+                    drawing.Position =
+                        Vector2.new(
+                            pos.X,
+                            pos.Y
+                        )
+
+                    drawing.Size =
+                        Settings.TextSize
+
+                    drawing.Visible = true
+
+                else
+
+                    drawing.Visible = false
+
+                end
+
+            else
+
+                drawing.Visible = false
+
+            end
+
+        end
+
+    end
+
+end
+
+--------------------------------------------------
+-- MONSTER ESP
+--------------------------------------------------
+
+local function UpdateMonsters()
+
+    if not Settings.MonsterESP then
+
+        for _, v in pairs(
+            Storage.Monsters
+        ) do
+
+            v.Visible = false
+
+        end
+
+        return
+
+    end
+
+    local myChar =
+        LocalPlayer.Character
+
+    local myHRP =
+        myChar
+        and myChar
+        :FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+    if not myHRP then
+        return
+    end
+
+    for _, obj in pairs(
+        workspace:GetChildren()
+    ) do
+
+        if IsRealMonster(obj) then
+
+            if not Storage.Monsters[obj] then
+
+                Storage.Monsters[obj] =
+                    CreateDrawing(false)
+
+            end
+
+            local drawing =
+                Storage.Monsters[obj]
+
+            local HRP =
+                obj.HumanoidRootPart
+
+            local pos, visible =
+                Camera
+                :WorldToViewportPoint(
+                    HRP.Position
+                )
+
+            if visible then
+
+                local dist =
+                    math.floor(
+                        (
+                            myHRP.Position
+                            -
+                            HRP.Position
+                        ).Magnitude
+                    )
+
+                drawing.Text =
+                    string.format(
+                        "⚠️ %s\n[%d m]",
+                        obj.Name,
+                        dist
+                    )
+
+                drawing.Position =
+                    Vector2.new(
+                        pos.X,
+                        pos.Y
+                    )
+
+                drawing.Size =
+                    Settings.TextSize
+
+                drawing.Visible = true
+
+            else
+
+                drawing.Visible = false
+
+            end
+
+        elseif Storage.Monsters[obj] then
+
+            Storage.Monsters[obj]
+            .Visible = false
+
+        end
+
+    end
+
+end
+
+--------------------------------------------------
+-- LOOP
+--------------------------------------------------
+
+RunService.RenderStepped:Connect(function()
+
+    pcall(function()
+
+        UpdatePlayers()
+        UpdateMonsters()
+
+    end)
+
+end)
+
+--------------------------------------------------
+-- TOGGLES
+--------------------------------------------------
+
+VisualTab:Toggle({
+    Title = "透视玩家",
+    Value = false,
+
+    Callback = function(state)
+
+        Settings.PlayerESP = state
+
+    end
+})
+
+VisualTab:Toggle({
+    Title = "透视怪物",
+    Desc = "显示场景中的怪物实体",
+    Value = false,
+
+    Callback = function(state)
+
+        Settings.MonsterESP = state
+
+    end
+})
+
+VisualTab:Toggle({
+    Title = "智能过滤静态NPC",
+    Desc = "只显示真正会动的怪物",
+    Value = true,
+
+    Callback = function(state)
+
+        Settings.OnlyActive = state
+
+    end
+})
+
+--------------------------------------------------
+-- TEXT SIZE
+--------------------------------------------------
+
+VisualTab:Slider({
+    Title = "文字大小",
+
+    Value = {
+        Min = 10,
+        Max = 22,
+        Default = 14
+    },
+
+    Callback = function(v)
+
+        Settings.TextSize = v
+
+    end
+})
+
+--------------------------------------------------
+-- RESET CACHE
+--------------------------------------------------
+
+VisualTab:Button({
+    Title = "重置视觉缓存",
+    Desc = "透视异常时使用",
+
+    Callback = function()
+
+        for _, v in pairs(
+            Storage.Players
+        ) do
+
+            pcall(function()
+                v:Remove()
+            end)
+
+        end
+
+        for _, v in pairs(
+            Storage.Monsters
+        ) do
+
+            pcall(function()
+                v:Remove()
+            end)
+
+        end
+
+        Storage = {
+            Players = {},
+            Monsters = {}
+        }
+
+        WindUI:Notify({
+            Title = "ESP",
+            Content =
+                "视觉缓存已重置",
+            Duration = 4
+        })
+
+    end
+})
+
+--------------------------------------------------
+-- NOTIFY
+--------------------------------------------------
+
+WindUI:Notify({
+    Title = "智能视觉助手",
+    Content =
+        "动态过滤ESP已加载",
+    Duration = 5
+})
+
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(
+    Enum.KeyCode.RightControl
+)
