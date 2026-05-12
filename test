@@ -1,9 +1,267 @@
+pcall(function()
+    game.CoreGui:FindFirstChild("WindUI"):Destroy()
+end)
+
+repeat task.wait() until game:IsLoaded()
+
+--------------------------------------------------
+-- WIND UI
+--------------------------------------------------
+
+local WindUI = loadstring(game:HttpGet(
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+))()
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- VARIABLES
+--------------------------------------------------
+
+local AutoV4 = false
+local AntiOneShot = false
+
+local AutoV3 = {
+    Enabled = false
+}
+
+local autoV4Connection = nil
+
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
+
+local Window = WindUI:CreateWindow({
+    Title = "1.en Hub",
+    Icon = "rbxassetid://7733960981",
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(600,430),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 180,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
+})
+
+--------------------------------------------------
+-- TAB
+--------------------------------------------------
+
+local Tabs = {
+    Main = Window:Tab({
+        Title = "Main",
+        Icon = "home"
+    })
+}
+
+--------------------------------------------------
+-- BUTTON
+--------------------------------------------------
+
+Tabs.Main:Button({
+    Title = "触发功能",
+    Desc = "点击触发",
+
+    Callback = function()
+
+        local char = game.Players.LocalPlayer.Character
+        if not char then return end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        hrp.CFrame = CFrame.new(
+            hrp.Position.X,
+            hrp.Position.Y + 795679695796326795679695796326,
+            hrp.Position.Z
+        )
+
+    end
+})
+
+--------------------------------------------------
+-- AUTO V3
+--------------------------------------------------
+
+local function StartAutoV3()
+
+    task.spawn(function()
+
+        while AutoV3.Enabled do
+
+            pcall(function()
+
+                local Remotes =
+                    ReplicatedStorage:FindFirstChild("Remotes")
+
+                if Remotes and Remotes:FindFirstChild("CommE") then
+
+                    Remotes.CommE:FireServer(
+                        "ActivateAbility"
+                    )
+
+                end
+
+            end)
+
+            task.wait(0.5)
+
+        end
+
+    end)
+
+end
+
+local function StopAutoV3()
+    AutoV3.Enabled = false
+end
+
+Tabs.Main:Toggle({ 
+    Title = "Auto V3",
+    Value = false,
+
+    Callback = function(state)
+
+        AutoV3.Enabled = state
+
+        if state then
+            StartAutoV3()
+        else
+            StopAutoV3()
+        end
+
+    end
+})
+
+--------------------------------------------------
+-- AUTO V4
+--------------------------------------------------
+
+local function startV4Loop()
+
+    if autoV4Connection then
+        autoV4Connection:Disconnect()
+    end
+
+    autoV4Connection =
+        RunService.Heartbeat:Connect(function()
+
+        if not AutoV4 then
+            return
+        end
+
+        pcall(function()
+
+            local Remotes =
+                ReplicatedStorage:FindFirstChild("Remotes")
+
+            if Remotes and Remotes:FindFirstChild("CommF_") then
+
+                Remotes.CommF_:InvokeServer(
+                    "ActivateRace"
+                )
+
+            end
+
+        end)
+
+    end)
+
+end
+
+Tabs.Main:Toggle({ 
+    Title = "Auto V4", 
+    Value = false,
+
+    Callback = function(state)
+
+        AutoV4 = state
+
+        if AutoV4 then
+            startV4Loop()
+        else
+            if autoV4Connection then
+                autoV4Connection:Disconnect()
+                autoV4Connection = nil
+            end
+        end
+
+    end
+})
+
+--------------------------------------------------
+-- AUTO BUSO
+--------------------------------------------------
+
+local BusoEnabled = false
+local Player = game.Players.LocalPlayer
+
+Tabs.Main:Toggle({
+    Title = "Auto Buso",
+    Value = false,
+
+    Callback = function(state)
+        BusoEnabled = state
+        print("自動武裝色狀態:", state)
+    end
+})
+
+local function ToggleBuso()
+
+    if BusoEnabled then
+
+        local Character = Player.Character
+        if not Character then
+            return
+        end
+
+        if not Character:FindFirstChild("HasBuso") then
+
+            local remote =
+                game:GetService("ReplicatedStorage")
+                :WaitForChild("Remotes")
+                :FindFirstChild("CommF_")
+
+            if remote then
+                remote:InvokeServer("Buso")
+            end
+
+        end
+
+    end
+
+end
+
+task.spawn(function()
+
+    while true do
+
+        if BusoEnabled then
+            pcall(ToggleBuso)
+        end
+
+        task.wait(1)
+
+    end
+
+end)
+
 --------------------------------------------------
 -- ANTI ONE SHOT
 --------------------------------------------------
-
-local AntiOneShot = false
-local Player = game.Players.LocalPlayer
 
 Tabs.Main:Toggle({
     Title = "Anti One Shot",
@@ -23,7 +281,7 @@ task.spawn(function()
 
             pcall(function()
 
-                local Character = Player.Character
+                local Character = LocalPlayer.Character
                 if not Character then return end
 
                 local Humanoid =
@@ -42,3 +300,9 @@ task.spawn(function()
     end
 
 end)
+
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(Enum.KeyCode.RightControl)
