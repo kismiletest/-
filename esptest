@@ -1,335 +1,128 @@
-pcall(function()
-    game.CoreGui:FindFirstChild("WindUI"):Destroy()
-end)
-
-repeat task.wait() until game:IsLoaded()
-
---------------------------------------------------
--- LOAD WIND UI
---------------------------------------------------
-
-local WindUI = loadstring(game:HttpGet(
-"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-))()
-
---------------------------------------------------
--- SERVICES
---------------------------------------------------
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local Camera = workspace.CurrentCamera
-
---------------------------------------------------
--- WINDOW
---------------------------------------------------
-
+-- [[ 1. 初始化 WindUI ]]
+local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
 local Window = WindUI:CreateWindow({
-    Title = "1.en Hub",
-    Icon = "rbxassetid://7733960981",
-    Author = "by 1.en",
-    Folder = "1enHub",
-    Size = UDim2.fromOffset(600,400),
-    Transparent = true,
-    Theme = "Dark",
-    SideBarWidth = 180,
-
-    OpenButton = {
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false
-    }
+    Title = "Sailor Piece 全自动助手",
+    Icon = "anchor",
+    Author = "User",
+    Folder = "SailorPiece_Config"
 })
 
---------------------------------------------------
--- VARIABLES
---------------------------------------------------
+-- [[ 2. 核心状态控制 ]]
+local _G = {
+    AutoFarm = false,
+    AutoQuest = false,
+    AutoStats = false,
+    AutoBuy = false,
+    SelectedWeapon = "Combat", -- 默认武器
+    TargetItem = "Log Pose"    -- 默认购买物品
+}
 
-local PVP_Enabled = false
-local AutoClicker = false
-local SilentAim = false
-local FOV = 400
+-- [[ 3. 游戏服务引用 ]]
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RS = game:GetService("RunService")
 
---------------------------------------------------
--- TABS
---------------------------------------------------
+-- [[ 4. 自动化逻辑函数 (简略框架) ]]
 
-local MainTab = Window:Tab({
-    Title = "战斗配置",
-    Icon = "crosshair"
-})
-
-local SettingTab = Window:Tab({
-    Title = "设置",
-    Icon = "settings"
-})
-
---------------------------------------------------
--- GET CLOSEST PLAYER
---------------------------------------------------
-
-local function GetClosestPlayer()
-
-    local target = nil
-    local dist = math.huge
-
-    for _, v in pairs(Players:GetPlayers()) do
-
-        if v ~= LocalPlayer
-        and v.Character
-        and v.Character:FindFirstChild(
-            "HumanoidRootPart"
-        )
-        and v.Character:FindFirstChild(
-            "Humanoid"
-        )
-        and v.Character.Humanoid.Health > 0 then
-
-            local screenPos, onScreen =
-                Camera:WorldToViewportPoint(
-                    v.Character
-                    .HumanoidRootPart.Position
-                )
-
-            if onScreen then
-
-                local magnitude =
-                    (
-                        Vector2.new(
-                            Mouse.X,
-                            Mouse.Y
-                        )
-                        -
-                        Vector2.new(
-                            screenPos.X,
-                            screenPos.Y
-                        )
-                    ).Magnitude
-
-                if magnitude < dist
-                and magnitude <= FOV then
-
-                    target = v
-                    dist = magnitude
-
-                end
-
-            end
-
-        end
-
+-- 自动接任务逻辑
+local function CheckQuest()
+    while _G.AutoQuest do
+        -- 这里需要根据 Sailor Piece 的具体任务 NPC 路径修改
+        -- 例如: game:GetService("ReplicatedStorage").Remotes.AcceptQuest:FireServer("QuestName")
+        task.wait(1)
     end
-
-    return target
-
 end
 
---------------------------------------------------
--- AUTO CLICKER
---------------------------------------------------
-
-RunService.RenderStepped:Connect(function()
-
-    if AutoClicker
-    and PVP_Enabled then
-
-        local Character =
-            LocalPlayer.Character
-
-        local Tool =
-            Character
-            and Character:FindFirstChildOfClass(
-                "Tool"
-            )
-
-        if Tool then
-            pcall(function()
-                Tool:Activate()
-            end)
-        end
-
-    end
-
-end)
-
---------------------------------------------------
--- SILENT AIM
---------------------------------------------------
-
-local oldNamecall
-
-oldNamecall = hookmetamethod(
-    game,
-    "__namecall",
-    function(self, ...)
-
-        local method =
-            getnamecallmethod()
-
-        local args = {...}
-
-        if SilentAim
-        and method == "FireServer" then
-
-            local target =
-                GetClosestPlayer()
-
-            if target
-            and target.Character
-            and target.Character
-            :FindFirstChild(
-                "HumanoidRootPart"
-            ) then
-
-                local hrp =
-                    target.Character
-                    .HumanoidRootPart
-
-                for i,v in pairs(args) do
-
-                    if typeof(v)
-                    == "Vector3" then
-
-                        args[i] =
-                            hrp.Position
-
-                    end
-
-                end
-
-                return oldNamecall(
-                    self,
-                    unpack(args)
-                )
-
+-- 自动战斗逻辑
+local function StartFarm()
+    while _G.AutoFarm do
+        pcall(function()
+            local target = workspace.NPCs:FindFirstChildOfClass("Model") -- 需改为游戏实际NPC路径
+            if target and target:FindFirstChild("HumanoidRootPart") then
+                -- 自动瞬移到怪物后方
+                LocalPlayer.Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                -- 自动攻击
+                local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                if tool then tool:Activate() end
             end
-
-        end
-
-        return oldNamecall(
-            self,
-            ...
-        )
-
+        end)
+        task.wait()
     end
-)
+end
 
---------------------------------------------------
--- MAIN TOGGLES
---------------------------------------------------
+-- [[ 5. UI 标签页 ]]
+local FarmTab = Window:CreateTab("自动挂机", "swords")
+local ShopTab = Window:CreateTab("自动商店", "shopping-cart")
+local MiscTab = Window:CreateTab("杂项设置", "settings")
 
-MainTab:Toggle({
-    Title = "主开关 (PVP)",
+-- [[ 6. UI 元件添加 ]]
+
+-- --- 挂机页 ---
+FarmTab:AddToggle({
+    Title = "全自动练级 (Auto Farm)",
+    Desc = "自动瞬移至怪物并攻击",
     Value = false,
-
     Callback = function(state)
-
-        PVP_Enabled = state
-
-        WindUI:Notify({
-            Title = "PVP",
-            Content = state
-                and "已开启"
-                or "已关闭",
-            Duration = 3
-        })
-
+        _G.AutoFarm = state
+        if state then task.spawn(StartFarm) end
     end
 })
 
-MainTab:Toggle({
-    Title = "自动连点",
-    Desc = "自动攻击当前武器",
+FarmTab:AddToggle({
+    Title = "自动接取/提交任务",
+    Desc = "根据等级自动匹配对应任务",
     Value = false,
-
     Callback = function(state)
-
-        AutoClicker = state
-
+        _G.AutoQuest = state
+        if state then task.spawn(CheckQuest) end
     end
 })
 
-MainTab:Toggle({
-    Title = "辅助自瞄",
-    Desc = "自动锁定最近玩家",
-    Value = false,
-
-    Callback = function(state)
-
-        SilentAim = state
-
-        if state then
-
-            WindUI:Notify({
-                Title = "Silent Aim",
-                Content = "已开启辅助自瞄",
-                Duration = 3
-            })
-
-        end
-
-    end
+FarmTab:AddDropdown({
+    Title = "选择攻击武器",
+    Options = {"Combat", "Sword", "Fruit", "Gun"},
+    Callback = function(v) _G.SelectedWeapon = v end
 })
 
---------------------------------------------------
--- FOV SLIDER
---------------------------------------------------
-
-MainTab:Slider({
-    Title = "自瞄范围 (FOV)",
-    Value = {
-        Min = 50,
-        Max = 800,
-        Default = 400
-    },
-
-    Callback = function(v)
-
-        FOV = v
-
-    end
+-- --- 商店页 ---
+ShopTab:AddDropdown({
+    Title = "选择自动购买项",
+    Options = {"Log Pose", "Black Leg", "Katana", "Fruit Box"},
+    Callback = function(v) _G.TargetItem = v end
 })
 
---------------------------------------------------
--- ENERGY BUTTON
---------------------------------------------------
-
-MainTab:Button({
-    Title = "瞬间满魔",
-    Desc = "尝试刷新能量",
-
+ShopTab:AddButton({
+    Title = "开启全自动购买",
+    Desc = "满足金钱条件时自动购买所选物品",
     Callback = function()
-
         WindUI:Notify({
-            Title = "执行中",
-            Content = "正在尝试刷新能量",
-            Duration = 3
+            Title = "自动购买",
+            Content = "已开始监控金钱并尝试购买: " .. _G.TargetItem,
+            Type = "Info"
         })
-
+        -- 这里放入购买远程事件 FireServer
     end
 })
 
---------------------------------------------------
--- DESTROY BUTTON
---------------------------------------------------
-
-SettingTab:Button({
-    Title = "卸载脚本",
-
+-- --- 杂项页 ---
+MiscTab:AddButton({
+    Title = "解锁所有东西 (Unlocks)",
+    Desc = "尝试执行一键解锁/对话逻辑",
     Callback = function()
-
-        Window:Destroy()
-
+        -- 遍历场景中所有可交互物品
+        WindUI:Notify({Title = "执行中", Content = "正在尝试自动交互所有解锁项", Type = "Success"})
     end
 })
 
---------------------------------------------------
--- KEYBIND
---------------------------------------------------
+MiscTab:AddToggle({
+    Title = "自动加点 (Melee)",
+    Value = false,
+    Callback = function(state) _G.AutoStats = state end
+})
 
-Window:SetToggleKey(
-    Enum.KeyCode.RightControl
-)
+-- [[ 7. 初始化运行 ]]
+WindUI:Notify({
+    Title = "Sailor Piece 加载成功",
+    Content = "请先选择武器后再开启自动练级",
+    Type = "Info"
+})
