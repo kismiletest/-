@@ -27,10 +27,11 @@ local LocalPlayer = Players.LocalPlayer
 --------------------------------------------------
 
 local AutoV4 = false
-local AntiOneShot = false
+local AntiVoid = false
 
 local AutoV3 = {
-    Enabled = false
+    Enabled = false,
+    Running = false
 }
 
 local autoV4Connection = nil
@@ -57,7 +58,7 @@ local Window = WindUI:CreateWindow({
 })
 
 --------------------------------------------------
--- TAB
+-- TABS
 --------------------------------------------------
 
 local Tabs = {
@@ -66,6 +67,11 @@ local Tabs = {
         Icon = "home"
     })
 }
+
+local ESPTab = Window:Tab({
+    Title = "ESP",
+    Icon = "eye"
+})
 
 --------------------------------------------------
 -- BUTTON
@@ -77,17 +83,14 @@ Tabs.Main:Button({
 
     Callback = function()
 
-        local char = game.Players.LocalPlayer.Character
+        local char = LocalPlayer.Character
         if not char then return end
 
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
-        hrp.CFrame = CFrame.new(
-            hrp.Position.X,
-            hrp.Position.Y + 795679695796326795679695796326,
-            hrp.Position.Z
-        )
+        hrp.CFrame =
+            hrp.CFrame + Vector3.new(0,500,0)
 
     end
 })
@@ -97,6 +100,12 @@ Tabs.Main:Button({
 --------------------------------------------------
 
 local function StartAutoV3()
+
+    if AutoV3.Running then
+        return
+    end
+
+    AutoV3.Running = true
 
     task.spawn(function()
 
@@ -121,15 +130,13 @@ local function StartAutoV3()
 
         end
 
+        AutoV3.Running = false
+
     end)
 
 end
 
-local function StopAutoV3()
-    AutoV3.Enabled = false
-end
-
-Tabs.Main:Toggle({ 
+Tabs.Main:Toggle({
     Title = "Auto V3",
     Value = false,
 
@@ -139,8 +146,6 @@ Tabs.Main:Toggle({
 
         if state then
             StartAutoV3()
-        else
-            StopAutoV3()
         end
 
     end
@@ -156,12 +161,20 @@ local function startV4Loop()
         autoV4Connection:Disconnect()
     end
 
+    local last = 0
+
     autoV4Connection =
         RunService.Heartbeat:Connect(function()
 
         if not AutoV4 then
             return
         end
+
+        if tick() - last < 1 then
+            return
+        end
+
+        last = tick()
 
         pcall(function()
 
@@ -182,8 +195,8 @@ local function startV4Loop()
 
 end
 
-Tabs.Main:Toggle({ 
-    Title = "Auto V4", 
+Tabs.Main:Toggle({
+    Title = "Auto V4",
     Value = false,
 
     Callback = function(state)
@@ -191,12 +204,16 @@ Tabs.Main:Toggle({
         AutoV4 = state
 
         if AutoV4 then
+
             startV4Loop()
+
         else
+
             if autoV4Connection then
                 autoV4Connection:Disconnect()
                 autoV4Connection = nil
             end
+
         end
 
     end
@@ -207,7 +224,9 @@ Tabs.Main:Toggle({
 --------------------------------------------------
 
 local BusoEnabled = false
-local Player = game.Players.LocalPlayer
+
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local CommF = Remotes:WaitForChild("CommF_")
 
 Tabs.Main:Toggle({
     Title = "Auto Buso",
@@ -215,31 +234,23 @@ Tabs.Main:Toggle({
 
     Callback = function(state)
         BusoEnabled = state
-        print("自動武裝色狀態:", state)
     end
 })
 
 local function ToggleBuso()
 
-    if BusoEnabled then
+    if not BusoEnabled then
+        return
+    end
 
-        local Character = Player.Character
-        if not Character then
-            return
-        end
+    local Character = LocalPlayer.Character
+    if not Character then
+        return
+    end
 
-        if not Character:FindFirstChild("HasBuso") then
+    if not Character:FindFirstChild("HasBuso") then
 
-            local remote =
-                game:GetService("ReplicatedStorage")
-                :WaitForChild("Remotes")
-                :FindFirstChild("CommF_")
-
-            if remote then
-                remote:InvokeServer("Buso")
-            end
-
-        end
+        CommF:InvokeServer("Buso")
 
     end
 
@@ -249,9 +260,7 @@ task.spawn(function()
 
     while true do
 
-        if BusoEnabled then
-            pcall(ToggleBuso)
-        end
+        pcall(ToggleBuso)
 
         task.wait(1)
 
@@ -260,16 +269,15 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- ANTI ONE SHOT / ANTI VOID
+-- ANTI VOID
 --------------------------------------------------
 
 Tabs.Main:Toggle({
-    Title = "Anti One Shot",
+    Title = "Anti Void",
     Value = false,
 
     Callback = function(state)
-        AntiOneShot = state
-        print("Anti One Shot:", state)
+        AntiVoid = state
     end
 })
 
@@ -277,7 +285,7 @@ task.spawn(function()
 
     while task.wait(0.1) do
 
-        if AntiOneShot then
+        if AntiVoid then
 
             pcall(function()
 
@@ -291,7 +299,6 @@ task.spawn(function()
                     return
                 end
 
-                -- 防止被打進地下 / 虛空
                 if HRP.Position.Y <= -500 then
 
                     HRP.CFrame = CFrame.new(
@@ -307,6 +314,181 @@ task.spawn(function()
         end
 
     end
+
+end)
+
+--------------------------------------------------
+-- ESP
+--------------------------------------------------
+
+local ESPEnabled = false
+local ESP_Objects = {}
+
+local function CreateESP(player)
+
+    if player == LocalPlayer then
+        return
+    end
+
+    if ESP_Objects[player] then
+        return
+    end
+
+    local text = Drawing.new("Text")
+
+    text.Visible = false
+    text.Center = true
+    text.Outline = true
+    text.Font = 2
+    text.Size = 13
+    text.Color = Color3.fromRGB(255,255,255)
+
+    ESP_Objects[player] = text
+
+end
+
+local function RemoveESP(player)
+
+    if ESP_Objects[player] then
+
+        ESP_Objects[player]:Remove()
+        ESP_Objects[player] = nil
+
+    end
+
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    CreateESP(player)
+end
+
+Players.PlayerAdded:Connect(CreateESP)
+Players.PlayerRemoving:Connect(RemoveESP)
+
+RunService.RenderStepped:Connect(function()
+
+    if not ESPEnabled then
+
+        for _, esp in pairs(ESP_Objects) do
+            esp.Visible = false
+        end
+
+        return
+    end
+
+    local Camera = workspace.CurrentCamera
+
+    local MyCharacter = LocalPlayer.Character
+    local MyHRP = MyCharacter
+        and MyCharacter:FindFirstChild("HumanoidRootPart")
+
+    for player, text in pairs(ESP_Objects) do
+
+        local Character = player.Character
+
+        if Character then
+
+            local HRP =
+                Character:FindFirstChild("HumanoidRootPart")
+
+            local Humanoid =
+                Character:FindFirstChild("Humanoid")
+
+            if HRP and Humanoid and Humanoid.Health > 0 then
+
+                local Position, OnScreen =
+                    Camera:WorldToViewportPoint(HRP.Position)
+
+                if OnScreen then
+
+                    local Distance = 0
+
+                    if MyHRP then
+                        Distance = math.floor(
+                            (MyHRP.Position - HRP.Position).Magnitude
+                        )
+                    end
+
+                    text.Position = Vector2.new(
+                        Position.X,
+                        Position.Y
+                    )
+
+                    text.Text = string.format(
+                        "[%s]\nHP: %d\n%d Studs",
+                        player.DisplayName,
+                        math.floor(Humanoid.Health),
+                        Distance
+                    )
+
+                    if Distance <= 50 then
+                        text.Color = Color3.fromRGB(255,0,0)
+                    elseif Distance <= 150 then
+                        text.Color = Color3.fromRGB(255,255,0)
+                    else
+                        text.Color = Color3.fromRGB(255,255,255)
+                    end
+
+                    text.Visible = true
+
+                else
+
+                    text.Visible = false
+
+                end
+
+            else
+
+                text.Visible = false
+
+            end
+
+        else
+
+            text.Visible = false
+
+        end
+
+    end
+
+end)
+
+ESPTab:Toggle({
+    Title = "玩家透视 (ESP)",
+    Desc = "显示名字、血量、距离",
+    Value = false,
+
+    Callback = function(state)
+
+        ESPEnabled = state
+
+        if state then
+
+            WindUI:Notify({
+                Title = "ESP 已开启",
+                Content = "正在加载玩家透视...",
+                Duration = 3
+            })
+
+        else
+
+            for _, esp in pairs(ESP_Objects) do
+                esp.Visible = false
+            end
+
+        end
+
+    end
+})
+
+--------------------------------------------------
+-- CHARACTER LOAD
+--------------------------------------------------
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+
+    repeat task.wait()
+    until char:FindFirstChild("HumanoidRootPart")
 
 end)
 
