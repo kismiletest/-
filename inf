@@ -27,6 +27,7 @@ local LocalPlayer = Players.LocalPlayer
 --------------------------------------------------
 
 local AutoV4 = false
+local BusoEnabled = false
 
 local AutoV3 = {
     Enabled = false
@@ -200,6 +201,47 @@ Tabs.Main:Toggle({
 
     end
 })
+
+--------------------------------------------------
+-- AUTO BUSO
+--------------------------------------------------
+
+Tabs.Main:Toggle({
+    Title = "Auto Buso",
+    Value = false,
+
+    Callback = function(state)
+        BusoEnabled = state
+        print("自動武裝色狀態:", state)
+    end
+})
+
+task.spawn(function()
+
+    while task.wait(1) do
+
+        if BusoEnabled then
+
+            pcall(function()
+
+                local Remotes =
+                    ReplicatedStorage:FindFirstChild("Remotes")
+
+                if Remotes and Remotes:FindFirstChild("CommF_") then
+
+                    Remotes.CommF_:InvokeServer(
+                        "Buso"
+                    )
+
+                end
+
+            end)
+
+        end
+
+    end
+
+end)
 
 --------------------------------------------------
 -- KEYBIND
