@@ -1,96 +1,44 @@
--- 初始化 WindUI (假设你已经加载了库)
-local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
-local Window = Window or WindUI:CreateWindow({
-    Title = "ESP 视觉增强",
-    Icon = "eye",
-    Author = "User",
-    Folder = "ESPConfig"
-})
+--------------------------------------------------
+-- ANTI ONE SHOT
+--------------------------------------------------
 
-local MainTab = Window:CreateTab("视觉", "eye")
+local AntiOneShot = false
+local Player = game.Players.LocalPlayer
 
--- 变量控制
-local ESPEnabled = false
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-
--- 存储 ESP 绘制对象
-local ESP_Objects = {}
-
--- 创建 ESP 绘制函数
-local function CreateESP(player)
-    if player == LocalPlayer then return end
-    
-    local text = Drawing.new("Text")
-    text.Visible = false
-    text.Center = true
-    text.Outline = true
-    text.Font = 2
-    text.Size = 13
-    text.Color = Color3.fromRGB(255, 255, 255)
-    
-    ESP_Objects[player] = text
-end
-
--- 移除 ESP 绘制函数
-local function RemoveESP(player)
-    if ESP_Objects[player] then
-        ESP_Objects[player]:Remove()
-        ESP_Objects[player] = nil
-    end
-end
-
--- 渲染循环
-RunService.RenderStepped:Connect(function()
-    if not ESPEnabled then
-        for _, text in pairs(ESP_Objects) do text.Visible = false end
-        return
-    end
-
-    for player, text in pairs(ESP_Objects) do
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-            local hrp = player.Character.HumanoidRootPart
-            local humanoid = player.Character.Humanoid
-            local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
-            
-            if onScreen then
-                local distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
-                local health = math.floor(humanoid.Health)
-                
-                text.Position = Vector2.new(pos.X, pos.Y)
-                text.Text = string.format("[%s]\n%d HP | %d Studs", player.DisplayName, health, distance)
-                
-                -- 根据距离调整颜色 (可选)
-                text.Color = distance < 50 and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(255, 255, 255)
-                text.Visible = true
-            else
-                text.Visible = false
-            end
-        else
-            text.Visible = false
-        end
-    end
-end)
-
--- 初始化现有的玩家
-for _, player in pairs(Players:GetPlayers()) do CreateESP(player) end
-Players.PlayerAdded:Connect(CreateESP)
-Players.PlayerRemoving:Connect(RemoveESP)
-
--- WindUI 元件
-MainTab:AddToggle({
-    Title = "玩家透视 (ESP)",
-    Desc = "显示名字、血量和距离",
+Tabs.Main:Toggle({
+    Title = "Anti One Shot",
     Value = false,
+
     Callback = function(state)
-        ESPEnabled = state
-        if state then
-            WindUI:Notify({
-                Title = "ESP 已启用",
-                Content = "正在扫描场景中的玩家...",
-                Type = "Info"
-            })
-        end
+        AntiOneShot = state
+        print("Anti One Shot:", state)
     end
 })
+
+task.spawn(function()
+
+    while task.wait(0.1) do
+
+        if AntiOneShot then
+
+            pcall(function()
+
+                local Character = Player.Character
+                if not Character then return end
+
+                local Humanoid =
+                    Character:FindFirstChildOfClass("Humanoid")
+
+                if not Humanoid then return end
+
+                if Humanoid.Health <= 1 then
+                    Humanoid.Health = Humanoid.MaxHealth
+                end
+
+            end)
+
+        end
+
+    end
+
+end)
