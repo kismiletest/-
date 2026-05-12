@@ -17,20 +17,21 @@ local WindUI = loadstring(game:HttpGet(
 --------------------------------------------------
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 --------------------------------------------------
 -- WINDOW
 --------------------------------------------------
 
 local Window = WindUI:CreateWindow({
-    Title = "1.en Hub",
-    Icon = "rbxassetid://7733960981",
+    Title = "ESP Hub",
+    Icon = "eye",
     Author = "by 1.en",
-    Folder = "1enHub",
+    Folder = "UniversalESP",
+
     Size = UDim2.fromOffset(600,400),
     Transparent = true,
     Theme = "Dark",
@@ -47,9 +48,9 @@ local Window = WindUI:CreateWindow({
 -- TAB
 --------------------------------------------------
 
-local MainTab = Window:Tab({
-    Title = "练级配置",
-    Icon = "home"
+local ESPTab = Window:Tab({
+    Title = "视觉透视",
+    Icon = "eye"
 })
 
 --------------------------------------------------
@@ -57,395 +58,469 @@ local MainTab = Window:Tab({
 --------------------------------------------------
 
 local Settings = {
-    AutoFarm = false,
-    Weapon = "Melee",
-    Distance = 7,
-    TweenSpeed = 250
+    PlayerESP = false,
+    MonsterESP = false,
+
+    ShowDistance = true,
+    ShowHealth = true,
+
+    TextSize = 14
 }
 
 --------------------------------------------------
--- TWEEN FUNCTION
+-- STORAGE
 --------------------------------------------------
 
-local function To(targetCFrame)
+local Storage = {
+    Players = {},
+    Monsters = {}
+}
 
-    local Character =
+--------------------------------------------------
+-- CREATE DRAWING
+--------------------------------------------------
+
+local function CreateDrawing(Type)
+
+    local text =
+        Drawing.new("Text")
+
+    text.Visible = false
+    text.Center = true
+    text.Outline = true
+    text.Font = 2
+    text.Size = Settings.TextSize
+
+    if Type == "Player" then
+
+        text.Color =
+            Color3.new(
+                0,
+                1,
+                0.5
+            )
+
+    else
+
+        text.Color =
+            Color3.new(
+                1,
+                0.2,
+                0.2
+            )
+
+    end
+
+    return text
+
+end
+
+--------------------------------------------------
+-- PLAYER ESP
+--------------------------------------------------
+
+local function UpdatePlayers()
+
+    for _, p in pairs(
+        Players:GetPlayers()
+    ) do
+
+        if p ~= LocalPlayer then
+
+            if not Storage.Players[p] then
+
+                Storage.Players[p] =
+                    CreateDrawing(
+                        "Player"
+                    )
+
+            end
+
+            local drawing =
+                Storage.Players[p]
+
+            local Character =
+                p.Character
+
+            local HRP =
+                Character
+                and Character
+                :FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            local Humanoid =
+                Character
+                and Character
+                :FindFirstChild(
+                    "Humanoid"
+                )
+
+            local myChar =
+                LocalPlayer.Character
+
+            local myHRP =
+                myChar
+                and myChar
+                :FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            if Settings.PlayerESP
+            and HRP
+            and Humanoid
+            and Humanoid.Health > 0
+            and myHRP then
+
+                local pos, visible =
+                    Camera
+                    :WorldToViewportPoint(
+                        HRP.Position
+                    )
+
+                if visible then
+
+                    local dist =
+                        math.floor(
+                            (
+                                myHRP.Position
+                                -
+                                HRP.Position
+                            ).Magnitude
+                        )
+
+                    local content =
+                        "[" ..
+                        p.DisplayName ..
+                        "]"
+
+                    if Settings.ShowHealth then
+
+                        content =
+                            content
+                            ..
+                            "\nHP: "
+                            ..
+                            math.floor(
+                                Humanoid.Health
+                            )
+
+                    end
+
+                    if Settings.ShowDistance then
+
+                        content =
+                            content
+                            ..
+                            "\nDist: "
+                            ..
+                            dist
+
+                    end
+
+                    drawing.Position =
+                        Vector2.new(
+                            pos.X,
+                            pos.Y
+                        )
+
+                    drawing.Text =
+                        content
+
+                    drawing.Size =
+                        Settings.TextSize
+
+                    drawing.Visible = true
+
+                else
+
+                    drawing.Visible = false
+
+                end
+
+            else
+
+                drawing.Visible = false
+
+            end
+
+        end
+
+    end
+
+end
+
+--------------------------------------------------
+-- MONSTER ESP
+--------------------------------------------------
+
+local function UpdateMonsters()
+
+    if not Settings.MonsterESP then
+
+        for _, d in pairs(
+            Storage.Monsters
+        ) do
+
+            d.Visible = false
+
+        end
+
+        return
+
+    end
+
+    local myChar =
         LocalPlayer.Character
 
-    local HRP =
-        Character
-        and Character
+    local myHRP =
+        myChar
+        and myChar
         :FindFirstChild(
             "HumanoidRootPart"
         )
 
-    if not HRP then
+    if not myHRP then
         return
     end
 
-    local distance =
-        (
-            HRP.Position
-            -
-            targetCFrame.Position
-        ).Magnitude
+    for _, obj in pairs(
+        workspace:GetChildren()
+    ) do
 
-    local tweenInfo =
-        TweenInfo.new(
-            distance
-            / Settings.TweenSpeed,
-            Enum.EasingStyle.Linear
+        if obj:IsA("Model")
+        and not Players
+        :GetPlayerFromCharacter(
+            obj
         )
+        and obj:FindFirstChild(
+            "HumanoidRootPart"
+        ) then
 
-    local tween =
-        TweenService:Create(
-            HRP,
-            tweenInfo,
-            {
-                CFrame = targetCFrame
-            }
-        )
+            if not Storage.Monsters[obj] then
 
-    tween:Play()
-
-    return tween
-
-end
-
---------------------------------------------------
--- QUEST DATA
---------------------------------------------------
-
-local function GetQuestData()
-
-    local level = 1
-
-    pcall(function()
-
-        level =
-            LocalPlayer
-            .Data
-            .Level
-            .Value
-
-    end)
-
-    if level < 10 then
-
-        return {
-            NPC = "Bandit Quest Giver",
-            Quest = "BanditQuest1",
-            Monster = "Bandit",
-            Pos = CFrame.new(
-                1061,
-                16,
-                1545
-            )
-        }
-
-    elseif level < 15 then
-
-        return {
-            NPC = "Monkey Quest Giver",
-            Quest = "JungleQuest",
-            Monster = "Monkey",
-            Pos = CFrame.new(
-                -1600,
-                36,
-                154
-            )
-        }
-
-    end
-
-    return nil
-
-end
-
---------------------------------------------------
--- AUTO FARM LOOP
---------------------------------------------------
-
-task.spawn(function()
-
-    while task.wait() do
-
-        if Settings.AutoFarm then
-
-            pcall(function()
-
-                local Character =
-                    LocalPlayer.Character
-
-                if not Character then
-                    return
-                end
-
-                local HRP =
-                    Character
-                    :FindFirstChild(
-                        "HumanoidRootPart"
+                Storage.Monsters[obj] =
+                    CreateDrawing(
+                        "Monster"
                     )
 
-                local Humanoid =
-                    Character
-                    :FindFirstChild(
-                        "Humanoid"
+            end
+
+            local drawing =
+                Storage.Monsters[obj]
+
+            local HRP =
+                obj.HumanoidRootPart
+
+            local Humanoid =
+                obj
+                :FindFirstChildOfClass(
+                    "Humanoid"
+                )
+
+            local pos, visible =
+                Camera
+                :WorldToViewportPoint(
+                    HRP.Position
+                )
+
+            if visible
+            and (
+                not Humanoid
+                or Humanoid.Health > 0
+            ) then
+
+                local dist =
+                    math.floor(
+                        (
+                            myHRP.Position
+                            -
+                            HRP.Position
+                        ).Magnitude
                     )
 
-                if not HRP
-                or not Humanoid then
-                    return
+                local content =
+                    "[怪物: "
+                    ..
+                    obj.Name
+                    ..
+                    "]"
+
+                if Humanoid
+                and Settings.ShowHealth then
+
+                    content =
+                        content
+                        ..
+                        "\nHP: "
+                        ..
+                        math.floor(
+                            Humanoid.Health
+                        )
+
                 end
 
-                local questData =
-                    GetQuestData()
+                if Settings.ShowDistance then
 
-                if not questData then
-                    return
+                    content =
+                        content
+                        ..
+                        "\nDist: "
+                        ..
+                        dist
+
                 end
 
-                --------------------------------------------------
-                -- CHECK QUEST
-                --------------------------------------------------
-
-                local hasQuest = false
-
-                pcall(function()
-
-                    hasQuest =
-                        LocalPlayer
-                        .PlayerGui
-                        .Main
-                        .Quest
-                        .Visible
-
-                end)
-
-                --------------------------------------------------
-                -- TAKE QUEST
-                --------------------------------------------------
-
-                if not hasQuest then
-
-                    To(
-                        questData.Pos
+                drawing.Position =
+                    Vector2.new(
+                        pos.X,
+                        pos.Y
                     )
 
-                    task.wait(0.5)
+                drawing.Text =
+                    content
 
-                    local Remotes =
-                        ReplicatedStorage
-                        :FindFirstChild(
-                            "Remotes"
-                        )
+                drawing.Size =
+                    Settings.TextSize
 
-                    if Remotes
-                    and Remotes
-                    :FindFirstChild(
-                        "CommF_"
-                    ) then
+                drawing.Visible = true
 
-                        Remotes
-                        .CommF_
-                        :InvokeServer(
-                            "StartQuest",
-                            questData.Quest,
-                            1
-                        )
+            else
 
-                    end
+                drawing.Visible = false
 
-                else
-
-                    --------------------------------------------------
-                    -- KILL MONSTER
-                    --------------------------------------------------
-
-                    local EnemyFolder =
-                        workspace
-                        :FindFirstChild(
-                            "Enemies"
-                        )
-
-                    if not EnemyFolder then
-                        return
-                    end
-
-                    for _, v in pairs(
-                        EnemyFolder:GetChildren()
-                    ) do
-
-                        if v.Name
-                        == questData.Monster
-                        and v:FindFirstChild(
-                            "Humanoid"
-                        )
-                        and v.Humanoid.Health > 0
-                        and v:FindFirstChild(
-                            "HumanoidRootPart"
-                        ) then
-
-                            --------------------------------------------------
-                            -- TELEPORT
-                            --------------------------------------------------
-
-                            HRP.CFrame =
-                                v.HumanoidRootPart
-                                .CFrame
-                                * CFrame.new(
-                                    0,
-                                    Settings.Distance,
-                                    0
-                                )
-                                * CFrame.Angles(
-                                    math.rad(-90),
-                                    0,
-                                    0
-                                )
-
-                            --------------------------------------------------
-                            -- TOOL
-                            --------------------------------------------------
-
-                            local Tool =
-                                LocalPlayer
-                                .Backpack
-                                :FindFirstChild(
-                                    Settings.Weapon
-                                )
-                                or
-                                Character
-                                :FindFirstChild(
-                                    Settings.Weapon
-                                )
-
-                            if Tool then
-
-                                if Tool.Parent
-                                ~= Character then
-
-                                    Humanoid
-                                    :EquipTool(
-                                        Tool
-                                    )
-
-                                end
-
-                                Tool:Activate()
-
-                            end
-
-                            break
-
-                        end
-
-                    end
-
-                end
-
-            end)
+            end
 
         end
 
     end
+
+end
+
+--------------------------------------------------
+-- LOOP
+--------------------------------------------------
+
+RunService.RenderStepped:Connect(function()
+
+    pcall(function()
+
+        UpdatePlayers()
+        UpdateMonsters()
+
+    end)
 
 end)
 
 --------------------------------------------------
--- TOGGLE
+-- TOGGLES
 --------------------------------------------------
 
-MainTab:Toggle({
-    Title = "全自动挂机",
-    Desc = "自动接任务 + 自动刷怪",
+ESPTab:Toggle({
+    Title = "玩家透视",
     Value = false,
 
     Callback = function(state)
 
-        Settings.AutoFarm = state
+        Settings.PlayerESP = state
 
-        if state then
+    end
+})
 
-            WindUI:Notify({
-                Title = "Auto Farm",
-                Content =
-                    "开始自动挂机",
-                Duration = 4
-            })
+ESPTab:Toggle({
+    Title = "怪物透视",
+    Desc = "自动识别非玩家实体",
+    Value = false,
 
-        else
+    Callback = function(state)
 
-            WindUI:Notify({
-                Title = "Auto Farm",
-                Content =
-                    "已关闭自动挂机",
-                Duration = 4
-            })
+        Settings.MonsterESP = state
+
+    end
+})
+
+ESPTab:Toggle({
+    Title = "显示距离",
+    Value = true,
+
+    Callback = function(state)
+
+        Settings.ShowDistance = state
+
+    end
+})
+
+ESPTab:Toggle({
+    Title = "显示血量",
+    Value = true,
+
+    Callback = function(state)
+
+        Settings.ShowHealth = state
+
+    end
+})
+
+--------------------------------------------------
+-- TEXT SIZE
+--------------------------------------------------
+
+ESPTab:Slider({
+    Title = "文字大小",
+
+    Value = {
+        Min = 10,
+        Max = 24,
+        Default = 14
+    },
+
+    Callback = function(v)
+
+        Settings.TextSize = v
+
+    end
+})
+
+--------------------------------------------------
+-- CLEAN
+--------------------------------------------------
+
+ESPTab:Button({
+    Title = "清理所有ESP",
+
+    Callback = function()
+
+        for _, v in pairs(
+            Storage.Players
+        ) do
+
+            pcall(function()
+                v:Remove()
+            end)
 
         end
 
-    end
-})
+        for _, v in pairs(
+            Storage.Monsters
+        ) do
 
---------------------------------------------------
--- WEAPON
---------------------------------------------------
+            pcall(function()
+                v:Remove()
+            end)
 
-MainTab:Dropdown({
-    Title = "攻击武器",
+        end
 
-    Values = {
-        "Melee",
-        "Sword",
-        "Fruit"
-    },
+        Storage = {
+            Players = {},
+            Monsters = {}
+        }
 
-    Value = "Melee",
-
-    Callback = function(v)
-
-        Settings.Weapon = v
-
-    end
-})
-
---------------------------------------------------
--- HEIGHT
---------------------------------------------------
-
-MainTab:Slider({
-    Title = "飞行高度",
-
-    Value = {
-        Min = 5,
-        Max = 15,
-        Default = 7
-    },
-
-    Callback = function(v)
-
-        Settings.Distance = v
-
-    end
-})
-
---------------------------------------------------
--- TWEEN SPEED
---------------------------------------------------
-
-MainTab:Slider({
-    Title = "瞬移速度",
-
-    Value = {
-        Min = 100,
-        Max = 500,
-        Default = 250
-    },
-
-    Callback = function(v)
-
-        Settings.TweenSpeed = v
+        WindUI:Notify({
+            Title = "ESP",
+            Content =
+                "已清理所有绘制",
+            Duration = 4
+        })
 
     end
 })
@@ -455,9 +530,9 @@ MainTab:Slider({
 --------------------------------------------------
 
 WindUI:Notify({
-    Title = "1.en Hub",
+    Title = "ESP Hub",
     Content =
-        "Blox Fruit 加载成功",
+        "视觉增强加载成功",
     Duration = 5
 })
 
