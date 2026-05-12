@@ -5,11 +5,11 @@ end)
 repeat task.wait() until game:IsLoaded()
 
 --------------------------------------------------
--- LOAD WIND UI
+-- LOAD UI
 --------------------------------------------------
 
 local WindUI = loadstring(game:HttpGet(
-"https://tree-hub.vercel.app/api/UI/WindUI"
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
 
 --------------------------------------------------
@@ -28,28 +28,29 @@ local Camera = workspace.CurrentCamera
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
-    Icon = "ghost",
+    Icon = "rbxassetid://7733960981",
     Author = "by 1.en",
     Folder = "1enHub",
     Size = UDim2.fromOffset(600,400),
     Transparent = true,
     Theme = "Dark",
-    SideBarWidth = 180
+    SideBarWidth = 180,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
 })
 
 --------------------------------------------------
--- TABS
+-- TAB
 --------------------------------------------------
 
-local MainTab = Window:CreateTab(
-    "Main",
-    "home"
-)
-
-local VisualTab = Window:CreateTab(
-    "视觉透视",
-    "eye"
-)
+local VisualTab = Window:Tab({
+    Title = "视觉透视",
+    Icon = "eye"
+})
 
 --------------------------------------------------
 -- VARIABLES
@@ -64,10 +65,10 @@ local ESP_Storage = {
 }
 
 --------------------------------------------------
--- CREATE DRAWING
+-- DRAWING
 --------------------------------------------------
 
-local function CreateDrawingText()
+local function CreateDrawing()
 
     local text = Drawing.new("Text")
 
@@ -76,7 +77,6 @@ local function CreateDrawingText()
     text.Outline = true
     text.Font = 2
     text.Size = 14
-    text.Color = Color3.new(1,1,1)
 
     return text
 
@@ -86,20 +86,18 @@ end
 -- PLAYER ESP
 --------------------------------------------------
 
-local function HandlePlayerESP()
+local function UpdatePlayers()
 
     for _, player in pairs(Players:GetPlayers()) do
 
         if player ~= LocalPlayer then
 
             if not ESP_Storage.Players[player] then
-
                 ESP_Storage.Players[player] =
-                    CreateDrawingText()
-
+                    CreateDrawing()
             end
 
-            local drawing =
+            local draw =
                 ESP_Storage.Players[player]
 
             local char = player.Character
@@ -123,46 +121,46 @@ local function HandlePlayerESP()
             and hrp
             and myHRP then
 
-                local pos, onScreen =
+                local pos, visible =
                     Camera:WorldToViewportPoint(
                         hrp.Position
                     )
 
-                if onScreen then
+                if visible then
 
                     local dist = math.floor(
                         (myHRP.Position
                         - hrp.Position).Magnitude
                     )
 
-                    drawing.Position =
+                    draw.Position =
                         Vector2.new(pos.X, pos.Y)
 
-                    drawing.Text =
-                        string.format(
-                            "[%s]\n%d 距离",
-                            player.DisplayName,
-                            dist
-                        )
+                    draw.Text =
+                        "[" ..
+                        player.DisplayName ..
+                        "]\n" ..
+                        dist ..
+                        " 距离"
 
-                    drawing.Color =
+                    draw.Color =
                         Color3.fromRGB(
                             0,
                             255,
                             140
                         )
 
-                    drawing.Visible = true
+                    draw.Visible = true
 
                 else
 
-                    drawing.Visible = false
+                    draw.Visible = false
 
                 end
 
             else
 
-                drawing.Visible = false
+                draw.Visible = false
 
             end
 
@@ -176,94 +174,89 @@ end
 -- MONSTER ESP
 --------------------------------------------------
 
-local function HandleMonsterESP()
+local function UpdateMonsters()
 
-    if MonsterESPEnabled then
+    if not MonsterESPEnabled then
 
-        for _, obj in pairs(workspace:GetChildren()) do
+        for _, draw in pairs(
+            ESP_Storage.Monsters
+        ) do
 
-            if obj:IsA("Model")
-            and not Players:GetPlayerFromCharacter(obj)
-            and obj:FindFirstChild(
-                "HumanoidRootPart"
-            ) then
+            draw.Visible = false
 
-                if not ESP_Storage.Monsters[obj] then
+        end
 
-                    ESP_Storage.Monsters[obj] =
-                        CreateDrawingText()
+        return
+    end
 
-                end
+    for _, obj in pairs(workspace:GetChildren()) do
 
-                local drawing =
-                    ESP_Storage.Monsters[obj]
+        if obj:IsA("Model")
+        and not Players:GetPlayerFromCharacter(obj)
+        and obj:FindFirstChild(
+            "HumanoidRootPart"
+        ) then
 
-                local hrp =
-                    obj.HumanoidRootPart
+            if not ESP_Storage.Monsters[obj] then
 
-                local myChar =
-                    LocalPlayer.Character
+                ESP_Storage.Monsters[obj] =
+                    CreateDrawing()
 
-                local myHRP =
-                    myChar and
-                    myChar:FindFirstChild(
-                        "HumanoidRootPart"
+            end
+
+            local draw =
+                ESP_Storage.Monsters[obj]
+
+            local hrp =
+                obj.HumanoidRootPart
+
+            local myChar =
+                LocalPlayer.Character
+
+            local myHRP =
+                myChar and
+                myChar:FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            if myHRP then
+
+                local pos, visible =
+                    Camera:WorldToViewportPoint(
+                        hrp.Position
                     )
 
-                if myHRP then
+                if visible then
 
-                    local pos, onScreen =
-                        Camera:WorldToViewportPoint(
-                            hrp.Position
+                    local dist = math.floor(
+                        (myHRP.Position
+                        - hrp.Position).Magnitude
+                    )
+
+                    draw.Position =
+                        Vector2.new(pos.X, pos.Y)
+
+                    draw.Text =
+                        "[怪物]\n" ..
+                        dist ..
+                        " 距离"
+
+                    draw.Color =
+                        Color3.fromRGB(
+                            255,
+                            50,
+                            50
                         )
 
-                    if onScreen then
+                    draw.Visible = true
 
-                        local dist = math.floor(
-                            (myHRP.Position
-                            - hrp.Position).Magnitude
-                        )
+                else
 
-                        drawing.Position =
-                            Vector2.new(
-                                pos.X,
-                                pos.Y
-                            )
-
-                        drawing.Text =
-                            string.format(
-                                "[怪物/实体]\n%d 距离",
-                                dist
-                            )
-
-                        drawing.Color =
-                            Color3.fromRGB(
-                                255,
-                                50,
-                                50
-                            )
-
-                        drawing.Visible = true
-
-                    else
-
-                        drawing.Visible = false
-
-                    end
+                    draw.Visible = false
 
                 end
 
             end
-
-        end
-
-    else
-
-        for _, drawing in pairs(
-            ESP_Storage.Monsters
-        ) do
-
-            drawing.Visible = false
 
         end
 
@@ -272,51 +265,35 @@ local function HandleMonsterESP()
 end
 
 --------------------------------------------------
--- RENDER LOOP
+-- LOOP
 --------------------------------------------------
 
 RunService.RenderStepped:Connect(function()
 
     pcall(function()
 
-        HandlePlayerESP()
-        HandleMonsterESP()
+        UpdatePlayers()
+        UpdateMonsters()
 
     end)
 
 end)
 
 --------------------------------------------------
--- PLAYER ESP TOGGLE
+-- TOGGLES
 --------------------------------------------------
 
-VisualTab:AddToggle({
-    Title = "透视玩家",
-    Desc = "显示其他玩家及距离",
+VisualTab:Toggle({
+    Title = "玩家透视",
     Value = false,
 
     Callback = function(state)
-
         PlayerESPEnabled = state
-
-        WindUI:Notify({
-            Title = "玩家 ESP",
-            Content = state
-                and "已开启"
-                or "已关闭",
-            Type = "Info"
-        })
-
     end
 })
 
---------------------------------------------------
--- MONSTER ESP TOGGLE
---------------------------------------------------
-
-VisualTab:AddToggle({
-    Title = "透视怪物",
-    Desc = "自动识别怪物实体",
+VisualTab:Toggle({
+    Title = "怪物透视",
     Value = false,
 
     Callback = function(state)
@@ -326,20 +303,10 @@ VisualTab:AddToggle({
         if state then
 
             WindUI:Notify({
-                Title = "扫描中",
-                Content = "正在识别场景中的怪物...",
-                Type = "Info"
+                Title = "ESP",
+                Content = "正在扫描怪物...",
+                Duration = 3
             })
-
-        else
-
-            for _, drawing in pairs(
-                ESP_Storage.Monsters
-            ) do
-
-                drawing.Visible = false
-
-            end
 
         end
 
@@ -350,6 +317,4 @@ VisualTab:AddToggle({
 -- KEYBIND
 --------------------------------------------------
 
-Window:SetToggleKey(
-    Enum.KeyCode.RightControl
-)
+Window:SetToggleKey(Enum.KeyCode.RightControl)
