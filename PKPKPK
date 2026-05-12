@@ -1,0 +1,120 @@
+
+local WindUI = loadstring(request({
+    Url = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
+}).Body)()
+
+local Window = WindUI:CreateWindow({
+    Title = "自动加入",
+    Icon = "rbxassetid://10888331510",
+    Theme = "Dark",
+    Size = UDim2.fromOffset(500, 400),
+    Transparent = true
+})
+
+local Tab = Window:Tab({
+    Title = "主要",
+    Icon = "rbxassetid://10888331510"
+})
+
+local TimeInfo = Tab:Paragraph({
+    Title = "当前北京时间",
+    Desc = "加载中..."
+})
+
+local AutoJoin = false
+local TargetCrewID = nil
+
+local timeOptions = {}
+local currentUtcTime = os.time()
+local beijingTimeSec = currentUtcTime + 8 * 3600
+local baseTime = beijingTimeSec - (beijingTimeSec % 60) -- 取整到当前分钟的0秒
+
+for i = 1, 60 do 
+    local futureTime = baseTime + (i * 60)
+    table.insert(timeOptions, os.date("!%H:%M:00", futureTime))
+end
+
+local TargetTime = timeOptions[1] or "12:00:00"
+
+task.spawn(function()
+    while task.wait(1) do
+        local utcTime = os.time()
+        local beijingTime = os.date("!%Y-%m-%d %H:%M:%S", utcTime + 8 * 3600)
+        TimeInfo:SetDesc("当前时间: " .. beijingTime)
+    end
+end)
+
+Tab:Dropdown({
+    Title = "选择触发时间",
+    Values = timeOptions,
+    Value = TargetTime,
+    Callback = function(Value)
+        TargetTime = Value
+    end
+})
+
+Tab:Input({
+    Title = "自定义船员ID (CrewID)",
+    PlaceholderText = "请输入你要加入的 CrewID",
+    Callback = function(Text)
+        if Text and Text ~= "" then
+            TargetCrewID = Text
+            WindUI:Notify({
+                Title = "CrewID 已更新",
+                Content = "目标 CrewID 设置为: " .. TargetCrewID,
+                Duration = 3
+            })
+        end
+    end
+})
+
+local ToggleSwitch = Tab:Toggle({
+    Title = "开启自动加入",
+    Value = AutoJoin,
+    Callback = function(Value)
+        AutoJoin = Value
+    end
+})
+
+task.spawn(function()
+    while task.wait(1) do
+        if AutoJoin then
+            local utcTime = os.time()
+            local currentHourMin = os.date("!%H:%M", utcTime + 8 * 3600)
+            local targetHourMin = string.sub(TargetTime, 1, 5) -- 提取前五位，即 HH:MM
+            
+            if currentHourMin == targetHourMin then
+                if not TargetCrewID or TargetCrewID == "" then
+                    WindUI:Notify({
+                        Title = "加入失败",
+                        Content = "未设置 CrewID，请先输入 CrewID！",
+                        Duration = 5
+                    })
+                    AutoJoin = false
+                    ToggleSwitch:SetValue(false)
+                    continue
+                end
+                
+                local args = {
+                    "Join",
+                    {
+                        CrewID = TargetCrewID
+                    }
+                }
+                
+                pcall(function()
+                    game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Crew"):InvokeServer(unpack(args))
+                end)
+                
+                AutoJoin = false
+                ToggleSwitch:SetValue(false)
+                
+                WindUI:Notify({
+                    Title = "自动加入船员",
+                    Content = "时间已到，已发送加入船员请求！",
+                    Duration = 5
+                })
+            end
+        end
+    end
+end)
