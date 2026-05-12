@@ -57,18 +57,13 @@ local Window = WindUI:CreateWindow({
 })
 
 --------------------------------------------------
--- TABS
+-- TAB
 --------------------------------------------------
 
 local Tabs = {
     Main = Window:Tab({
         Title = "Main",
         Icon = "home"
-    }),
-
-    ESP = Window:Tab({
-        Title = "ESP",
-        Icon = "eye"
     })
 }
 
@@ -265,7 +260,7 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- ANTI VOID
+-- ANTI ONE SHOT / ANTI VOID
 --------------------------------------------------
 
 Tabs.Main:Toggle({
@@ -274,6 +269,7 @@ Tabs.Main:Toggle({
 
     Callback = function(state)
         AntiOneShot = state
+        print("Anti One Shot:", state)
     end
 })
 
@@ -295,6 +291,7 @@ task.spawn(function()
                     return
                 end
 
+                -- 防止被打進地下 / 虛空
                 if HRP.Position.Y <= -500 then
 
                     HRP.CFrame = CFrame.new(
@@ -312,152 +309,6 @@ task.spawn(function()
     end
 
 end)
-
---------------------------------------------------
--- ESP
---------------------------------------------------
-
-local ESPEnabled = false
-local ESP_Objects = {}
-
-local function CreateESP(player)
-
-    if player == LocalPlayer then
-        return
-    end
-
-    local text = Drawing.new("Text")
-
-    text.Visible = false
-    text.Center = true
-    text.Outline = true
-    text.Font = 2
-    text.Size = 13
-    text.Color = Color3.fromRGB(255,255,255)
-
-    ESP_Objects[player] = text
-
-end
-
-local function RemoveESP(player)
-
-    if ESP_Objects[player] then
-
-        ESP_Objects[player]:Remove()
-        ESP_Objects[player] = nil
-
-    end
-
-end
-
-RunService.RenderStepped:Connect(function()
-
-    if not ESPEnabled then
-
-        for _, text in pairs(ESP_Objects) do
-            text.Visible = false
-        end
-
-        return
-    end
-
-    for player, text in pairs(ESP_Objects) do
-
-        if player.Character
-        and player.Character:FindFirstChild("HumanoidRootPart")
-        and player.Character:FindFirstChild("Humanoid") then
-
-            local hrp =
-                player.Character.HumanoidRootPart
-
-            local humanoid =
-                player.Character.Humanoid
-
-            local pos, onScreen =
-                workspace.CurrentCamera
-                :WorldToViewportPoint(hrp.Position)
-
-            if onScreen then
-
-                local myHRP =
-                    LocalPlayer.Character
-                    and LocalPlayer.Character
-                    :FindFirstChild("HumanoidRootPart")
-
-                if myHRP then
-
-                    local distance = math.floor(
-                        (myHRP.Position - hrp.Position)
-                        .Magnitude
-                    )
-
-                    local health =
-                        math.floor(humanoid.Health)
-
-                    text.Position =
-                        Vector2.new(pos.X, pos.Y)
-
-                    text.Text =
-                        string.format(
-                            "[%s]\n%d HP | %d Studs",
-                            player.DisplayName,
-                            health,
-                            distance
-                        )
-
-                    text.Color =
-                        distance < 50
-                        and Color3.fromRGB(255,0,0)
-                        or Color3.fromRGB(255,255,255)
-
-                    text.Visible = true
-
-                end
-
-            else
-
-                text.Visible = false
-
-            end
-
-        else
-
-            text.Visible = false
-
-        end
-
-    end
-
-end)
-
-for _, player in pairs(Players:GetPlayers()) do
-    CreateESP(player)
-end
-
-Players.PlayerAdded:Connect(CreateESP)
-Players.PlayerRemoving:Connect(RemoveESP)
-
-Tabs.ESP:Toggle({
-    Title = "玩家透视 (ESP)",
-    Desc = "显示名字、血量和距离",
-    Value = false,
-
-    Callback = function(state)
-
-        ESPEnabled = state
-
-        if state then
-
-            WindUI:Notify({
-                Title = "ESP 已启用",
-                Content = "正在扫描场景中的玩家...",
-                Duration = 3
-            })
-
-        end
-
-    end
-})
 
 --------------------------------------------------
 -- KEYBIND
