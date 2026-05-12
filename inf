@@ -27,7 +27,6 @@ local LocalPlayer = Players.LocalPlayer
 --------------------------------------------------
 
 local AutoV4 = false
-local BusoEnabled = false
 
 local AutoV3 = {
     Enabled = false
@@ -206,6 +205,9 @@ Tabs.Main:Toggle({
 -- AUTO BUSO
 --------------------------------------------------
 
+local BusoEnabled = false
+local Player = game.Players.LocalPlayer
+
 Tabs.Main:Toggle({
     Title = "Auto Buso",
     Value = false,
@@ -216,28 +218,41 @@ Tabs.Main:Toggle({
     end
 })
 
-task.spawn(function()
+local function ToggleBuso()
 
-    while task.wait(1) do
+    if BusoEnabled then
 
-        if BusoEnabled then
+        local Character = Player.Character
+        if not Character then
+            return
+        end
 
-            pcall(function()
+        if not Character:FindFirstChild("HasBuso") then
 
-                local Remotes =
-                    ReplicatedStorage:FindFirstChild("Remotes")
+            local remote =
+                game:GetService("ReplicatedStorage")
+                :WaitForChild("Remotes")
+                :FindFirstChild("CommF_")
 
-                if Remotes and Remotes:FindFirstChild("CommF_") then
-
-                    Remotes.CommF_:InvokeServer(
-                        "Buso"
-                    )
-
-                end
-
-            end)
+            if remote then
+                remote:InvokeServer("Buso")
+            end
 
         end
+
+    end
+
+end
+
+task.spawn(function()
+
+    while true do
+
+        if BusoEnabled then
+            pcall(ToggleBuso)
+        end
+
+        task.wait(1)
 
     end
 
