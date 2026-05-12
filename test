@@ -9,7 +9,7 @@ repeat task.wait() until game:IsLoaded()
 --------------------------------------------------
 
 local WindUI = loadstring(game:HttpGet(
-"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+"https://tree-hub.vercel.app/api/UI/WindUI"
 ))()
 
 --------------------------------------------------
@@ -42,53 +42,30 @@ local autoV4Connection = nil
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
-    Icon = "rbxassetid://7733960981",
+    Icon = "home",
     Author = "by 1.en",
-    Folder = "1enHub",
-    Size = UDim2.fromOffset(600,430),
-    Transparent = true,
-    Theme = "Dark",
-    SideBarWidth = 180,
-
-    OpenButton = {
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false
-    }
+    Folder = "1enHub"
 })
 
 --------------------------------------------------
 -- TABS
 --------------------------------------------------
 
-local Tabs = {
-    Main = Window:Tab({
-        Title = "Main",
-        Icon = "home"
-    }),
-
-    ESP = Window:Tab({
-        Title = "ESP",
-        Icon = "eye"
-    }),
-
-    Player = Window:Tab({
-        Title = "Player",
-        Icon = "users"
-    })
-}
+local MainTab = Window:CreateTab("Main", "home")
+local ESPTab = Window:CreateTab("ESP", "eye")
+local PlayerTab = Window:CreateTab("Player", "users")
 
 --------------------------------------------------
 -- BUTTON
 --------------------------------------------------
 
-Tabs.Main:Button({
+MainTab:AddButton({
     Title = "触发功能",
     Desc = "点击触发",
 
     Callback = function()
 
-        local char = game.Players.LocalPlayer.Character
+        local char = LocalPlayer.Character
         if not char then return end
 
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -96,7 +73,7 @@ Tabs.Main:Button({
 
         hrp.CFrame = CFrame.new(
             hrp.Position.X,
-            hrp.Position.Y + 795679695796326795679695796326,
+            hrp.Position.Y + 5000,
             hrp.Position.Z
         )
 
@@ -118,7 +95,8 @@ local function StartAutoV3()
                 local Remotes =
                     ReplicatedStorage:FindFirstChild("Remotes")
 
-                if Remotes and Remotes:FindFirstChild("CommE") then
+                if Remotes
+                and Remotes:FindFirstChild("CommE") then
 
                     Remotes.CommE:FireServer(
                         "ActivateAbility"
@@ -136,11 +114,7 @@ local function StartAutoV3()
 
 end
 
-local function StopAutoV3()
-    AutoV3.Enabled = false
-end
-
-Tabs.Main:Toggle({ 
+MainTab:AddToggle({
     Title = "Auto V3",
     Value = false,
 
@@ -150,8 +124,6 @@ Tabs.Main:Toggle({
 
         if state then
             StartAutoV3()
-        else
-            StopAutoV3()
         end
 
     end
@@ -179,7 +151,8 @@ local function startV4Loop()
             local Remotes =
                 ReplicatedStorage:FindFirstChild("Remotes")
 
-            if Remotes and Remotes:FindFirstChild("CommF_") then
+            if Remotes
+            and Remotes:FindFirstChild("CommF_") then
 
                 Remotes.CommF_:InvokeServer(
                     "ActivateRace"
@@ -193,21 +166,25 @@ local function startV4Loop()
 
 end
 
-Tabs.Main:Toggle({ 
-    Title = "Auto V4", 
+MainTab:AddToggle({
+    Title = "Auto V4",
     Value = false,
 
     Callback = function(state)
 
         AutoV4 = state
 
-        if AutoV4 then
+        if state then
+
             startV4Loop()
+
         else
+
             if autoV4Connection then
                 autoV4Connection:Disconnect()
                 autoV4Connection = nil
             end
+
         end
 
     end
@@ -218,9 +195,8 @@ Tabs.Main:Toggle({
 --------------------------------------------------
 
 local BusoEnabled = false
-local Player = game.Players.LocalPlayer
 
-Tabs.Main:Toggle({
+MainTab:AddToggle({
     Title = "Auto Buso",
     Value = false,
 
@@ -233,7 +209,7 @@ local function ToggleBuso()
 
     if BusoEnabled then
 
-        local Character = Player.Character
+        local Character = LocalPlayer.Character
         if not Character then
             return
         end
@@ -241,7 +217,7 @@ local function ToggleBuso()
         if not Character:FindFirstChild("HasBuso") then
 
             local remote =
-                game:GetService("ReplicatedStorage")
+                ReplicatedStorage
                 :WaitForChild("Remotes")
                 :FindFirstChild("CommF_")
 
@@ -273,7 +249,7 @@ end)
 -- ANTI VOID
 --------------------------------------------------
 
-Tabs.Main:Toggle({
+MainTab:AddToggle({
     Title = "Anti One Shot",
     Value = false,
 
@@ -294,7 +270,9 @@ task.spawn(function()
                 if not Character then return end
 
                 local HRP =
-                    Character:FindFirstChild("HumanoidRootPart")
+                    Character:FindFirstChild(
+                        "HumanoidRootPart"
+                    )
 
                 if not HRP then
                     return
@@ -369,8 +347,12 @@ RunService.RenderStepped:Connect(function()
     for player, text in pairs(ESP_Objects) do
 
         if player.Character
-        and player.Character:FindFirstChild("HumanoidRootPart")
-        and player.Character:FindFirstChild("Humanoid") then
+        and player.Character:FindFirstChild(
+            "HumanoidRootPart"
+        )
+        and player.Character:FindFirstChild(
+            "Humanoid"
+        ) then
 
             local hrp =
                 player.Character.HumanoidRootPart
@@ -379,21 +361,24 @@ RunService.RenderStepped:Connect(function()
                 player.Character.Humanoid
 
             local pos, onScreen =
-                workspace.CurrentCamera
-                :WorldToViewportPoint(hrp.Position)
+                Camera:WorldToViewportPoint(
+                    hrp.Position
+                )
 
             if onScreen then
 
                 local myHRP =
                     LocalPlayer.Character
                     and LocalPlayer.Character
-                    :FindFirstChild("HumanoidRootPart")
+                    :FindFirstChild(
+                        "HumanoidRootPart"
+                    )
 
                 if myHRP then
 
                     local distance = math.floor(
-                        (myHRP.Position - hrp.Position)
-                        .Magnitude
+                        (myHRP.Position
+                        - hrp.Position).Magnitude
                     )
 
                     local health =
@@ -409,11 +394,6 @@ RunService.RenderStepped:Connect(function()
                             health,
                             distance
                         )
-
-                    text.Color =
-                        distance < 50
-                        and Color3.fromRGB(255,0,0)
-                        or Color3.fromRGB(255,255,255)
 
                     text.Visible = true
 
@@ -435,14 +415,16 @@ RunService.RenderStepped:Connect(function()
 
 end)
 
-for _, player in pairs(Players:GetPlayers()) do
+for _, player in pairs(
+    Players:GetPlayers()
+) do
     CreateESP(player)
 end
 
 Players.PlayerAdded:Connect(CreateESP)
 Players.PlayerRemoving:Connect(RemoveESP)
 
-Tabs.ESP:Toggle({
+ESPTab:AddToggle({
     Title = "玩家透视 (ESP)",
     Desc = "显示名字、血量和距离",
     Value = false,
@@ -455,8 +437,7 @@ Tabs.ESP:Toggle({
 
             WindUI:Notify({
                 Title = "ESP 已启用",
-                Content = "正在扫描场景中的玩家...",
-                Duration = 3
+                Content = "正在扫描玩家"
             })
 
         end
@@ -475,7 +456,9 @@ local function GetPlayerList()
 
     local list = {}
 
-    for _, player in pairs(Players:GetPlayers()) do
+    for _, player in pairs(
+        Players:GetPlayers()
+    ) do
 
         if player ~= LocalPlayer then
             table.insert(list, player.Name)
@@ -487,23 +470,30 @@ local function GetPlayerList()
 
 end
 
-local PlayerDropdown = Tabs.Player:Dropdown({
+local PlayerDropdown =
+    PlayerTab:AddDropdown({
+
     Title = "选择目标玩家",
-    Values = GetPlayerList(),
-    Value = nil,
+    Desc = "选择观看目标",
+    Multi = false,
+    Options = GetPlayerList(),
 
     Callback = function(value)
 
         SelectedPlayerName = value
 
-        if IsSpectating and SelectedPlayerName then
+        if IsSpectating
+        and SelectedPlayerName then
 
             local target =
-                Players:FindFirstChild(SelectedPlayerName)
+                Players:FindFirstChild(
+                    SelectedPlayerName
+                )
 
             if target
             and target.Character
-            and target.Character:FindFirstChild("Humanoid") then
+            and target.Character
+                :FindFirstChild("Humanoid") then
 
                 Camera.CameraSubject =
                     target.Character.Humanoid
@@ -515,24 +505,26 @@ local PlayerDropdown = Tabs.Player:Dropdown({
     end
 })
 
-Tabs.Player:Button({
+PlayerTab:AddButton({
     Title = "刷新玩家列表",
     Desc = "更新在线玩家",
 
     Callback = function()
 
-        PlayerDropdown:Refresh(GetPlayerList())
+        PlayerDropdown:Refresh(
+            GetPlayerList(),
+            true
+        )
 
         WindUI:Notify({
-            Title = "列表已更新",
-            Content = "已重新获取房间玩家名单",
-            Duration = 3
+            Title = "刷新成功",
+            Content = "玩家列表已更新"
         })
 
     end
 })
 
-Tabs.Player:Toggle({
+PlayerTab:AddToggle({
     Title = "观看视角",
     Desc = "锁定目标玩家视角",
     Value = false,
@@ -541,7 +533,7 @@ Tabs.Player:Toggle({
 
         IsSpectating = state
 
-        if IsSpectating then
+        if state then
 
             if SelectedPlayerName then
 
@@ -559,48 +551,29 @@ Tabs.Player:Toggle({
                         target.Character.Humanoid
 
                     WindUI:Notify({
-                        Title = "视角切换",
-                        Content = "正在观看: "
-                            .. SelectedPlayerName,
-                        Duration = 3
-                    })
-
-                else
-
-                    WindUI:Notify({
-                        Title = "错误",
-                        Content = "无法找到玩家",
-                        Duration = 3
+                        Title = "观看玩家",
+                        Content =
+                            SelectedPlayerName
                     })
 
                 end
-
-            else
-
-                WindUI:Notify({
-                    Title = "提示",
-                    Content = "请先选择玩家",
-                    Duration = 3
-                })
 
             end
 
         else
 
-            local char = LocalPlayer.Character
+            local char =
+                LocalPlayer.Character
 
-            if char and char:FindFirstChild("Humanoid") then
+            if char
+            and char:FindFirstChild(
+                "Humanoid"
+            ) then
 
                 Camera.CameraSubject =
                     char.Humanoid
 
             end
-
-            WindUI:Notify({
-                Title = "视角恢复",
-                Content = "已返回自己的视角",
-                Duration = 3
-            })
 
         end
 
@@ -609,34 +582,27 @@ Tabs.Player:Toggle({
 
 Players.PlayerRemoving:Connect(function(player)
 
-    if player.Name == SelectedPlayerName
-    and IsSpectating then
+    PlayerDropdown:Refresh(
+        GetPlayerList(),
+        true
+    )
 
-        local char = LocalPlayer.Character
+    if player.Name
+    == SelectedPlayerName then
 
-        if char and char:FindFirstChild("Humanoid") then
+        local char =
+            LocalPlayer.Character
+
+        if char
+        and char:FindFirstChild(
+            "Humanoid"
+        ) then
 
             Camera.CameraSubject =
                 char.Humanoid
 
         end
 
-        IsSpectating = false
-
-        WindUI:Notify({
-            Title = "目标已离开",
-            Content = "已恢复自己的视角",
-            Duration = 3
-        })
-
     end
 
-    PlayerDropdown:Refresh(GetPlayerList())
-
 end)
-
---------------------------------------------------
--- KEYBIND
---------------------------------------------------
-
-Window:SetToggleKey(Enum.KeyCode.RightControl)
