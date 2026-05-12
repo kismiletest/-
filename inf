@@ -1,0 +1,83 @@
+pcall(function()
+    game.CoreGui:FindFirstChild("WindUI"):Destroy()
+end)
+
+repeat task.wait() until game:IsLoaded()
+
+--------------------------------------------------
+-- WIND UI
+--------------------------------------------------
+
+local WindUI = loadstring(game:HttpGet(
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+))()
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
+
+local Window = WindUI:CreateWindow({
+    Title = "1.en Hub",
+    Icon = "rbxassetid://7733960981",
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(600,430),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 180,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
+})
+
+--------------------------------------------------
+-- TAB
+--------------------------------------------------
+
+local Tabs = {
+    Main = Window:Tab({
+        Title = "Main",
+        Icon = "home"
+    })
+}
+
+--------------------------------------------------
+-- BUTTON
+--------------------------------------------------
+
+Tabs.Main:Button({
+    Title = "超级升空",
+    Desc = "点击后直接飞上天空",
+
+    Callback = function()
+
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        hrp.CFrame = CFrame.new(
+            hrp.Position.X,
+            hrp.Position.Y + 999999,
+            hrp.Position.Z
+        )
+
+    end
+})
+
+--------------------------------------------------
+-- KEYBIND
+--------------------------------------------------
+
+Window:SetToggleKey(Enum.KeyCode.RightControl)
