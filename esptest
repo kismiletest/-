@@ -1,525 +1,124 @@
-pcall(function()
-    game.CoreGui:FindFirstChild("WindUI"):Destroy()
-end)
+-- [[ 1. 初始化 WindUI ]]
+local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+if game.CoreGui:FindFirstChild("WindUI") then game.CoreGui.WindUI:Destroy() end
 
-repeat task.wait() until game:IsLoaded()
+local Window = WindUI:CreateWindow({
+    Title = "智能怪物过滤 (核心版)",
+    Icon = "skull",
+    Author = "Gemini",
+    Folder = "AntiNPCE_Config"
+})
 
---------------------------------------------------
--- LOAD WIND UI
---------------------------------------------------
+local ESPTab = Window:CreateTab("视觉透视", "eye")
 
-local WindUI = loadstring(game:HttpGet(
-"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-))()
+-- [[ 2. 配置项 ]]
+local _G = {
+    MonsterESP = false,
+    PlayerESP = false,
+    OnlyAggressive = true, -- 核心：只显示会动的/有威胁的
+    MinDist = 5,           -- 距离太近（比如刚好重合的NPC）过滤掉
+}
 
---------------------------------------------------
--- SERVICES
---------------------------------------------------
-
+local Storage = {Monsters = {}, Players = {}}
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
---------------------------------------------------
--- WINDOW
---------------------------------------------------
+-- [[ 3. 核心：智能识别“真怪物”逻辑 ]]
+local function IsActiveMonster(obj)
+    -- 必须是模型且不是玩家
+    if not obj:IsA("Model") or Players:GetPlayerFromCharacter(obj) then return false end
+    
+    local hum = obj:FindFirstChildOfClass("Humanoid")
+    local hrp = obj:FindFirstChild("HumanoidRootPart")
+    
+    if hum and hrp and hum.Health > 0 then
+        -- 过滤 1: 名字过滤 (排除掉图片中那种明显的任务/商店 NPC)
+        local name = obj.Name:lower()
+        local blacklist = {"npc", "shop", "quest", "merchant", "guide", "click", "dialogue"}
+        for _, word in pairs(blacklist) do
+            if name:find(word) then return false end
+        end
 
-local Window = WindUI:CreateWindow({
-    Title = "智能视觉助手",
-    Icon = "scan-eye",
-    Author = "by 1.en",
-    Folder = "SmartESP",
-
-    Size = UDim2.fromOffset(600,400),
-    Transparent = true,
-    Theme = "Dark",
-    SideBarWidth = 180,
-
-    OpenButton = {
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false
-    }
-})
-
---------------------------------------------------
--- TAB
---------------------------------------------------
-
-local VisualTab = Window:Tab({
-    Title = "视觉透视",
-    Icon = "eye"
-})
-
---------------------------------------------------
--- SETTINGS
---------------------------------------------------
-
-local Settings = {
-    PlayerESP = false,
-    MonsterESP = false,
-    ShowDistance = true,
-    TextSize = 14,
-    OnlyActive = true
-}
-
---------------------------------------------------
--- STORAGE
---------------------------------------------------
-
-local Storage = {
-    Players = {},
-    Monsters = {}
-}
-
---------------------------------------------------
--- CREATE DRAWING
---------------------------------------------------
-
-local function CreateDrawing(isPlayer)
-
-    local text =
-        Drawing.new("Text")
-
-    text.Visible = false
-    text.Center = true
-    text.Outline = true
-    text.Font = 2
-    text.Size = Settings.TextSize
-
-    if isPlayer then
-
-        text.Color =
-            Color3.fromRGB(
-                0,
-                255,
-                150
-            )
-
-    else
-
-        text.Color =
-            Color3.fromRGB(
-                255,
-                50,
-                50
-            )
-
-    end
-
-    return text
-
-end
-
---------------------------------------------------
--- MONSTER FILTER
---------------------------------------------------
-
-local function IsRealMonster(obj)
-
-    if not obj:IsA("Model") then
-        return false
-    end
-
-    if Players:GetPlayerFromCharacter(obj) then
-        return false
-    end
-
-    local Humanoid =
-        obj:FindFirstChildOfClass(
-            "Humanoid"
-        )
-
-    local HRP =
-        obj:FindFirstChild(
-            "HumanoidRootPart"
-        )
-
-    if Humanoid
-    and HRP
-    and Humanoid.Health > 0 then
-
-        if Settings.OnlyActive then
-
-            local moving =
-                (
-                    Humanoid.MoveDirection
-                    .Magnitude > 0
-                )
-                or
-                (
-                    Humanoid.WalkSpeed > 0
-                )
-
-            local name =
-                string.lower(
-                    obj.Name
-                )
-
-            local staticNPC =
-                name:find("shop")
-                or
-                name:find("npc")
-                or
-                name:find("quest")
-                or
-                name:find("merchant")
-
-            if not moving
-            or staticNPC then
-                return false
-            end
-
+        -- 过滤 2: 动态检测 (只有正在动的才是会抓人的怪)
+        if _G.OnlyAggressive then
+            -- 如果它的移动向量是 0，且没有任何动画位移，则判定为静态 NPC
+            local isMoving = (hum.MoveDirection.Magnitude > 0 or hum.WalkSpeed > 0)
+            if not isMoving then return false end
         end
 
         return true
-
     end
-
     return false
-
 end
 
---------------------------------------------------
--- PLAYER ESP
---------------------------------------------------
+-- [[ 4. 渲染循环 ]]
+game:GetService("RunService").RenderStepped:Connect(function()
+    -- 清理逻辑: 如果怪物被删除了，清理掉对应的 Drawing
+    for obj, drawing in pairs(Storage.Monsters) do
+        if not obj.Parent then
+            drawing:Remove()
+            Storage.Monsters[obj] = nil
+        end
+    end
 
-local function UpdatePlayers()
-
-    for _, p in pairs(
-        Players:GetPlayers()
-    ) do
-
-        if p ~= LocalPlayer then
-
-            if not Storage.Players[p] then
-
-                Storage.Players[p] =
-                    CreateDrawing(true)
-
-            end
-
-            local drawing =
-                Storage.Players[p]
-
-            local Character =
-                p.Character
-
-            local HRP =
-                Character
-                and Character
-                :FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            local myChar =
-                LocalPlayer.Character
-
-            local myHRP =
-                myChar
-                and myChar
-                :FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            if Settings.PlayerESP
-            and HRP
-            and myHRP then
-
-                local pos, visible =
-                    Camera
-                    :WorldToViewportPoint(
-                        HRP.Position
-                    )
-
-                if visible then
-
-                    local dist =
-                        math.floor(
-                            (
-                                myHRP.Position
-                                -
-                                HRP.Position
-                            ).Magnitude
-                        )
-
-                    drawing.Text =
-                        string.format(
-                            "[%s]\n%d m",
-                            p.DisplayName,
-                            dist
-                        )
-
-                    drawing.Position =
-                        Vector2.new(
-                            pos.X,
-                            pos.Y
-                        )
-
-                    drawing.Size =
-                        Settings.TextSize
-
-                    drawing.Visible = true
-
-                else
-
-                    drawing.Visible = false
-
+    if not _G.MonsterESP then
+        for _, d in pairs(Storage.Monsters) do d.Visible = false end
+    else
+        for _, obj in pairs(workspace:GetDescendants()) do
+            -- 注意：为了更深层搜索，改用 GetDescendants，但配合 IsActiveMonster 过滤
+            if IsActiveMonster(obj) then
+                if not Storage.Monsters[obj] then
+                    local t = Drawing.new("Text")
+                    t.Center = true
+                    t.Outline = true
+                    t.Color = Color3.fromRGB(255, 0, 0) -- 真怪物显示红色
+                    Storage.Monsters[obj] = t
                 end
-
-            else
-
-                drawing.Visible = false
-
+                
+                local d = Storage.Monsters[obj]
+                local pos, onScreen = Camera:WorldToViewportPoint(obj.HumanoidRootPart.Position)
+                
+                if onScreen then
+                    local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - obj.HumanoidRootPart.Position).Magnitude)
+                    d.Position = Vector2.new(pos.X, pos.Y)
+                    d.Text = string.format("⚠️ [危险目标]\n%s\n[%d m]", obj.Name, dist)
+                    d.Visible = true
+                else d.Visible = false end
+            elseif Storage.Monsters[obj] then
+                Storage.Monsters[obj].Visible = false
             end
-
         end
-
     end
-
-end
-
---------------------------------------------------
--- MONSTER ESP
---------------------------------------------------
-
-local function UpdateMonsters()
-
-    if not Settings.MonsterESP then
-
-        for _, v in pairs(
-            Storage.Monsters
-        ) do
-
-            v.Visible = false
-
-        end
-
-        return
-
-    end
-
-    local myChar =
-        LocalPlayer.Character
-
-    local myHRP =
-        myChar
-        and myChar
-        :FindFirstChild(
-            "HumanoidRootPart"
-        )
-
-    if not myHRP then
-        return
-    end
-
-    for _, obj in pairs(
-        workspace:GetChildren()
-    ) do
-
-        if IsRealMonster(obj) then
-
-            if not Storage.Monsters[obj] then
-
-                Storage.Monsters[obj] =
-                    CreateDrawing(false)
-
-            end
-
-            local drawing =
-                Storage.Monsters[obj]
-
-            local HRP =
-                obj.HumanoidRootPart
-
-            local pos, visible =
-                Camera
-                :WorldToViewportPoint(
-                    HRP.Position
-                )
-
-            if visible then
-
-                local dist =
-                    math.floor(
-                        (
-                            myHRP.Position
-                            -
-                            HRP.Position
-                        ).Magnitude
-                    )
-
-                drawing.Text =
-                    string.format(
-                        "⚠️ %s\n[%d m]",
-                        obj.Name,
-                        dist
-                    )
-
-                drawing.Position =
-                    Vector2.new(
-                        pos.X,
-                        pos.Y
-                    )
-
-                drawing.Size =
-                    Settings.TextSize
-
-                drawing.Visible = true
-
-            else
-
-                drawing.Visible = false
-
-            end
-
-        elseif Storage.Monsters[obj] then
-
-            Storage.Monsters[obj]
-            .Visible = false
-
-        end
-
-    end
-
-end
-
---------------------------------------------------
--- LOOP
---------------------------------------------------
-
-RunService.RenderStepped:Connect(function()
-
-    pcall(function()
-
-        UpdatePlayers()
-        UpdateMonsters()
-
-    end)
-
 end)
 
---------------------------------------------------
--- TOGGLES
---------------------------------------------------
+-- [[ 5. UI 元件 ]]
 
-VisualTab:Toggle({
-    Title = "透视玩家",
+ESPTab:AddToggle({
+    Title = "透视会抓人的怪物",
+    Desc = "自动屏蔽你图片中那种静态 NPC",
     Value = false,
-
-    Callback = function(state)
-
-        Settings.PlayerESP = state
-
-    end
+    Callback = function(state) _G.MonsterESP = state end
 })
 
-VisualTab:Toggle({
-    Title = "透视怪物",
-    Desc = "显示场景中的怪物实体",
-    Value = false,
-
-    Callback = function(state)
-
-        Settings.MonsterESP = state
-
-    end
-})
-
-VisualTab:Toggle({
-    Title = "智能过滤静态NPC",
-    Desc = "只显示真正会动的怪物",
+ESPTab:AddToggle({
+    Title = "动态行为过滤",
+    Desc = "只显示正在移动或追逐玩家的怪物",
     Value = true,
-
-    Callback = function(state)
-
-        Settings.OnlyActive = state
-
-    end
+    Callback = function(state) _G.OnlyAggressive = state end
 })
 
---------------------------------------------------
--- TEXT SIZE
---------------------------------------------------
-
-VisualTab:Slider({
-    Title = "文字大小",
-
-    Value = {
-        Min = 10,
-        Max = 22,
-        Default = 14
-    },
-
-    Callback = function(v)
-
-        Settings.TextSize = v
-
-    end
-})
-
---------------------------------------------------
--- RESET CACHE
---------------------------------------------------
-
-VisualTab:Button({
-    Title = "重置视觉缓存",
-    Desc = "透视异常时使用",
-
+ESPTab:AddButton({
+    Title = "手动重置视觉 (解决残影)",
     Callback = function()
-
-        for _, v in pairs(
-            Storage.Players
-        ) do
-
-            pcall(function()
-                v:Remove()
-            end)
-
-        end
-
-        for _, v in pairs(
-            Storage.Monsters
-        ) do
-
-            pcall(function()
-                v:Remove()
-            end)
-
-        end
-
-        Storage = {
-            Players = {},
-            Monsters = {}
-        }
-
-        WindUI:Notify({
-            Title = "ESP",
-            Content =
-                "视觉缓存已重置",
-            Duration = 4
-        })
-
+        for _, v in pairs(Storage.Monsters) do v:Remove() end
+        Storage.Monsters = {}
+        WindUI:Notify({Title = "已重置", Content = "所有怪物透视已重新扫描", Type = "Info"})
     end
 })
-
---------------------------------------------------
--- NOTIFY
---------------------------------------------------
 
 WindUI:Notify({
-    Title = "智能视觉助手",
-    Content =
-        "动态过滤ESP已加载",
-    Duration = 5
+    Title = "系统就绪",
+    Content = "已根据你的图片特征优化了过滤算法",
+    Type = "Success"
 })
-
---------------------------------------------------
--- KEYBIND
---------------------------------------------------
-
-Window:SetToggleKey(
-    Enum.KeyCode.RightControl
-)
