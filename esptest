@@ -17,6 +17,9 @@ local WindUI = loadstring(game:HttpGet(
 --------------------------------------------------
 
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------
@@ -44,9 +47,9 @@ local Window = WindUI:CreateWindow({
 -- TAB
 --------------------------------------------------
 
-local FarmTab = Window:Tab({
-    Title = "全自动挂机",
-    Icon = "swords"
+local MainTab = Window:Tab({
+    Title = "练级配置",
+    Icon = "home"
 })
 
 --------------------------------------------------
@@ -54,9 +57,110 @@ local FarmTab = Window:Tab({
 --------------------------------------------------
 
 local Settings = {
-    AutoLevel = false,
-    Distance = 5
+    AutoFarm = false,
+    Weapon = "Melee",
+    Distance = 7,
+    TweenSpeed = 250
 }
+
+--------------------------------------------------
+-- TWEEN FUNCTION
+--------------------------------------------------
+
+local function To(targetCFrame)
+
+    local Character =
+        LocalPlayer.Character
+
+    local HRP =
+        Character
+        and Character
+        :FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+    if not HRP then
+        return
+    end
+
+    local distance =
+        (
+            HRP.Position
+            -
+            targetCFrame.Position
+        ).Magnitude
+
+    local tweenInfo =
+        TweenInfo.new(
+            distance
+            / Settings.TweenSpeed,
+            Enum.EasingStyle.Linear
+        )
+
+    local tween =
+        TweenService:Create(
+            HRP,
+            tweenInfo,
+            {
+                CFrame = targetCFrame
+            }
+        )
+
+    tween:Play()
+
+    return tween
+
+end
+
+--------------------------------------------------
+-- QUEST DATA
+--------------------------------------------------
+
+local function GetQuestData()
+
+    local level = 1
+
+    pcall(function()
+
+        level =
+            LocalPlayer
+            .Data
+            .Level
+            .Value
+
+    end)
+
+    if level < 10 then
+
+        return {
+            NPC = "Bandit Quest Giver",
+            Quest = "BanditQuest1",
+            Monster = "Bandit",
+            Pos = CFrame.new(
+                1061,
+                16,
+                1545
+            )
+        }
+
+    elseif level < 15 then
+
+        return {
+            NPC = "Monkey Quest Giver",
+            Quest = "JungleQuest",
+            Monster = "Monkey",
+            Pos = CFrame.new(
+                -1600,
+                36,
+                154
+            )
+        }
+
+    end
+
+    return nil
+
+end
 
 --------------------------------------------------
 -- AUTO FARM LOOP
@@ -64,9 +168,9 @@ local Settings = {
 
 task.spawn(function()
 
-    while task.wait(0.5) do
+    while task.wait() do
 
-        if Settings.AutoLevel then
+        if Settings.AutoFarm then
 
             pcall(function()
 
@@ -94,86 +198,147 @@ task.spawn(function()
                     return
                 end
 
-                --------------------------------------------------
-                -- FIND CLOSEST MONSTER
-                --------------------------------------------------
+                local questData =
+                    GetQuestData()
 
-                local target = nil
-                local dist = math.huge
-
-                for _, v in pairs(
-                    workspace:GetDescendants()
-                ) do
-
-                    if v:IsA("Humanoid")
-                    and v.Parent ~= Character
-                    and v.Health > 0 then
-
-                        local enemyHRP =
-                            v.Parent
-                            :FindFirstChild(
-                                "HumanoidRootPart"
-                            )
-
-                        if enemyHRP then
-
-                            local distance =
-                                (
-                                    HRP.Position
-                                    -
-                                    enemyHRP.Position
-                                ).Magnitude
-
-                            if distance < dist then
-
-                                target = enemyHRP
-                                dist = distance
-
-                            end
-
-                        end
-
-                    end
-
+                if not questData then
+                    return
                 end
 
                 --------------------------------------------------
-                -- TELEPORT + ATTACK
+                -- CHECK QUEST
                 --------------------------------------------------
 
-                if target then
+                local hasQuest = false
 
-                    HRP.CFrame =
-                        target.CFrame
-                        * CFrame.new(
-                            0,
-                            Settings.Distance,
-                            0
+                pcall(function()
+
+                    hasQuest =
+                        LocalPlayer
+                        .PlayerGui
+                        .Main
+                        .Quest
+                        .Visible
+
+                end)
+
+                --------------------------------------------------
+                -- TAKE QUEST
+                --------------------------------------------------
+
+                if not hasQuest then
+
+                    To(
+                        questData.Pos
+                    )
+
+                    task.wait(0.5)
+
+                    local Remotes =
+                        ReplicatedStorage
+                        :FindFirstChild(
+                            "Remotes"
                         )
 
-                    local Tool =
-                        Character
-                        :FindFirstChildOfClass(
-                            "Tool"
+                    if Remotes
+                    and Remotes
+                    :FindFirstChild(
+                        "CommF_"
+                    ) then
+
+                        Remotes
+                        .CommF_
+                        :InvokeServer(
+                            "StartQuest",
+                            questData.Quest,
+                            1
                         )
-                        or
-                        LocalPlayer.Backpack
-                        :FindFirstChildOfClass(
-                            "Tool"
+
+                    end
+
+                else
+
+                    --------------------------------------------------
+                    -- KILL MONSTER
+                    --------------------------------------------------
+
+                    local EnemyFolder =
+                        workspace
+                        :FindFirstChild(
+                            "Enemies"
                         )
 
-                    if Tool then
+                    if not EnemyFolder then
+                        return
+                    end
 
-                        if Tool.Parent
-                        ~= Character then
+                    for _, v in pairs(
+                        EnemyFolder:GetChildren()
+                    ) do
 
-                            Humanoid:EquipTool(
-                                Tool
-                            )
+                        if v.Name
+                        == questData.Monster
+                        and v:FindFirstChild(
+                            "Humanoid"
+                        )
+                        and v.Humanoid.Health > 0
+                        and v:FindFirstChild(
+                            "HumanoidRootPart"
+                        ) then
+
+                            --------------------------------------------------
+                            -- TELEPORT
+                            --------------------------------------------------
+
+                            HRP.CFrame =
+                                v.HumanoidRootPart
+                                .CFrame
+                                * CFrame.new(
+                                    0,
+                                    Settings.Distance,
+                                    0
+                                )
+                                * CFrame.Angles(
+                                    math.rad(-90),
+                                    0,
+                                    0
+                                )
+
+                            --------------------------------------------------
+                            -- TOOL
+                            --------------------------------------------------
+
+                            local Tool =
+                                LocalPlayer
+                                .Backpack
+                                :FindFirstChild(
+                                    Settings.Weapon
+                                )
+                                or
+                                Character
+                                :FindFirstChild(
+                                    Settings.Weapon
+                                )
+
+                            if Tool then
+
+                                if Tool.Parent
+                                ~= Character then
+
+                                    Humanoid
+                                    :EquipTool(
+                                        Tool
+                                    )
+
+                                end
+
+                                Tool:Activate()
+
+                            end
+
+                            break
 
                         end
-
-                        Tool:Activate()
 
                     end
 
@@ -191,20 +356,21 @@ end)
 -- TOGGLE
 --------------------------------------------------
 
-FarmTab:Toggle({
-    Title = "全自动练级",
-    Desc = "自动寻找最近怪物并攻击",
+MainTab:Toggle({
+    Title = "全自动挂机",
+    Desc = "自动接任务 + 自动刷怪",
     Value = false,
 
     Callback = function(state)
 
-        Settings.AutoLevel = state
+        Settings.AutoFarm = state
 
         if state then
 
             WindUI:Notify({
                 Title = "Auto Farm",
-                Content = "已开启自动挂机",
+                Content =
+                    "开始自动挂机",
                 Duration = 4
             })
 
@@ -212,7 +378,8 @@ FarmTab:Toggle({
 
             WindUI:Notify({
                 Title = "Auto Farm",
-                Content = "已关闭自动挂机",
+                Content =
+                    "已关闭自动挂机",
                 Duration = 4
             })
 
@@ -222,16 +389,38 @@ FarmTab:Toggle({
 })
 
 --------------------------------------------------
--- HEIGHT SLIDER
+-- WEAPON
 --------------------------------------------------
 
-FarmTab:Slider({
+MainTab:Dropdown({
+    Title = "攻击武器",
+
+    Values = {
+        "Melee",
+        "Sword",
+        "Fruit"
+    },
+
+    Value = "Melee",
+
+    Callback = function(v)
+
+        Settings.Weapon = v
+
+    end
+})
+
+--------------------------------------------------
+-- HEIGHT
+--------------------------------------------------
+
+MainTab:Slider({
     Title = "飞行高度",
 
     Value = {
-        Min = 3,
+        Min = 5,
         Max = 15,
-        Default = 5
+        Default = 7
     },
 
     Callback = function(v)
@@ -242,32 +431,21 @@ FarmTab:Slider({
 })
 
 --------------------------------------------------
--- RESET CAMERA
+-- TWEEN SPEED
 --------------------------------------------------
 
-FarmTab:Button({
-    Title = "重置视角",
-    Desc = "防止镜头卡死",
+MainTab:Slider({
+    Title = "瞬移速度",
 
-    Callback = function()
+    Value = {
+        Min = 100,
+        Max = 500,
+        Default = 250
+    },
 
-        local Character =
-            LocalPlayer.Character
+    Callback = function(v)
 
-        local Humanoid =
-            Character
-            and Character
-            :FindFirstChild(
-                "Humanoid"
-            )
-
-        if Humanoid then
-
-            workspace.CurrentCamera
-            .CameraSubject =
-                Humanoid
-
-        end
+        Settings.TweenSpeed = v
 
     end
 })
@@ -278,7 +456,8 @@ FarmTab:Button({
 
 WindUI:Notify({
     Title = "1.en Hub",
-    Content = "加载成功",
+    Content =
+        "Blox Fruit 加载成功",
     Duration = 5
 })
 
