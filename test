@@ -9,7 +9,7 @@ repeat task.wait() until game:IsLoaded()
 --------------------------------------------------
 
 local WindUI = loadstring(game:HttpGet(
-"https://tree-hub.vercel.app/api/UI/WindUI"
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
 
 --------------------------------------------------
@@ -21,7 +21,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
 --------------------------------------------------
 -- VARIABLES
@@ -42,30 +41,48 @@ local autoV4Connection = nil
 
 local Window = WindUI:CreateWindow({
     Title = "1.en Hub",
-    Icon = "home",
+    Icon = "rbxassetid://7733960981",
     Author = "by 1.en",
-    Folder = "1enHub"
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(600,430),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 180,
+
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
 })
 
 --------------------------------------------------
 -- TABS
 --------------------------------------------------
 
-local MainTab = Window:CreateTab("Main", "home")
-local ESPTab = Window:CreateTab("ESP", "eye")
-local PlayerTab = Window:CreateTab("Player", "users")
+local Tabs = {
+    Main = Window:Tab({
+        Title = "Main",
+        Icon = "home"
+    }),
+
+    ESP = Window:Tab({
+        Title = "ESP",
+        Icon = "eye"
+    })
+}
 
 --------------------------------------------------
 -- BUTTON
 --------------------------------------------------
 
-MainTab:AddButton({
+Tabs.Main:Button({
     Title = "触发功能",
     Desc = "点击触发",
 
     Callback = function()
 
-        local char = LocalPlayer.Character
+        local char = game.Players.LocalPlayer.Character
         if not char then return end
 
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -73,7 +90,7 @@ MainTab:AddButton({
 
         hrp.CFrame = CFrame.new(
             hrp.Position.X,
-            hrp.Position.Y + 5000,
+            hrp.Position.Y + 795679695796326795679695796326,
             hrp.Position.Z
         )
 
@@ -95,8 +112,7 @@ local function StartAutoV3()
                 local Remotes =
                     ReplicatedStorage:FindFirstChild("Remotes")
 
-                if Remotes
-                and Remotes:FindFirstChild("CommE") then
+                if Remotes and Remotes:FindFirstChild("CommE") then
 
                     Remotes.CommE:FireServer(
                         "ActivateAbility"
@@ -114,7 +130,11 @@ local function StartAutoV3()
 
 end
 
-MainTab:AddToggle({
+local function StopAutoV3()
+    AutoV3.Enabled = false
+end
+
+Tabs.Main:Toggle({ 
     Title = "Auto V3",
     Value = false,
 
@@ -124,6 +144,8 @@ MainTab:AddToggle({
 
         if state then
             StartAutoV3()
+        else
+            StopAutoV3()
         end
 
     end
@@ -151,8 +173,7 @@ local function startV4Loop()
             local Remotes =
                 ReplicatedStorage:FindFirstChild("Remotes")
 
-            if Remotes
-            and Remotes:FindFirstChild("CommF_") then
+            if Remotes and Remotes:FindFirstChild("CommF_") then
 
                 Remotes.CommF_:InvokeServer(
                     "ActivateRace"
@@ -166,25 +187,21 @@ local function startV4Loop()
 
 end
 
-MainTab:AddToggle({
-    Title = "Auto V4",
+Tabs.Main:Toggle({ 
+    Title = "Auto V4", 
     Value = false,
 
     Callback = function(state)
 
         AutoV4 = state
 
-        if state then
-
+        if AutoV4 then
             startV4Loop()
-
         else
-
             if autoV4Connection then
                 autoV4Connection:Disconnect()
                 autoV4Connection = nil
             end
-
         end
 
     end
@@ -195,13 +212,15 @@ MainTab:AddToggle({
 --------------------------------------------------
 
 local BusoEnabled = false
+local Player = game.Players.LocalPlayer
 
-MainTab:AddToggle({
+Tabs.Main:Toggle({
     Title = "Auto Buso",
     Value = false,
 
     Callback = function(state)
         BusoEnabled = state
+        print("自動武裝色狀態:", state)
     end
 })
 
@@ -209,7 +228,7 @@ local function ToggleBuso()
 
     if BusoEnabled then
 
-        local Character = LocalPlayer.Character
+        local Character = Player.Character
         if not Character then
             return
         end
@@ -217,7 +236,7 @@ local function ToggleBuso()
         if not Character:FindFirstChild("HasBuso") then
 
             local remote =
-                ReplicatedStorage
+                game:GetService("ReplicatedStorage")
                 :WaitForChild("Remotes")
                 :FindFirstChild("CommF_")
 
@@ -249,7 +268,7 @@ end)
 -- ANTI VOID
 --------------------------------------------------
 
-MainTab:AddToggle({
+Tabs.Main:Toggle({
     Title = "Anti One Shot",
     Value = false,
 
@@ -270,9 +289,7 @@ task.spawn(function()
                 if not Character then return end
 
                 local HRP =
-                    Character:FindFirstChild(
-                        "HumanoidRootPart"
-                    )
+                    Character:FindFirstChild("HumanoidRootPart")
 
                 if not HRP then
                     return
@@ -347,12 +364,8 @@ RunService.RenderStepped:Connect(function()
     for player, text in pairs(ESP_Objects) do
 
         if player.Character
-        and player.Character:FindFirstChild(
-            "HumanoidRootPart"
-        )
-        and player.Character:FindFirstChild(
-            "Humanoid"
-        ) then
+        and player.Character:FindFirstChild("HumanoidRootPart")
+        and player.Character:FindFirstChild("Humanoid") then
 
             local hrp =
                 player.Character.HumanoidRootPart
@@ -361,24 +374,21 @@ RunService.RenderStepped:Connect(function()
                 player.Character.Humanoid
 
             local pos, onScreen =
-                Camera:WorldToViewportPoint(
-                    hrp.Position
-                )
+                workspace.CurrentCamera
+                :WorldToViewportPoint(hrp.Position)
 
             if onScreen then
 
                 local myHRP =
                     LocalPlayer.Character
                     and LocalPlayer.Character
-                    :FindFirstChild(
-                        "HumanoidRootPart"
-                    )
+                    :FindFirstChild("HumanoidRootPart")
 
                 if myHRP then
 
                     local distance = math.floor(
-                        (myHRP.Position
-                        - hrp.Position).Magnitude
+                        (myHRP.Position - hrp.Position)
+                        .Magnitude
                     )
 
                     local health =
@@ -394,6 +404,11 @@ RunService.RenderStepped:Connect(function()
                             health,
                             distance
                         )
+
+                    text.Color =
+                        distance < 50
+                        and Color3.fromRGB(255,0,0)
+                        or Color3.fromRGB(255,255,255)
 
                     text.Visible = true
 
@@ -415,16 +430,14 @@ RunService.RenderStepped:Connect(function()
 
 end)
 
-for _, player in pairs(
-    Players:GetPlayers()
-) do
+for _, player in pairs(Players:GetPlayers()) do
     CreateESP(player)
 end
 
 Players.PlayerAdded:Connect(CreateESP)
 Players.PlayerRemoving:Connect(RemoveESP)
 
-ESPTab:AddToggle({
+Tabs.ESP:Toggle({
     Title = "玩家透视 (ESP)",
     Desc = "显示名字、血量和距离",
     Value = false,
@@ -437,7 +450,8 @@ ESPTab:AddToggle({
 
             WindUI:Notify({
                 Title = "ESP 已启用",
-                Content = "正在扫描玩家"
+                Content = "正在扫描场景中的玩家...",
+                Duration = 3
             })
 
         end
@@ -445,167 +459,6 @@ ESPTab:AddToggle({
     end
 })
 
---------------------------------------------------
--- PLAYER TAB
---------------------------------------------------
-
-local SelectedPlayerName = nil
-local IsSpectating = false
-
-local function GetPlayerList()
-
-    local list = {}
-
-    for _, player in pairs(
-        Players:GetPlayers()
-    ) do
-
-        if player ~= LocalPlayer then
-            table.insert(list, player.Name)
-        end
-
-    end
-
-    return list
-
-end
-
-local PlayerDropdown =
-    PlayerTab:AddDropdown({
-
-    Title = "选择目标玩家",
-    Desc = "选择观看目标",
-    Multi = false,
-    Options = GetPlayerList(),
-
-    Callback = function(value)
-
-        SelectedPlayerName = value
-
-        if IsSpectating
-        and SelectedPlayerName then
-
-            local target =
-                Players:FindFirstChild(
-                    SelectedPlayerName
-                )
-
-            if target
-            and target.Character
-            and target.Character
-                :FindFirstChild("Humanoid") then
-
-                Camera.CameraSubject =
-                    target.Character.Humanoid
-
-            end
-
-        end
-
-    end
-})
-
-PlayerTab:AddButton({
-    Title = "刷新玩家列表",
-    Desc = "更新在线玩家",
-
-    Callback = function()
-
-        PlayerDropdown:Refresh(
-            GetPlayerList(),
-            true
-        )
-
-        WindUI:Notify({
-            Title = "刷新成功",
-            Content = "玩家列表已更新"
-        })
-
-    end
-})
-
-PlayerTab:AddToggle({
-    Title = "观看视角",
-    Desc = "锁定目标玩家视角",
-    Value = false,
-
-    Callback = function(state)
-
-        IsSpectating = state
-
-        if state then
-
-            if SelectedPlayerName then
-
-                local target =
-                    Players:FindFirstChild(
-                        SelectedPlayerName
-                    )
-
-                if target
-                and target.Character
-                and target.Character
-                    :FindFirstChild("Humanoid") then
-
-                    Camera.CameraSubject =
-                        target.Character.Humanoid
-
-                    WindUI:Notify({
-                        Title = "观看玩家",
-                        Content =
-                            SelectedPlayerName
-                    })
-
-                end
-
-            end
-
-        else
-
-            local char =
-                LocalPlayer.Character
-
-            if char
-            and char:FindFirstChild(
-                "Humanoid"
-            ) then
-
-                Camera.CameraSubject =
-                    char.Humanoid
-
-            end
-
-        end
-
-    end
-})
-
-Players.PlayerRemoving:Connect(function(player)
-
-    PlayerDropdown:Refresh(
-        GetPlayerList(),
-        true
-    )
-
-    if player.Name
-    == SelectedPlayerName then
-
-        local char =
-            LocalPlayer.Character
-
-        if char
-        and char:FindFirstChild(
-            "Humanoid"
-        ) then
-
-            Camera.CameraSubject =
-                char.Humanoid
-
-        end
-
-    end
-
-end)
 --------------------------------------------------
 -- KEYBIND
 --------------------------------------------------
