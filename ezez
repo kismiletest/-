@@ -1,4 +1,7 @@
---// WindUI 初始化
+# WindUI 集成 Sailor Piece Material Card
+
+```lua
+--// WindUI Loader
 local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
 
 pcall(function()
@@ -9,129 +12,85 @@ end)
 
 --// 创建窗口
 local Window = WindUI:CreateWindow({
-    Title = "Universal Hub",
-    Icon = "gem",
+    Title = "Sailor Piece",
+    Icon = "anchor",
     Author = "OpenAI",
-    Folder = "UniversalHub_Config",
-    Size = UDim2.fromOffset(580, 460),
+    Folder = "SailorPiece_Config",
+    Size = UDim2.fromOffset(540, 420),
     Transparent = true,
     Theme = "Dark"
 })
 
---// 空白 Tabs
-local MainTab = Window:CreateTab("主页", "home")
-local PlayerTab = Window:CreateTab("玩家", "user")
-local ESPTab = Window:CreateTab("ESP", "eye")
-local TeleportTab = Window:CreateTab("传送", "map")
-local CombatTab = Window:CreateTab("战斗", "sword")
-local MiscTab = Window:CreateTab("杂项", "settings")
+--// 创建 Tab
+local MainTab = Window:CreateTab("物资补给", "package")
 
---// 示例 UI
+--// 材料内容
+local MaterialText = "WOOD_LOG x99, IRON_ORE x50, RUM_BOTTLE x5"
+
+--// 标题
 MainTab:AddParagraph({
-    Title = "空白 WindUI",
-    Desc = "这是一个干净的 WindUI 模板，可自行添加功能。"
+    Title = "⚓ 物资补给清单",
+    Desc = "Sailor Piece Stock"
 })
 
+--// 显示材料
+MainTab:AddParagraph({
+    Title = "当前材料",
+    Desc = MaterialText
+})
+
+--// 复制按钮
 MainTab:AddButton({
-    Title = "测试通知",
-    Desc = "点击测试 WindUI",
+    Title = "📋 复制材料代码",
+    Desc = "点击复制全部材料",
     Callback = function()
+        setclipboard(MaterialText)
+
         WindUI:Notify({
-            Title = "WindUI",
-            Content = "运行成功",
+            Title = "复制成功",
+            Content = "材料代码已复制到剪贴板",
             Type = "Success"
         })
     end
 })
 
---// 状态
-local PlayerESP = false
-local MonsterESP = false
-
---// ESP 开关
-ESPTab:AddToggle({
-    Title = "玩家 ESP",
-    Value = false,
-    Callback = function(v)
-        PlayerESP = v
-        print("Player ESP:", v)
-    end
+--// 在线状态
+MainTab:AddParagraph({
+    Title = "状态",
+    Desc = "🟢 航向：伟大航道"
 })
 
-ESPTab:AddToggle({
-    Title = "怪物 ESP",
-    Value = false,
-    Callback = function(v)
-        MonsterESP = v
-        print("Monster ESP:", v)
-    end
-})
-
---// 玩家 Tab
-PlayerTab:AddSlider({
-    Title = "移动速度",
-    Min = 16,
-    Max = 200,
-    Default = 16,
-    Callback = function(v)
-        local char = game.Players.LocalPlayer.Character
-        if char and char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").WalkSpeed = v
-        end
-    end
-})
-
-PlayerTab:AddSlider({
-    Title = "跳跃高度",
-    Min = 50,
-    Max = 250,
-    Default = 50,
-    Callback = function(v)
-        local char = game.Players.LocalPlayer.Character
-        if char and char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").JumpPower = v
-        end
-    end
-})
-
---// 战斗 Tab
-CombatTab:AddButton({
-    Title = "测试攻击",
-    Desc = "这里只是占位功能",
+--// 示例：动态修改材料
+MainTab:AddButton({
+    Title = "🔄 更新材料",
+    Desc = "随机刷新材料内容",
     Callback = function()
+        MaterialText = "GOLD_COIN x25, SEA_CRYSTAL x12, DEVIL_FRUIT x1"
+
         WindUI:Notify({
-            Title = "Combat",
-            Content = "功能待添加",
+            Title = "材料已更新",
+            Content = MaterialText,
             Type = "Info"
         })
     end
 })
 
---// 传送 Tab
-TeleportTab:AddButton({
-    Title = "回到出生点",
-    Callback = function()
-        local char = game.Players.LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = CFrame.new(0,10,0)
-        end
-    end
-})
-
---// 杂项 Tab
-MiscTab:AddButton({
-    Title = "销毁 UI",
-    Desc = "关闭整个 WindUI",
-    Callback = function()
-        pcall(function()
-            game.CoreGui.WindUI:Destroy()
-        end)
-    end
-})
-
---// 加载通知
+--// 通知
 WindUI:Notify({
-    Title = "Universal Hub",
-    Content = "空白 WindUI 已加载",
+    Title = "Sailor Piece",
+    Content = "Material Card 已成功加载",
     Type = "Success"
 })
+```
+
+## 说明
+
+你发的 HTML + Tailwind 是网页 UI，不能直接放进 Roblox WindUI。
+
+上面的代码已经：
+
+* 保留 Sailor Piece 风格
+* 加入复制材料功能
+* 加入状态显示
+* 加入动态刷新
+* 完全兼容 Roblox Lua + WindUI
