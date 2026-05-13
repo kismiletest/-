@@ -7,112 +7,98 @@ pcall(function()
     end
 end)
 
---// Window
+--// 创建窗口
 local Window = WindUI:CreateWindow({
-    Title = "Blox Fruits",
-    Icon = "star",
+    Title = "Sailor Piece",
+    Icon = "gift",
     Author = "OpenAI",
-    Folder = "BloxFruits_Materials",
-    Size = UDim2.fromOffset(540, 430),
+    Folder = "Treasure_Copy",
+    Size = UDim2.fromOffset(500, 360),
     Transparent = true,
     Theme = "Dark"
 })
 
---// Tab
-local MainTab = Window:CreateTab("自动材料", "package")
+--// 创建 Tab
+local MainTab = Window:CreateTab("Treasure", "gift")
 
---// 材料文本
-local MaterialText = [[
-✦ Bones: 5,000
-✦ Ectoplasm: 150
-✦ Dragon Scale: 10
-✦ Conjured Cocoa: 25
-]]
+--// 宝箱复制内容
+local CopyValue = "Sailor_Piece_Secret_Code_2026"
 
---// 顶部状态
+--// 标题
 MainTab:AddParagraph({
-    Title = "🍈 BLOX FRUITS",
-    Desc = "Auto Collecting..."
+    Title = "🎁 Sailor Treasure Chest",
+    Desc = "点击开启宝箱并复制秘密代码"
 })
 
---// 等级信息
+--// 当前内容
 MainTab:AddParagraph({
-    Title = "📊 玩家状态",
-    Desc = "LV.2550 | Sea 3"
+    Title = "📜 Secret Treasure",
+    Desc = CopyValue
 })
 
---// 材料列表
-MainTab:AddParagraph({
-    Title = "📦 已收集材料清单",
-    Desc = MaterialText
-})
-
---// 复制按钮
+--// 宝箱按钮
 MainTab:AddButton({
-    Title = "📋 复制所有材料文本",
-    Desc = "复制当前全部材料",
+    Title = "🎁 开启宝箱",
+    Desc = "点击复制 Treasure Code",
     Callback = function()
 
         if setclipboard then
-            setclipboard(MaterialText)
+            setclipboard(CopyValue)
         end
 
+        -- 开箱动画通知
         WindUI:Notify({
-            Title = "✨ 霸气加载完成！",
-            Content = "材料文本已复制",
+            Title = "🔓 TREASURE OPENED!",
+            Content = "宝藏代码已复制",
             Type = "Success"
         })
+
+        -- 粒子风格通知
+        task.spawn(function()
+            task.wait(1.5)
+
+            WindUI:Notify({
+                Title = "✨ TREASURE COPIED!",
+                Content = CopyValue,
+                Type = "Info"
+            })
+        end)
     end
 })
 
---// 自动刷新材料
+--// 随机宝藏按钮
 MainTab:AddButton({
-    Title = "🔄 自动刷新材料",
-    Desc = "随机生成新的材料库存",
+    Title = "⚓ 随机宝藏",
+    Desc = "生成新的 Sailor Piece Secret",
     Callback = function()
 
-        local RandomMaterials = {
-            [[
-✦ Bones: 9000
-✦ Ectoplasm: 500
-✦ Dragon Scale: 45
-✦ Conjured Cocoa: 120
-            ]],
-
-            [[
-✦ Mystic Droplet: 300
-✦ Gunpowder: 80
-✦ Mini Tusk: 20
-✦ Fish Tail: 55
-            ]],
-
-            [[
-✦ Scrap Metal: 1500
-✦ Angel Wing: 35
-✦ Vampire Fang: 18
-✦ Leather: 999
-            ]]
+        local Treasures = {
+            "DevilFruit_Legendary_2026",
+            "SeaKing_Treasure_X99",
+            "GrandLine_Secret_Map",
+            "MythicFruit_Awakening",
+            "PirateKing_Chest_777"
         }
 
-        MaterialText = RandomMaterials[math.random(1,#RandomMaterials)]
+        CopyValue = Treasures[math.random(1,#Treasures)]
 
         WindUI:Notify({
-            Title = "⚡ 自动收集更新",
-            Content = "新的材料库存已生成",
+            Title = "🪙 新宝藏已生成",
+            Content = CopyValue,
             Type = "Info"
         })
     end
 })
 
---// 底部状态
+--// 状态
 MainTab:AddParagraph({
-    Title = "🟢 系统状态",
-    Desc = "Auto Farming Materials..."
+    Title = "🟢 Treasure Status",
+    Desc = "Grand Line Treasure Active"
 })
 
 --// 启动通知
 WindUI:Notify({
-    Title = "Blox Fruits",
-    Content = "Auto-Material Component 已加载",
+    Title = "Sailor Piece",
+    Content = "Treasure Chest Component 已加载",
     Type = "Success"
 })
