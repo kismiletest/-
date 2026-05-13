@@ -1,9 +1,7 @@
-# WindUI 集成 Sailor Piece Material Card
-
-```lua
 --// WindUI Loader
 local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
 
+--// 删除旧 UI
 pcall(function()
     if game.CoreGui:FindFirstChild("WindUI") then
         game.CoreGui.WindUI:Destroy()
@@ -75,22 +73,22 @@ MainTab:AddButton({
     end
 })
 
---// 通知
+--// 额外按钮示例
+MainTab:AddButton({
+    Title = "⚓ 测试通知",
+    Desc = "测试 WindUI 是否正常",
+    Callback = function()
+        WindUI:Notify({
+            Title = "Sailor Piece",
+            Content = "WindUI 运行正常",
+            Type = "Success"
+        })
+    end
+})
+
+--// 加载通知
 WindUI:Notify({
     Title = "Sailor Piece",
     Content = "Material Card 已成功加载",
     Type = "Success"
 })
-```
-
-## 说明
-
-你发的 HTML + Tailwind 是网页 UI，不能直接放进 Roblox WindUI。
-
-上面的代码已经：
-
-* 保留 Sailor Piece 风格
-* 加入复制材料功能
-* 加入状态显示
-* 加入动态刷新
-* 完全兼容 Roblox Lua + WindUI
