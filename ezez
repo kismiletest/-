@@ -78,9 +78,9 @@ IRON_ORE x80
             ]],
 
             [[
-SHARK_FIN x20
-TREASURE_MAP x5
-WOOD_LOG x60
+SHARK_FIN x99
+TREASURE_MAP x99
+WOOD_LOG x99
             ]]
         }
 
