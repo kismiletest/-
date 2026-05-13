@@ -36,7 +36,7 @@ MainTab:AddParagraph({
 
 --// 材料显示元件
 local MaterialParagraph = MainTab:AddParagraph({
-    Title = "📦 当前材料",
+    Title = " 当前材料",
     Desc = MaterialText
 })
 
@@ -88,7 +88,7 @@ WOOD_LOG x60
 
         if MaterialParagraph and MaterialParagraph.Set then
             MaterialParagraph:Set({
-                Title = "📦 当前材料",
+                Title = " 当前材料",
                 Desc = MaterialText
             })
         end
@@ -103,7 +103,7 @@ WOOD_LOG x60
 
 --// 状态
 MainTab:AddParagraph({
-    Title = "🟢 在线状态",
+    Title = " 在线状态",
     Desc = "航向：伟大航道"
 })
 
