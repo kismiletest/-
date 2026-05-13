@@ -1,94 +1,115 @@
 --// WindUI Loader
 local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
 
---// 删除旧 UI
 pcall(function()
     if game.CoreGui:FindFirstChild("WindUI") then
         game.CoreGui.WindUI:Destroy()
     end
 end)
 
---// 创建窗口
+--// Window
 local Window = WindUI:CreateWindow({
     Title = "Sailor Piece",
     Icon = "anchor",
     Author = "OpenAI",
-    Folder = "SailorPiece_Config",
-    Size = UDim2.fromOffset(540, 420),
+    Folder = "SailorPiece",
+    Size = UDim2.fromOffset(520, 420),
     Transparent = true,
     Theme = "Dark"
 })
 
---// 创建 Tab
-local MainTab = Window:CreateTab("物资补给", "package")
+--// Tab
+local MainTab = Window:CreateTab("复制材料", "package")
 
---// 材料内容
-local MaterialText = "WOOD_LOG x99, IRON_ORE x50, RUM_BOTTLE x5"
+--// 材料数据
+local MaterialText = [[
+WOOD_LOG x99
+IRON_ORE x50
+RUM_BOTTLE x5
+]]
 
---// 标题
+--// Sailor Piece 风格标题
 MainTab:AddParagraph({
-    Title = "⚓ 物资补给清单",
-    Desc = "Sailor Piece Stock"
+    Title = "⚓ Sailor Piece Material Card",
+    Desc = "物资补给清单"
 })
 
---// 显示材料
-MainTab:AddParagraph({
-    Title = "当前材料",
+--// 材料显示元件
+local MaterialParagraph = MainTab:AddParagraph({
+    Title = "📦 当前材料",
     Desc = MaterialText
 })
 
---// 复制按钮
+--// 复制材料按钮
 MainTab:AddButton({
-    Title = "📋 复制材料代码",
+    Title = "📋 复制材料",
     Desc = "点击复制全部材料",
     Callback = function()
-        setclipboard(MaterialText)
+
+        if setclipboard then
+            setclipboard(MaterialText)
+        end
 
         WindUI:Notify({
             Title = "复制成功",
-            Content = "材料代码已复制到剪贴板",
+            Content = "材料已复制到剪贴板",
             Type = "Success"
         })
     end
 })
 
---// 在线状态
-MainTab:AddParagraph({
-    Title = "状态",
-    Desc = "🟢 航向：伟大航道"
-})
-
---// 示例：动态修改材料
+--// 更新材料按钮
 MainTab:AddButton({
-    Title = "🔄 更新材料",
-    Desc = "随机刷新材料内容",
+    Title = "🔄 刷新材料",
+    Desc = "随机刷新 Sailor Piece 材料",
     Callback = function()
-        MaterialText = "GOLD_COIN x25, SEA_CRYSTAL x12, DEVIL_FRUIT x1"
+
+        local Materials = {
+            [[
+WOOD_LOG x120
+SEA_CRYSTAL x15
+RUM_BOTTLE x3
+            ]],
+
+            [[
+GOLD_COIN x50
+DEVIL_FRUIT x1
+IRON_ORE x80
+            ]],
+
+            [[
+SHARK_FIN x20
+TREASURE_MAP x5
+WOOD_LOG x60
+            ]]
+        }
+
+        MaterialText = Materials[math.random(1, #Materials)]
+
+        if MaterialParagraph and MaterialParagraph.Set then
+            MaterialParagraph:Set({
+                Title = "📦 当前材料",
+                Desc = MaterialText
+            })
+        end
 
         WindUI:Notify({
-            Title = "材料已更新",
-            Content = MaterialText,
+            Title = "库存已更新",
+            Content = "新的 Sailor Piece 材料已生成",
             Type = "Info"
         })
     end
 })
 
---// 额外按钮示例
-MainTab:AddButton({
-    Title = "⚓ 测试通知",
-    Desc = "测试 WindUI 是否正常",
-    Callback = function()
-        WindUI:Notify({
-            Title = "Sailor Piece",
-            Content = "WindUI 运行正常",
-            Type = "Success"
-        })
-    end
+--// 状态
+MainTab:AddParagraph({
+    Title = "🟢 在线状态",
+    Desc = "航向：伟大航道"
 })
 
 --// 加载通知
 WindUI:Notify({
     Title = "Sailor Piece",
-    Content = "Material Card 已成功加载",
+    Content = "复制材料元件加载完成",
     Type = "Success"
 })
