@@ -9,41 +9,48 @@ end)
 
 --// Window
 local Window = WindUI:CreateWindow({
-    Title = "Sailor Piece",
-    Icon = "anchor",
+    Title = "Blox Fruits",
+    Icon = "star",
     Author = "OpenAI",
-    Folder = "SailorPiece",
-    Size = UDim2.fromOffset(520, 420),
+    Folder = "BloxFruits_Materials",
+    Size = UDim2.fromOffset(540, 430),
     Transparent = true,
     Theme = "Dark"
 })
 
 --// Tab
-local MainTab = Window:CreateTab("复制材料", "package")
+local MainTab = Window:CreateTab("自动材料", "package")
 
---// 材料数据
+--// 材料文本
 local MaterialText = [[
-WOOD_LOG x99
-IRON_ORE x50
-RUM_BOTTLE x5
+✦ Bones: 5,000
+✦ Ectoplasm: 150
+✦ Dragon Scale: 10
+✦ Conjured Cocoa: 25
 ]]
 
---// Sailor Piece 风格标题
+--// 顶部状态
 MainTab:AddParagraph({
-    Title = "⚓ Sailor Piece Material Card",
-    Desc = "物资补给清单"
+    Title = "🍈 BLOX FRUITS",
+    Desc = "Auto Collecting..."
 })
 
---// 材料显示元件
-local MaterialParagraph = MainTab:AddParagraph({
-    Title = " 当前材料",
+--// 等级信息
+MainTab:AddParagraph({
+    Title = "📊 玩家状态",
+    Desc = "LV.2550 | Sea 3"
+})
+
+--// 材料列表
+MainTab:AddParagraph({
+    Title = "📦 已收集材料清单",
     Desc = MaterialText
 })
 
---// 复制材料按钮
+--// 复制按钮
 MainTab:AddButton({
-    Title = "📋 复制材料",
-    Desc = "点击复制全部材料",
+    Title = "📋 复制所有材料文本",
+    Desc = "复制当前全部材料",
     Callback = function()
 
         if setclipboard then
@@ -51,65 +58,61 @@ MainTab:AddButton({
         end
 
         WindUI:Notify({
-            Title = "复制成功",
-            Content = "材料已复制到剪贴板",
+            Title = "✨ 霸气加载完成！",
+            Content = "材料文本已复制",
             Type = "Success"
         })
     end
 })
 
---// 更新材料按钮
+--// 自动刷新材料
 MainTab:AddButton({
-    Title = "🔄 刷新材料",
-    Desc = "随机刷新 Sailor Piece 材料",
+    Title = "🔄 自动刷新材料",
+    Desc = "随机生成新的材料库存",
     Callback = function()
 
-        local Materials = {
+        local RandomMaterials = {
             [[
-WOOD_LOG x120
-SEA_CRYSTAL x15
-RUM_BOTTLE x3
+✦ Bones: 9000
+✦ Ectoplasm: 500
+✦ Dragon Scale: 45
+✦ Conjured Cocoa: 120
             ]],
 
             [[
-GOLD_COIN x50
-DEVIL_FRUIT x1
-IRON_ORE x80
+✦ Mystic Droplet: 300
+✦ Gunpowder: 80
+✦ Mini Tusk: 20
+✦ Fish Tail: 55
             ]],
 
             [[
-SHARK_FIN x99
-TREASURE_MAP x99
-WOOD_LOG x99
+✦ Scrap Metal: 1500
+✦ Angel Wing: 35
+✦ Vampire Fang: 18
+✦ Leather: 999
             ]]
         }
 
-        MaterialText = Materials[math.random(1, #Materials)]
-
-        if MaterialParagraph and MaterialParagraph.Set then
-            MaterialParagraph:Set({
-                Title = " 当前材料",
-                Desc = MaterialText
-            })
-        end
+        MaterialText = RandomMaterials[math.random(1,#RandomMaterials)]
 
         WindUI:Notify({
-            Title = "库存已更新",
-            Content = "新的 Sailor Piece 材料已生成",
+            Title = "⚡ 自动收集更新",
+            Content = "新的材料库存已生成",
             Type = "Info"
         })
     end
 })
 
---// 状态
+--// 底部状态
 MainTab:AddParagraph({
-    Title = " 在线状态",
-    Desc = "航向：伟大航道"
+    Title = "🟢 系统状态",
+    Desc = "Auto Farming Materials..."
 })
 
---// 加载通知
+--// 启动通知
 WindUI:Notify({
-    Title = "Sailor Piece",
-    Content = "复制材料元件加载完成",
+    Title = "Blox Fruits",
+    Content = "Auto-Material Component 已加载",
     Type = "Success"
 })
