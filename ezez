@@ -9,96 +9,86 @@ end)
 
 --// 创建窗口
 local Window = WindUI:CreateWindow({
-    Title = "Sailor Piece",
-    Icon = "gift",
+    Title = "Sailor Piece Helper",
+    Icon = "anchor",
     Author = "OpenAI",
-    Folder = "Treasure_Copy",
-    Size = UDim2.fromOffset(500, 360),
+    Folder = "SailorPieceConfig",
+    Size = UDim2.fromOffset(520, 380),
     Transparent = true,
     Theme = "Dark"
 })
 
 --// 创建 Tab
-local MainTab = Window:CreateTab("Treasure", "gift")
+local Tab = Window:CreateTab("Main", "home")
 
---// 宝箱复制内容
-local CopyValue = "Sailor_Piece_Secret_Code_2026"
+--// Item Code
+local ItemCode = "ITEM_CODE_HERE"
 
 --// 标题
-MainTab:AddParagraph({
-    Title = "🎁 Sailor Treasure Chest",
-    Desc = "点击开启宝箱并复制秘密代码"
+Tab:AddParagraph({
+    Title = "⚓ Sailor Piece Helper",
+    Desc = "复制 Sailor Piece 物品代码"
 })
 
---// 当前内容
-MainTab:AddParagraph({
-    Title = "📜 Secret Treasure",
-    Desc = CopyValue
+--// 显示代码
+Tab:AddParagraph({
+    Title = "📦 当前物品代码",
+    Desc = ItemCode
 })
 
---// 宝箱按钮
-MainTab:AddButton({
-    Title = "🎁 开启宝箱",
-    Desc = "点击复制 Treasure Code",
+--// 复制按钮
+Tab:AddButton({
+    Title = "📋 复制 Item Code",
+    Desc = "点击复制物品代码到剪贴板",
     Callback = function()
 
         if setclipboard then
-            setclipboard(CopyValue)
-        end
-
-        -- 开箱动画通知
-        WindUI:Notify({
-            Title = "🔓 TREASURE OPENED!",
-            Content = "宝藏代码已复制",
-            Type = "Success"
-        })
-
-        -- 粒子风格通知
-        task.spawn(function()
-            task.wait(1.5)
+            setclipboard(ItemCode)
 
             WindUI:Notify({
-                Title = "✨ TREASURE COPIED!",
-                Content = CopyValue,
-                Type = "Info"
+                Title = "复制成功",
+                Content = "代码已成功复制到剪贴板！",
+                Type = "Success"
             })
-        end)
+        else
+            warn("你的执行器不支持 setclipboard 函数")
+        end
     end
 })
 
---// 随机宝藏按钮
-MainTab:AddButton({
-    Title = "⚓ 随机宝藏",
-    Desc = "生成新的 Sailor Piece Secret",
+--// 随机代码按钮
+Tab:AddButton({
+    Title = "🔄 随机生成代码",
+    Desc = "刷新新的 Sailor Piece Item Code",
     Callback = function()
 
-        local Treasures = {
-            "DevilFruit_Legendary_2026",
-            "SeaKing_Treasure_X99",
-            "GrandLine_Secret_Map",
-            "MythicFruit_Awakening",
-            "PirateKing_Chest_777"
+        local Codes = {
+            "LEGENDARY_SWORD_2026",
+            "DEVIL_FRUIT_X99",
+            "SEA_SCROLL_SECRET",
+            "PIRATE_KING_KEY",
+            "MYTHIC_CHEST_DROP"
         }
 
-        CopyValue = Treasures[math.random(1,#Treasures)]
+        ItemCode = Codes[math.random(1,#Codes)]
 
         WindUI:Notify({
-            Title = "🪙 新宝藏已生成",
-            Content = CopyValue,
+            Title = "代码已更新",
+            Content = ItemCode,
             Type = "Info"
         })
     end
 })
 
 --// 状态
-MainTab:AddParagraph({
-    Title = "🟢 Treasure Status",
-    Desc = "Grand Line Treasure Active"
+Tab:AddParagraph({
+    Title = "🟢 系统状态",
+    Desc = "Sailor Piece Helper Active"
 })
 
---// 启动通知
+--// 加载通知
 WindUI:Notify({
-    Title = "Sailor Piece",
-    Content = "Treasure Chest Component 已加载",
+    Title = "Sailor Piece Helper",
+    Content = "复制物品代码元件已加载",
     Type = "Success"
 })
