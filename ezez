@@ -164,8 +164,32 @@ MainTab:CreateToggle({
     end
 })
 
---// 移动速度
+--// 移速
 local TargetSpeed = 16
+local SpeedEnabled = false
+
+MainTab:CreateToggle({
+    Name = "开启移速",
+    CurrentValue = false,
+    Flag = "SpeedToggle",
+
+    Callback = function(state)
+
+        SpeedEnabled = state
+
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hum then
+
+            if SpeedEnabled then
+                hum.WalkSpeed = TargetSpeed
+            else
+                hum.WalkSpeed = 16
+            end
+        end
+    end
+})
 
 MainTab:CreateSlider({
     Name = "移动速度",
@@ -182,7 +206,7 @@ MainTab:CreateSlider({
         local char = game.Players.LocalPlayer.Character
         local hum = char and char:FindFirstChild("Humanoid")
 
-        if hum then
+        if hum and SpeedEnabled then
             hum.WalkSpeed = TargetSpeed
         end
     end
@@ -196,8 +220,20 @@ task.spawn(function()
         local char = game.Players.LocalPlayer.Character
         local hum = char and char:FindFirstChild("Humanoid")
 
-        if hum and hum.WalkSpeed ~= TargetSpeed then
-            hum.WalkSpeed = TargetSpeed
+        if hum then
+
+            if SpeedEnabled then
+
+                if hum.WalkSpeed ~= TargetSpeed then
+                    hum.WalkSpeed = TargetSpeed
+                end
+
+            else
+
+                if hum.WalkSpeed ~= 16 then
+                    hum.WalkSpeed = 16
+                end
+            end
         end
 
         task.wait(0.1)
@@ -211,6 +247,7 @@ MainTab:CreateButton({
     Callback = function()
 
         TargetSpeed = 16
+        SpeedEnabled = false
 
         local char = game.Players.LocalPlayer.Character
         local hum = char and char:FindFirstChild("Humanoid")
