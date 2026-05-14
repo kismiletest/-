@@ -3,13 +3,13 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 --// 创建窗口
 local Window = Rayfield:CreateWindow({
-    Name = "自动加入",
-    LoadingTitle = "自动加入",
+    Name = "嘉登 Hub",
+    LoadingTitle = "嘉登 Hub",
     LoadingSubtitle = "Rayfield UI",
 
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "AutoJoinCrew",
+        FolderName = "嘉登Hub",
         FileName = "Config"
     },
 
