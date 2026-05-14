@@ -31,30 +31,48 @@ MainTab:CreateParagraph({
     Content = "Rayfield UI 已成功加载"
 })
 
---// 超高空传送
-MainTab:CreateButton({
+--// 高空开关
+local SkyEnabled = false
+
+MainTab:CreateToggle({
     Name = "飞上天骑着你妈妈飞走",
+    CurrentValue = false,
+    Flag = "SkyToggle",
 
-    Callback = function()
+    Callback = function(state)
 
-        local char = game.Players.LocalPlayer.Character
-        if not char then return end
+        SkyEnabled = state
 
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+        if SkyEnabled then
 
-        hrp.CFrame = CFrame.new(
-            hrp.Position.X,
-            hrp.Position.Y + 5000,
-            hrp.Position.Z
-        )
+            local char = game.Players.LocalPlayer.Character
+            if not char then return end
 
-        Rayfield:Notify({
-            Title = "传送成功",
-            Content = "已移动到高空",
-            Duration = 3,
-            Image = 4483362458
-        })
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+
+            hrp.CFrame = CFrame.new(
+                hrp.Position.X,
+                hrp.Position.Y + 795679695796326795679695796326,
+                hrp.Position.Z
+            )
+
+            Rayfield:Notify({
+                Title = "高空模式",
+                Content = "已飞上高空",
+                Duration = 3,
+                Image = 4483362458
+            })
+
+        else
+
+            Rayfield:Notify({
+                Title = "高空模式",
+                Content = "已关闭",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
     end
 })
 
