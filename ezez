@@ -25,6 +25,9 @@ local Window = Rayfield:CreateWindow({
 --// Main Tab
 local MainTab = Window:CreateTab("Main", 4483362458)
 
+--// 玩家列表 Tab
+local PlayerTab = Window:CreateTab("玩家列表", 4483362458)
+
 --// 信息
 MainTab:CreateParagraph({
     Title = "1.en Hub",
@@ -212,7 +215,6 @@ MainTab:CreateSlider({
     end
 })
 
--- 持续锁定移速
 task.spawn(function()
 
     while true do
@@ -240,7 +242,6 @@ task.spawn(function()
     end
 end)
 
--- 恢复默认速度
 MainTab:CreateButton({
     Name = "恢复默认速度",
 
@@ -265,94 +266,117 @@ MainTab:CreateButton({
     end
 })
 
---// 玩家列表
-local PlayerTab = Window:CreateTab("玩家列表", 4483362458)
+--// 玩家列表系统
+local PlayerUIEntries = {}
 
-local PlayerButtons = {}
+local function UpdatePlayerEntry(player)
 
-local function RefreshPlayerList()
+    if not player or not player.Parent then
 
-    -- 清空旧按钮
-    for _, btn in pairs(PlayerButtons) do
-        pcall(function()
-            btn:Destroy()
-        end)
+        if PlayerUIEntries[player.UserId] then
+            PlayerUIEntries[player.UserId]:Destroy()
+            PlayerUIEntries[player.UserId] = nil
+        end
+
+        return
     end
 
-    table.clear(PlayerButtons)
+    if PlayerUIEntries[player.UserId] then
 
-    -- 创建新列表
+        local entry = PlayerUIEntries[player.UserId]
+
+        local hum = player.Character and player.Character:FindFirstChild("Humanoid")
+
+        local hp = hum and math.floor(hum.Health) or 0
+        local maxHp = hum and math.floor(hum.MaxHealth) or 100
+
+        entry:SetDesc(string.format(
+            "血量: %d/%d | 状态: %s",
+            hp,
+            maxHp,
+            (hp > 0 and "存活" or "死亡")
+        ))
+
+        return
+    end
+
+    local thumb, isReady = game.Players:GetUserThumbnailAsync(
+        player.UserId,
+        Enum.ThumbnailType.HeadShot,
+        Enum.ThumbnailSize.Size150x150
+    )
+
+    local newEntry = PlayerTab:CreateButton({
+        Name = player.DisplayName .. " (@" .. player.Name .. ")",
+
+        Callback = function()
+
+            Rayfield:Notify({
+                Title = "玩家信息",
+                Content = "选中了 " .. player.Name,
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    })
+
+    if newEntry.SetImage then
+        newEntry:SetImage(isReady and thumb or "rbxassetid://15124031024")
+    end
+
+    if newEntry.SetDesc then
+        newEntry:SetDesc("正在获取状态...")
+    end
+
+    PlayerUIEntries[player.UserId] = newEntry
+end
+
+local function ScanPlayers()
+
     for _, player in pairs(game.Players:GetPlayers()) do
+        UpdatePlayerEntry(player)
+    end
 
-        local level = 0
+    for userId, uiInstance in pairs(PlayerUIEntries) do
 
-        local stats = player:FindFirstChild("leaderstats")
+        local isStillHere = false
 
-        if stats and stats:FindFirstChild("Level") then
-            level = stats.Level.Value
-        end
+        for _, p in pairs(game.Players:GetPlayers()) do
 
-        local health = 0
-        local maxHealth = 100
-
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-
-            local hum = player.Character.Humanoid
-
-            health = math.floor(hum.Health)
-            maxHealth = math.floor(hum.MaxHealth)
-        end
-
-        local btn = PlayerTab:CreateButton({
-            Name = player.DisplayName .. " (@" .. player.Name .. ")" ..
-                " | Lv." .. level ..
-                " | HP " .. health .. "/" .. maxHealth,
-
-            Callback = function()
-
-                Rayfield:Notify({
-                    Title = "玩家信息",
-                    Content = "你点击了 " .. player.Name,
-                    Duration = 3,
-                    Image = 4483362458
-                })
+            if p.UserId == userId then
+                isStillHere = true
+                break
             end
-        })
+        end
 
-        table.insert(PlayerButtons, btn)
+        if not isStillHere then
+
+            uiInstance:Destroy()
+            PlayerUIEntries[userId] = nil
+        end
     end
 end
 
--- 刷新按钮
-PlayerTab:CreateButton({
-    Name = "刷新玩家列表",
+ScanPlayers()
 
-    Callback = function()
+game.Players.PlayerAdded:Connect(function()
+    task.wait(1)
+    ScanPlayers()
+end)
 
-        RefreshPlayerList()
-
-        Rayfield:Notify({
-            Title = "刷新成功",
-            Content = "玩家列表已刷新",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end
-})
-
--- 自动刷新
-game.Players.PlayerAdded:Connect(RefreshPlayerList)
-game.Players.PlayerRemoving:Connect(RefreshPlayerList)
+game.Players.PlayerRemoving:Connect(function()
+    ScanPlayers()
+end)
 
 task.spawn(function()
 
     while true do
-        task.wait(3)
-        pcall(RefreshPlayerList)
+
+        ScanPlayers()
+
+        task.wait(2)
     end
 end)
-
-RefreshPlayerList()
 
 --// 玩家ESP
 local ESP_Enabled = false
@@ -383,7 +407,6 @@ local function updateESP(player)
             return
         end
 
-        -- Highlight
         local highlight = char:FindFirstChild("WindHighlight")
             or Instance.new("Highlight")
 
@@ -392,7 +415,6 @@ local function updateESP(player)
         highlight.FillColor = Color3.fromRGB(0,255,255)
         highlight.OutlineColor = Color3.fromRGB(255,255,255)
 
-        -- Billboard
         local head = char:WaitForChild("Head")
 
         local billboard = head:FindFirstChild("WindESP_Tag")
@@ -404,7 +426,6 @@ local function updateESP(player)
         billboard.StudsOffset = Vector3.new(0,3,0)
         billboard.AlwaysOnTop = true
 
-        -- 名字标签
         local infoLabel = billboard:FindFirstChild("Info")
             or Instance.new("TextLabel")
 
@@ -417,7 +438,6 @@ local function updateESP(player)
         infoLabel.TextSize = 13
         infoLabel.Font = Enum.Font.GothamBold
 
-        -- 血条背景
         local healthBarBG = billboard:FindFirstChild("HealthBG")
             or Instance.new("Frame")
 
@@ -428,7 +448,6 @@ local function updateESP(player)
         healthBarBG.BackgroundColor3 = Color3.new(0,0,0)
         healthBarBG.BorderSizePixel = 0
 
-        -- 血条
         local healthBar = healthBarBG:FindFirstChild("Bar")
             or Instance.new("Frame")
 
@@ -438,7 +457,6 @@ local function updateESP(player)
         healthBar.BackgroundColor3 = Color3.new(0,1,0)
         healthBar.BorderSizePixel = 0
 
-        -- 更新
         task.spawn(function()
 
             while char and char.Parent and billboard.Parent do
@@ -491,10 +509,8 @@ local function updateESP(player)
     player.CharacterAdded:Connect(setupCharacter)
 end
 
--- 当前玩家
 for _, p in pairs(game.Players:GetPlayers()) do
     updateESP(p)
 end
 
--- 新玩家
 game.Players.PlayerAdded:Connect(updateESP)
