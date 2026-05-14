@@ -1,68 +1,344 @@
-local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+--// Rayfield Loader
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local Window = WindUI:CreateWindow({
-    Title = "Advanced Player List",
-    Icon = "rbxassetid://10734951102",
-    Author = "Gemini Editor",
-    Folder = "Custom_PlayerList"
+--// 创建窗口
+local Window = Rayfield:CreateWindow({
+    Name = "1.en Hub",
+    LoadingTitle = "1.en Hub",
+    LoadingSubtitle = "Rayfield UI",
+
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "1enHub",
+        FileName = "1enHubConfig"
+    },
+
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = false
+    },
+
+    KeySystem = false
 })
 
-local MainTab = Window:Tab({
-    Title = "玩家管理",
-    Icon = "users"
+--// Main Tab
+local MainTab = Window:CreateTab("Main", 4483362458)
+
+--// 玩家管理 Tab
+local PlayerTab = Window:CreateTab("玩家管理", 4483362458)
+
+--// 信息
+MainTab:CreateParagraph({
+    Title = "1.en Hub",
+    Content = "Rayfield UI 已成功加载"
 })
 
--- 存储 UI 实例，避免重复
+--// 超高空传送
+MainTab:CreateButton({
+    Name = "超高空传送",
+    Callback = function()
+
+        local char = game.Players.LocalPlayer.Character
+        if not char then return end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        hrp.CFrame = CFrame.new(
+            hrp.Position.X,
+            hrp.Position.Y + 5000,
+            hrp.Position.Z
+        )
+
+        Rayfield:Notify({
+            Title = "传送成功",
+            Content = "已移动到高空",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+--// Auto Buso
+local Player = game.Players.LocalPlayer
+local BusoEnabled = false
+
+local function ToggleBuso()
+
+    if BusoEnabled then
+
+        if not Player.Character:FindFirstChild("HasBuso") then
+
+            local remote = game:GetService("ReplicatedStorage")
+                :WaitForChild("Remotes")
+                :FindFirstChild("CommF_")
+
+            if remote then
+                remote:InvokeServer("Buso")
+            end
+        end
+    end
+end
+
+task.spawn(function()
+
+    while true do
+
+        if BusoEnabled then
+            pcall(ToggleBuso)
+        end
+
+        task.wait(1)
+    end
+end)
+
+MainTab:CreateToggle({
+    Name = "Auto Buso",
+    CurrentValue = false,
+    Flag = "AutoBuso",
+
+    Callback = function(state)
+
+        BusoEnabled = state
+
+        print("自动武装色状态:", state)
+    end
+})
+
+--// Auto V3
+local AutoV3 = {
+    Enabled = false
+}
+
+local function StartAutoV3()
+    print("V3开启")
+end
+
+local function StopAutoV3()
+    print("V3关闭")
+end
+
+MainTab:CreateToggle({
+    Name = "Auto V3",
+    CurrentValue = false,
+    Flag = "AutoV3",
+
+    Callback = function(state)
+
+        AutoV3.Enabled = state
+
+        if state then
+            StartAutoV3()
+        else
+            StopAutoV3()
+        end
+    end
+})
+
+--// Auto V4
+local AutoV4 = false
+local autoV4Connection = nil
+
+local function startV4Loop()
+    print("V4开启")
+end
+
+MainTab:CreateToggle({
+    Name = "Auto V4",
+    CurrentValue = false,
+    Flag = "AutoV4",
+
+    Callback = function(state)
+
+        AutoV4 = state
+
+        if AutoV4 then
+
+            startV4Loop()
+
+        else
+
+            if autoV4Connection then
+                autoV4Connection:Disconnect()
+                autoV4Connection = nil
+            end
+        end
+    end
+})
+
+--// 移速
+local TargetSpeed = 100
+local SpeedEnabled = false
+
+MainTab:CreateToggle({
+    Name = "开启移速",
+    CurrentValue = false,
+    Flag = "SpeedToggle",
+
+    Callback = function(state)
+
+        SpeedEnabled = state
+
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hum then
+
+            if SpeedEnabled then
+                hum.WalkSpeed = TargetSpeed
+            else
+                hum.WalkSpeed = 16
+            end
+        end
+    end
+})
+
+MainTab:CreateSlider({
+    Name = "移动速度",
+    Range = {1, 1000},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 100,
+    Flag = "WalkSpeed",
+
+    Callback = function(Value)
+
+        TargetSpeed = Value
+
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hum and SpeedEnabled then
+            hum.WalkSpeed = TargetSpeed
+        end
+    end
+})
+
+task.spawn(function()
+
+    while true do
+
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hum then
+
+            if SpeedEnabled then
+
+                if hum.WalkSpeed ~= TargetSpeed then
+                    hum.WalkSpeed = TargetSpeed
+                end
+
+            else
+
+                if hum.WalkSpeed ~= 16 then
+                    hum.WalkSpeed = 16
+                end
+            end
+        end
+
+        task.wait(0.1)
+    end
+end)
+
+MainTab:CreateButton({
+    Name = "恢复默认速度",
+
+    Callback = function()
+
+        TargetSpeed = 100
+        SpeedEnabled = false
+
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hum then
+            hum.WalkSpeed = 16
+        end
+
+        Rayfield:Notify({
+            Title = "移速恢复",
+            Content = "已恢复默认速度",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+--// 高级玩家列表
 local PlayerItems = {}
 
--- 核心：创建/更新单个玩家条目
 local function CreatePlayerEntry(player)
-    -- 1. 获取头像 (HeadShot)
+
     local thumb, isReady = game.Players:GetUserThumbnailAsync(
         player.UserId,
         Enum.ThumbnailType.HeadShot,
         Enum.ThumbnailSize.Size150x150
     )
 
-    -- 2. 获取等级 (兼容常见游戏 leaderstats)
     local level = 0
+
     local stats = player:FindFirstChild("leaderstats")
+
     if stats then
-        local lObj = stats:FindFirstChild("Level") or stats:FindFirstChild("Lv") or stats:FindFirstChild("等级")
-        if lObj then level = lObj.Value end
+
+        local lObj =
+            stats:FindFirstChild("Level")
+            or stats:FindFirstChild("Lv")
+            or stats:FindFirstChild("等级")
+
+        if lObj then
+            level = lObj.Value
+        end
     end
 
-    -- 3. 构建描述信息 (血量、等级、距离)
     local function getDesc()
+
         local char = player.Character
         local hum = char and char:FindFirstChild("Humanoid")
         local root = char and char:FindFirstChild("HumanoidRootPart")
-        local lpRoot = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        
+
+        local lpRoot =
+            game.Players.LocalPlayer.Character
+            and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
         local hp = hum and math.floor(hum.Health) or 0
-        local dist = (root and lpRoot) and math.floor((root.Position - lpRoot.Position).Magnitude) or 0
-        
-        return string.format("等级: %d | 血量: %d | 距离: %d studs", level, hp, dist)
+
+        local dist =
+            (root and lpRoot)
+            and math.floor((root.Position - lpRoot.Position).Magnitude)
+            or 0
+
+        return string.format(
+            "等级: %d | 血量: %d | 距离: %d studs",
+            level,
+            hp,
+            dist
+        )
     end
 
-    -- 4. 创建 WindUI 元件
-    local entry = MainTab:Button({
-        Title = player.DisplayName .. " (@" .. player.Name .. ")",
-        Desc = getDesc(),
-        Image = isReady and thumb or "rbxassetid://15124031024",
+    local entry = PlayerTab:CreateButton({
+        Name = player.DisplayName .. " (@" .. player.Name .. ")",
+
         Callback = function()
-            -- 模拟高级脚本的点击操作菜单
-            WindUI:Notify({
-                Title = "玩家操作: " .. player.Name,
-                Content = "已选择该玩家，你可以添加传送、追踪等功能",
-                Duration = 3
+
+            Rayfield:Notify({
+                Title = "玩家操作",
+                Content = "已选择玩家: " .. player.Name,
+                Duration = 3,
+                Image = 4483362458
             })
-            -- 示例操作：传送到该玩家
-            -- if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            --    game.Players.LocalPlayer.Character:MoveTo(player.Character.HumanoidRootPart.Position)
-            -- end
         end
     })
+
+    if entry.SetImage then
+        entry:SetImage(isReady and thumb or "rbxassetid://15124031024")
+    end
+
+    if entry.SetDesc then
+        entry:SetDesc(getDesc())
+    end
 
     PlayerItems[player.UserId] = {
         UI = entry,
@@ -70,53 +346,210 @@ local function CreatePlayerEntry(player)
     }
 end
 
--- 扫描并同步函数
 local function Synchronize()
-    -- 清理已经离开的人
+
+    -- 删除离开的玩家
     for userId, data in pairs(PlayerItems) do
+
         if not game.Players:FindFirstChild(data.Player.Name) then
+
             data.UI:Destroy()
             PlayerItems[userId] = nil
         end
     end
 
-    -- 添加新人或更新旧人描述
+    -- 添加/更新玩家
     for _, player in pairs(game.Players:GetPlayers()) do
+
         if not PlayerItems[player.UserId] then
+
             CreatePlayerEntry(player)
+
         else
-            -- 仅更新描述，不重建 UI，防止闪烁
+
             local data = PlayerItems[player.UserId]
+
             local char = player.Character
             local hum = char and char:FindFirstChild("Humanoid")
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+
+            local lpRoot =
+                game.Players.LocalPlayer.Character
+                and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
             local hp = hum and math.floor(hum.Health) or 0
-            
-            -- 这里由于 WindUI 限制，通常直接更新文字可能需要封装
-            -- 如果你的 WindUI 版本支持 SetDesc，可以调用：
+
+            local dist =
+                (root and lpRoot)
+                and math.floor((root.Position - lpRoot.Position).Magnitude)
+                or 0
+
             if data.UI.SetDesc then
-                data.UI:SetDesc(string.format("更新时间: %s | 血量: %d", os.date("%X"), hp))
+
+                data.UI:SetDesc(string.format(
+                    "血量: %d | 距离: %d studs | 更新时间: %s",
+                    hp,
+                    dist,
+                    os.date("%X")
+                ))
             end
         end
     end
 end
 
--- --- 自动化执行 ---
-
--- 初始化加载
 Synchronize()
 
--- 监听事件
-game.Players.PlayerAdded:Connect(function(p)
+game.Players.PlayerAdded:Connect(function()
     task.wait(1)
     Synchronize()
 end)
 
-game.Players.PlayerRemoving:Connect(Synchronize)
+game.Players.PlayerRemoving:Connect(function()
+    Synchronize()
+end)
 
--- 持续后台静默刷新 (每 5 秒刷新一次数据，保持流畅)
 task.spawn(function()
+
     while true do
+
         Synchronize()
+
         task.wait(5)
     end
 end)
+
+--// 玩家ESP
+local ESP_Enabled = false
+
+MainTab:CreateToggle({
+    Name = "开启玩家透视",
+    CurrentValue = false,
+    Flag = "PlayerESP",
+
+    Callback = function(State)
+        ESP_Enabled = State
+    end
+})
+
+local function updateESP(player)
+
+    if player == game.Players.LocalPlayer then
+        return
+    end
+
+    local function setupCharacter(char)
+
+        local root = char:WaitForChild("HumanoidRootPart", 10)
+        local hum = char:WaitForChild("Humanoid", 10)
+
+        if not root or not hum then
+            return
+        end
+
+        local highlight = char:FindFirstChild("WindHighlight")
+            or Instance.new("Highlight")
+
+        highlight.Name = "WindHighlight"
+        highlight.Parent = char
+        highlight.FillColor = Color3.fromRGB(0,255,255)
+        highlight.OutlineColor = Color3.fromRGB(255,255,255)
+
+        local head = char:WaitForChild("Head")
+
+        local billboard = head:FindFirstChild("WindESP_Tag")
+            or Instance.new("BillboardGui")
+
+        billboard.Name = "WindESP_Tag"
+        billboard.Parent = head
+        billboard.Size = UDim2.new(0,150,0,70)
+        billboard.StudsOffset = Vector3.new(0,3,0)
+        billboard.AlwaysOnTop = true
+
+        local infoLabel = billboard:FindFirstChild("Info")
+            or Instance.new("TextLabel")
+
+        infoLabel.Name = "Info"
+        infoLabel.Parent = billboard
+        infoLabel.Size = UDim2.new(1,0,0.4,0)
+        infoLabel.BackgroundTransparency = 1
+        infoLabel.TextColor3 = Color3.new(1,1,1)
+        infoLabel.TextStrokeTransparency = 0
+        infoLabel.TextSize = 13
+        infoLabel.Font = Enum.Font.GothamBold
+
+        local healthBarBG = billboard:FindFirstChild("HealthBG")
+            or Instance.new("Frame")
+
+        healthBarBG.Name = "HealthBG"
+        healthBarBG.Parent = billboard
+        healthBarBG.Position = UDim2.new(0.25,0,0.5,0)
+        healthBarBG.Size = UDim2.new(0.5,0,0.1,0)
+        healthBarBG.BackgroundColor3 = Color3.new(0,0,0)
+        healthBarBG.BorderSizePixel = 0
+
+        local healthBar = healthBarBG:FindFirstChild("Bar")
+            or Instance.new("Frame")
+
+        healthBar.Name = "Bar"
+        healthBar.Parent = healthBarBG
+        healthBar.Size = UDim2.new(1,0,1,0)
+        healthBar.BackgroundColor3 = Color3.new(0,1,0)
+        healthBar.BorderSizePixel = 0
+
+        task.spawn(function()
+
+            while char and char.Parent and billboard.Parent do
+
+                if ESP_Enabled then
+
+                    local LocalCharacter = game.Players.LocalPlayer.Character
+                    local LocalRoot = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
+
+                    local dist = 0
+
+                    if LocalRoot then
+                        dist = (root.Position - LocalRoot.Position).Magnitude
+                    end
+
+                    highlight.Enabled = true
+                    billboard.Enabled = true
+
+                    infoLabel.Text = string.format(
+                        "%s\n[%d m]",
+                        player.Name,
+                        math.floor(dist)
+                    )
+
+                    local hpPercent = hum.Health / hum.MaxHealth
+
+                    healthBar.Size = UDim2.new(hpPercent,0,1,0)
+
+                    healthBar.BackgroundColor3 = Color3.fromHSV(
+                        hpPercent * 0.3,
+                        1,
+                        1
+                    )
+
+                else
+
+                    highlight.Enabled = false
+                    billboard.Enabled = false
+                end
+
+                task.wait(0.1)
+            end
+        end)
+    end
+
+    if player.Character then
+        setupCharacter(player.Character)
+    end
+
+    player.CharacterAdded:Connect(setupCharacter)
+end
+
+for _, p in pairs(game.Players:GetPlayers()) do
+    updateESP(p)
+end
+
+game.Players.PlayerAdded:Connect(updateESP)
