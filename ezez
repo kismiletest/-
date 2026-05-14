@@ -1,90 +1,7 @@
-repeat task.wait() until game:IsLoaded()
-
 --// Rayfield Loader
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
---------------------------------------------------
--- SERVICES
---------------------------------------------------
-
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
-local LocalPlayer = Players.LocalPlayer
-
---------------------------------------------------
--- VARIABLES & LOGIC
---------------------------------------------------
-
--- Auto V3
-local AutoV3 = false
-local AutoV3Task = nil
-
-local function StartAutoV3()
-    if AutoV3Task then return end
-
-    AutoV3Task = task.spawn(function()
-        while AutoV3 do
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
-            task.wait(1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
-            task.wait(1)
-        end
-
-        AutoV3Task = nil
-    end)
-end
-
--- Auto V4
-local AutoV4 = false
-local autoV4Connection = nil
-
-local function getAwakeningRemote()
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-
-    if backpack then
-        local awakening = backpack:FindFirstChild("Awakening")
-
-        if awakening then
-            return awakening:FindFirstChild("RemoteFunction")
-        end
-    end
-
-    return nil
-end
-
-local function startV4Loop()
-    if autoV4Connection then
-        autoV4Connection:Disconnect()
-    end
-
-    pcall(function()
-        local r = getAwakeningRemote()
-
-        if r then
-            r:InvokeServer(true)
-        end
-    end)
-
-    autoV4Connection = RunService.Heartbeat:Connect(function()
-        if not AutoV4 then return end
-
-        local r = getAwakeningRemote()
-
-        if r then
-            pcall(function()
-                r:InvokeServer(true)
-            end)
-        end
-    end)
-end
-
---------------------------------------------------
--- WINDOW
---------------------------------------------------
-
+--// 创建窗口
 local Window = Rayfield:CreateWindow({
     Name = "1.en Hub",
     LoadingTitle = "1.en Hub",
@@ -105,29 +22,20 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false
 })
 
---------------------------------------------------
--- TAB
---------------------------------------------------
-
+--// Main Tab
 local MainTab = Window:CreateTab("Main", 4483362458)
 
---------------------------------------------------
--- SECTION
---------------------------------------------------
-
+--// 信息
 MainTab:CreateParagraph({
-    Title = "PVP",
-    Content = "Combat Functions"
+    Title = "1.en Hub",
+    Content = "Rayfield UI 已成功加载"
 })
 
---------------------------------------------------
--- BUTTON
---------------------------------------------------
-
+--// 超高空传送
 MainTab:CreateButton({
-    Name = "全圖秒殺",
+    Name = "超高空传送",
     Callback = function()
-        local char = LocalPlayer.Character
+        local char = game.Players.LocalPlayer.Character
         if not char then return end
 
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -140,80 +48,24 @@ MainTab:CreateButton({
         )
 
         Rayfield:Notify({
-            Title = "成功",
-            Content = "已觸發功能",
+            Title = "传送成功",
+            Content = "已移动到高空",
             Duration = 3,
             Image = 4483362458
         })
     end
 })
 
---------------------------------------------------
--- AUTO V3
---------------------------------------------------
-
-MainTab:CreateToggle({
-    Name = "Auto V3",
-    CurrentValue = false,
-    Flag = "AutoV3",
-
-    Callback = function(Value)
-        AutoV3 = Value
-
-        if Value then
-            StartAutoV3()
-        end
-    end
-})
-
---------------------------------------------------
--- AUTO V4
---------------------------------------------------
-
-MainTab:CreateToggle({
-    Name = "Auto V4",
-    CurrentValue = false,
-    Flag = "AutoV4",
-
-    Callback = function(Value)
-        AutoV4 = Value
-
-        if AutoV4 then
-            startV4Loop()
-        else
-            if autoV4Connection then
-                autoV4Connection:Disconnect()
-                autoV4Connection = nil
-            end
-        end
-    end
-})
-
---------------------------------------------------
--- AUTO BUSO
---------------------------------------------------
-
+--// Auto Buso
+local Player = game.Players.LocalPlayer
 local BusoEnabled = false
-
-MainTab:CreateToggle({
-    Name = "Auto Buso",
-    CurrentValue = false,
-    Flag = "AutoBuso",
-
-    Callback = function(Value)
-        BusoEnabled = Value
-    end
-})
 
 local function ToggleBuso()
     if BusoEnabled then
-        local Character = LocalPlayer.Character
-        if not Character then return end
-
-        if not Character:FindFirstChild("HasBuso") then
-            local remote =
-                ReplicatedStorage:FindFirstChild("Remotes")
-                and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+        if not Player.Character:FindFirstChild("HasBuso") then
+            local remote = game:GetService("ReplicatedStorage")
+                :WaitForChild("Remotes")
+                :FindFirstChild("CommF_")
 
             if remote then
                 remote:InvokeServer("Buso")
@@ -227,7 +79,51 @@ task.spawn(function()
         if BusoEnabled then
             pcall(ToggleBuso)
         end
-
         task.wait(1)
     end
 end)
+
+MainTab:CreateToggle({
+    Name = "Auto Buso",
+    CurrentValue = false,
+    Flag = "AutoBuso",
+    Callback = function(state)
+        BusoEnabled = state
+        print("自动武装色状态:", state)
+    end
+})
+
+--// Auto V3
+MainTab:CreateToggle({
+    Name = "Auto V3",
+    CurrentValue = false,
+    Flag = "AutoV3",
+    Callback = function(state)
+        AutoV3.Enabled = state
+
+        if state then
+            StartAutoV3()
+        else
+            StopAutoV3()
+        end
+    end
+})
+
+--// Auto V4
+MainTab:CreateToggle({
+    Name = "Auto V4",
+    CurrentValue = false,
+    Flag = "AutoV4",
+    Callback = function(state)
+        AutoV4 = state
+
+        if AutoV4 then
+            startV4Loop()
+        else
+            if autoV4Connection then
+                autoV4Connection:Disconnect()
+                autoV4Connection = nil
+            end
+        end
+    end
+})
