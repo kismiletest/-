@@ -33,7 +33,7 @@ local TimeParagraph = MainTab:CreateParagraph({
 local AutoJoin = false
 local TargetCrewID = nil
 
---// 时间选项
+--// 时间列表
 local timeOptions = {}
 
 local currentUtcTime = os.time()
@@ -101,7 +101,7 @@ MainTab:CreateInput({
 
             Rayfield:Notify({
                 Title = "CrewID 已更新",
-                Content = "目标 CrewID: " .. TargetCrewID,
+                Content = "目标 CrewID 设置为: " .. TargetCrewID,
                 Duration = 3,
                 Image = 4483362458
             })
@@ -110,7 +110,7 @@ MainTab:CreateInput({
 })
 
 --// 自动加入开关
-MainTab:CreateToggle({
+local AutoJoinToggle = MainTab:CreateToggle({
     Name = "开启自动加入",
     CurrentValue = false,
     Flag = "AutoJoinCrew",
@@ -120,7 +120,7 @@ MainTab:CreateToggle({
     end
 })
 
---// 自动检测时间
+--// 自动加入检测
 task.spawn(function()
 
     while task.wait(1) do
@@ -142,12 +142,14 @@ task.spawn(function()
 
                     Rayfield:Notify({
                         Title = "加入失败",
-                        Content = "未设置 CrewID",
+                        Content = "未设置 CrewID，请先输入 CrewID！",
                         Duration = 5,
                         Image = 4483362458
                     })
 
                     AutoJoin = false
+                    AutoJoinToggle:Set(false)
+
                     continue
                 end
 
@@ -168,10 +170,11 @@ task.spawn(function()
                 end)
 
                 AutoJoin = false
+                AutoJoinToggle:Set(false)
 
                 Rayfield:Notify({
                     Title = "自动加入船员",
-                    Content = "已发送加入请求",
+                    Content = "时间已到，已发送加入船员请求！",
                     Duration = 5,
                     Image = 4483362458
                 })
