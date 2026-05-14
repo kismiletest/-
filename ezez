@@ -33,6 +33,7 @@ MainTab:CreateParagraph({
 
 --// 高空开关
 local SkyEnabled = false
+local OldPosition = nil
 
 MainTab:CreateToggle({
     Name = "飞上天骑着你妈妈飞走",
@@ -43,14 +44,18 @@ MainTab:CreateToggle({
 
         SkyEnabled = state
 
+        local char = game.Players.LocalPlayer.Character
+        if not char then return end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
         if SkyEnabled then
 
-            local char = game.Players.LocalPlayer.Character
-            if not char then return end
+            -- 保存原位置
+            OldPosition = hrp.CFrame
 
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if not hrp then return end
-
+            -- 飞上高空
             hrp.CFrame = CFrame.new(
                 hrp.Position.X,
                 hrp.Position.Y + 795679695796326795679695796326,
@@ -66,9 +71,14 @@ MainTab:CreateToggle({
 
         else
 
+            -- 回到原位置
+            if OldPosition then
+                hrp.CFrame = OldPosition
+            end
+
             Rayfield:Notify({
                 Title = "高空模式",
-                Content = "已关闭",
+                Content = "已返回原位置",
                 Duration = 3,
                 Image = 4483362458
             })
