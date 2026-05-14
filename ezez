@@ -36,7 +36,7 @@ MainTab:CreateParagraph({
 
 --// 超高空传送
 MainTab:CreateButton({
-    Name = "超高空传送",
+    Name = "飞上天骑着你妈妈飞走",
     Callback = function()
 
         local char = game.Players.LocalPlayer.Character
