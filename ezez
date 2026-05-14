@@ -35,6 +35,7 @@ MainTab:CreateParagraph({
 MainTab:CreateButton({
     Name = "超高空传送",
     Callback = function()
+
         local char = game.Players.LocalPlayer.Character
         if not char then return end
 
@@ -61,7 +62,9 @@ local Player = game.Players.LocalPlayer
 local BusoEnabled = false
 
 local function ToggleBuso()
+
     if BusoEnabled then
+
         if not Player.Character:FindFirstChild("HasBuso") then
 
             local remote = game:GetService("ReplicatedStorage")
@@ -76,10 +79,13 @@ local function ToggleBuso()
 end
 
 task.spawn(function()
+
     while true do
+
         if BusoEnabled then
             pcall(ToggleBuso)
         end
+
         task.wait(1)
     end
 end)
@@ -90,12 +96,26 @@ MainTab:CreateToggle({
     Flag = "AutoBuso",
 
     Callback = function(state)
+
         BusoEnabled = state
+
         print("自动武装色状态:", state)
     end
 })
 
 --// Auto V3
+local AutoV3 = {
+    Enabled = false
+}
+
+local function StartAutoV3()
+    print("V3开启")
+end
+
+local function StopAutoV3()
+    print("V3关闭")
+end
+
 MainTab:CreateToggle({
     Name = "Auto V3",
     CurrentValue = false,
@@ -114,6 +134,13 @@ MainTab:CreateToggle({
 })
 
 --// Auto V4
+local AutoV4 = false
+local autoV4Connection = nil
+
+local function startV4Loop()
+    print("V4开启")
+end
+
 MainTab:CreateToggle({
     Name = "Auto V4",
     CurrentValue = false,
@@ -124,13 +151,80 @@ MainTab:CreateToggle({
         AutoV4 = state
 
         if AutoV4 then
+
             startV4Loop()
+
         else
+
             if autoV4Connection then
                 autoV4Connection:Disconnect()
                 autoV4Connection = nil
             end
         end
+    end
+})
+
+--// 移动速度
+local TargetSpeed = 16
+
+MainTab:CreateSlider({
+    Name = "移动速度",
+    Range = {1, 1000},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
+
+    Callback = function(Value)
+
+        TargetSpeed = Value
+
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hum then
+            hum.WalkSpeed = TargetSpeed
+        end
+    end
+})
+
+-- 持续锁定移速
+task.spawn(function()
+
+    while true do
+
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hum and hum.WalkSpeed ~= TargetSpeed then
+            hum.WalkSpeed = TargetSpeed
+        end
+
+        task.wait(0.1)
+    end
+end)
+
+-- 恢复默认速度
+MainTab:CreateButton({
+    Name = "恢复默认速度",
+
+    Callback = function()
+
+        TargetSpeed = 16
+
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+
+        if hum then
+            hum.WalkSpeed = 16
+        end
+
+        Rayfield:Notify({
+            Title = "移速恢复",
+            Content = "已恢复默认速度",
+            Duration = 3,
+            Image = 4483362458
+        })
     end
 })
 
