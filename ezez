@@ -63,6 +63,7 @@ local BusoEnabled = false
 local function ToggleBuso()
     if BusoEnabled then
         if not Player.Character:FindFirstChild("HasBuso") then
+
             local remote = game:GetService("ReplicatedStorage")
                 :WaitForChild("Remotes")
                 :FindFirstChild("CommF_")
@@ -87,6 +88,7 @@ MainTab:CreateToggle({
     Name = "Auto Buso",
     CurrentValue = false,
     Flag = "AutoBuso",
+
     Callback = function(state)
         BusoEnabled = state
         print("自动武装色状态:", state)
@@ -98,7 +100,9 @@ MainTab:CreateToggle({
     Name = "Auto V3",
     CurrentValue = false,
     Flag = "AutoV3",
+
     Callback = function(state)
+
         AutoV3.Enabled = state
 
         if state then
@@ -114,7 +118,9 @@ MainTab:CreateToggle({
     Name = "Auto V4",
     CurrentValue = false,
     Flag = "AutoV4",
+
     Callback = function(state)
+
         AutoV4 = state
 
         if AutoV4 then
@@ -127,3 +133,148 @@ MainTab:CreateToggle({
         end
     end
 })
+
+--// 玩家ESP
+local ESP_Enabled = false
+
+MainTab:CreateToggle({
+    Name = "开启玩家透视",
+    CurrentValue = false,
+    Flag = "PlayerESP",
+
+    Callback = function(State)
+        ESP_Enabled = State
+    end
+})
+
+--// ESP 核心
+local function updateESP(player)
+
+    if player == game.Players.LocalPlayer then
+        return
+    end
+
+    local function setupCharacter(char)
+
+        local root = char:WaitForChild("HumanoidRootPart", 10)
+        local hum = char:WaitForChild("Humanoid", 10)
+
+        if not root or not hum then
+            return
+        end
+
+        -- Highlight
+        local highlight = char:FindFirstChild("WindHighlight")
+            or Instance.new("Highlight")
+
+        highlight.Name = "WindHighlight"
+        highlight.Parent = char
+        highlight.FillColor = Color3.fromRGB(0,255,255)
+        highlight.OutlineColor = Color3.fromRGB(255,255,255)
+
+        -- Billboard
+        local head = char:WaitForChild("Head")
+
+        local billboard = head:FindFirstChild("WindESP_Tag")
+            or Instance.new("BillboardGui")
+
+        billboard.Name = "WindESP_Tag"
+        billboard.Parent = head
+        billboard.Size = UDim2.new(0,150,0,70)
+        billboard.StudsOffset = Vector3.new(0,3,0)
+        billboard.AlwaysOnTop = true
+
+        -- 名字标签
+        local infoLabel = billboard:FindFirstChild("Info")
+            or Instance.new("TextLabel")
+
+        infoLabel.Name = "Info"
+        infoLabel.Parent = billboard
+        infoLabel.Size = UDim2.new(1,0,0.4,0)
+        infoLabel.BackgroundTransparency = 1
+        infoLabel.TextColor3 = Color3.new(1,1,1)
+        infoLabel.TextStrokeTransparency = 0
+        infoLabel.TextSize = 13
+        infoLabel.Font = Enum.Font.GothamBold
+
+        -- 血条背景
+        local healthBarBG = billboard:FindFirstChild("HealthBG")
+            or Instance.new("Frame")
+
+        healthBarBG.Name = "HealthBG"
+        healthBarBG.Parent = billboard
+        healthBarBG.Position = UDim2.new(0.25,0,0.5,0)
+        healthBarBG.Size = UDim2.new(0.5,0,0.1,0)
+        healthBarBG.BackgroundColor3 = Color3.new(0,0,0)
+        healthBarBG.BorderSizePixel = 0
+
+        -- 血条
+        local healthBar = healthBarBG:FindFirstChild("Bar")
+            or Instance.new("Frame")
+
+        healthBar.Name = "Bar"
+        healthBar.Parent = healthBarBG
+        healthBar.Size = UDim2.new(1,0,1,0)
+        healthBar.BackgroundColor3 = Color3.new(0,1,0)
+        healthBar.BorderSizePixel = 0
+
+        -- 更新
+        task.spawn(function()
+
+            while char and char.Parent and billboard.Parent do
+
+                if ESP_Enabled then
+
+                    local LocalCharacter = game.Players.LocalPlayer.Character
+                    local LocalRoot = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
+
+                    local dist = 0
+
+                    if LocalRoot then
+                        dist = (root.Position - LocalRoot.Position).Magnitude
+                    end
+
+                    highlight.Enabled = true
+                    billboard.Enabled = true
+
+                    infoLabel.Text = string.format(
+                        "%s\n[%d m]",
+                        player.Name,
+                        math.floor(dist)
+                    )
+
+                    local hpPercent = hum.Health / hum.MaxHealth
+
+                    healthBar.Size = UDim2.new(hpPercent,0,1,0)
+
+                    healthBar.BackgroundColor3 = Color3.fromHSV(
+                        hpPercent * 0.3,
+                        1,
+                        1
+                    )
+
+                else
+
+                    highlight.Enabled = false
+                    billboard.Enabled = false
+                end
+
+                task.wait(0.1)
+            end
+        end)
+    end
+
+    if player.Character then
+        setupCharacter(player.Character)
+    end
+
+    player.CharacterAdded:Connect(setupCharacter)
+end
+
+-- 当前玩家
+for _, p in pairs(game.Players:GetPlayers()) do
+    updateESP(p)
+end
+
+-- 新玩家
+game.Players.PlayerAdded:Connect(updateESP)
