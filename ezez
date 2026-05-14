@@ -265,6 +265,95 @@ MainTab:CreateButton({
     end
 })
 
+--// 玩家列表
+local PlayerTab = Window:CreateTab("玩家列表", 4483362458)
+
+local PlayerButtons = {}
+
+local function RefreshPlayerList()
+
+    -- 清空旧按钮
+    for _, btn in pairs(PlayerButtons) do
+        pcall(function()
+            btn:Destroy()
+        end)
+    end
+
+    table.clear(PlayerButtons)
+
+    -- 创建新列表
+    for _, player in pairs(game.Players:GetPlayers()) do
+
+        local level = 0
+
+        local stats = player:FindFirstChild("leaderstats")
+
+        if stats and stats:FindFirstChild("Level") then
+            level = stats.Level.Value
+        end
+
+        local health = 0
+        local maxHealth = 100
+
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+
+            local hum = player.Character.Humanoid
+
+            health = math.floor(hum.Health)
+            maxHealth = math.floor(hum.MaxHealth)
+        end
+
+        local btn = PlayerTab:CreateButton({
+            Name = player.DisplayName .. " (@" .. player.Name .. ")" ..
+                " | Lv." .. level ..
+                " | HP " .. health .. "/" .. maxHealth,
+
+            Callback = function()
+
+                Rayfield:Notify({
+                    Title = "玩家信息",
+                    Content = "你点击了 " .. player.Name,
+                    Duration = 3,
+                    Image = 4483362458
+                })
+            end
+        })
+
+        table.insert(PlayerButtons, btn)
+    end
+end
+
+-- 刷新按钮
+PlayerTab:CreateButton({
+    Name = "刷新玩家列表",
+
+    Callback = function()
+
+        RefreshPlayerList()
+
+        Rayfield:Notify({
+            Title = "刷新成功",
+            Content = "玩家列表已刷新",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+-- 自动刷新
+game.Players.PlayerAdded:Connect(RefreshPlayerList)
+game.Players.PlayerRemoving:Connect(RefreshPlayerList)
+
+task.spawn(function()
+
+    while true do
+        task.wait(3)
+        pcall(RefreshPlayerList)
+    end
+end)
+
+RefreshPlayerList()
+
 --// 玩家ESP
 local ESP_Enabled = false
 
