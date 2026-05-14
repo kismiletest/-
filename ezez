@@ -165,7 +165,7 @@ MainTab:CreateToggle({
 })
 
 --// 移速
-local TargetSpeed = 16
+local TargetSpeed = 100
 local SpeedEnabled = false
 
 MainTab:CreateToggle({
@@ -196,7 +196,7 @@ MainTab:CreateSlider({
     Range = {1, 1000},
     Increment = 1,
     Suffix = "Speed",
-    CurrentValue = 16,
+    CurrentValue = 100,
     Flag = "WalkSpeed",
 
     Callback = function(Value)
@@ -246,7 +246,7 @@ MainTab:CreateButton({
 
     Callback = function()
 
-        TargetSpeed = 16
+        TargetSpeed = 100
         SpeedEnabled = false
 
         local char = game.Players.LocalPlayer.Character
