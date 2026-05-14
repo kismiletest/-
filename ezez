@@ -1,94 +1,58 @@
---// WindUI Loader
-local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+--// EN Hub x Rayfield UI
 
-pcall(function()
-    if game.CoreGui:FindFirstChild("WindUI") then
-        game.CoreGui.WindUI:Destroy()
-    end
-end)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
---// 创建窗口
-local Window = WindUI:CreateWindow({
-    Title = "Sailor Piece Helper",
-    Icon = "anchor",
-    Author = "OpenAI",
-    Folder = "SailorPieceConfig",
-    Size = UDim2.fromOffset(520, 380),
-    Transparent = true,
-    Theme = "Dark"
+--// Window
+local Window = Rayfield:CreateWindow({
+    Name = "1.en Hub",
+    LoadingTitle = "1.en Hub Loading...",
+    LoadingSubtitle = "Rayfield Interface",
+    
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "1enHub",
+        FileName = "1enHubConfig"
+    },
+
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = false
+    },
+
+    KeySystem = false
 })
 
---// 创建 Tab
-local Tab = Window:CreateTab("Main", "home")
+--// Main Tab
+local MainTab = Window:CreateTab("Main", 4483362458)
 
---// Item Code
-local ItemCode = "ITEM_CODE_HERE"
-
---// 标题
-Tab:AddParagraph({
-    Title = "⚓ Sailor Piece Helper",
-    Desc = "复制 Sailor Piece 物品代码"
+--// Paragraph
+MainTab:CreateParagraph({
+    Title = "1.en Hub",
+    Content = "欢迎使用 1.en Hub"
 })
 
---// 显示代码
-Tab:AddParagraph({
-    Title = "📦 当前物品代码",
-    Desc = ItemCode
-})
-
---// 复制按钮
-Tab:AddButton({
-    Title = "📋 复制 Item Code",
-    Desc = "点击复制物品代码到剪贴板",
+--// Button
+MainTab:CreateButton({
+    Name = "超高空传送",
     Callback = function()
+        local char = game.Players.LocalPlayer.Character
+        if not char then return end
 
-        if setclipboard then
-            setclipboard(ItemCode)
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
 
-            WindUI:Notify({
-                Title = "复制成功",
-                Content = "代码已成功复制到剪贴板！",
-                Type = "Success"
-            })
-        else
-            warn("你的执行器不支持 setclipboard 函数")
-        end
-    end
-})
+        hrp.CFrame = CFrame.new(
+            hrp.Position.X,
+            hrp.Position.Y + 5000,
+            hrp.Position.Z
+        )
 
---// 随机代码按钮
-Tab:AddButton({
-    Title = "🔄 随机生成代码",
-    Desc = "刷新新的 Sailor Piece Item Code",
-    Callback = function()
-
-        local Codes = {
-            "LEGENDARY_SWORD_2026",
-            "DEVIL_FRUIT_X99",
-            "SEA_SCROLL_SECRET",
-            "PIRATE_KING_KEY",
-            "MYTHIC_CHEST_DROP"
-        }
-
-        ItemCode = Codes[math.random(1,#Codes)]
-
-        WindUI:Notify({
-            Title = "代码已更新",
-            Content = ItemCode,
-            Type = "Info"
+        Rayfield:Notify({
+            Title = "传送成功",
+            Content = "已移动到高空",
+            Duration = 3,
+            Image = 4483362458
         })
     end
-})
-
---// 状态
-Tab:AddParagraph({
-    Title = "🟢 系统状态",
-    Desc = "Sailor Piece Helper Active"
-})
-
---// 加载通知
-WindUI:Notify({
-    Title = "Sailor Piece Helper",
-    Content = "复制物品代码元件已加载",
-    Type = "Success"
 })
