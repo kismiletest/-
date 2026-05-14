@@ -244,142 +244,143 @@ end
 game.Players.PlayerAdded:Connect(updateESP)
 
 --// 玩家列表系统
-local ActiveEntries = {}
+local PlayerUIEntries = {}
 
-local function GetPlayerData(player)
+--// 自动寻找赏金/金钱
+local function GetBounty(player)
+
+    local possibleNames = {
+        "Bounty",
+        "赏金",
+        "Money",
+        "Cash",
+        "金币",
+        "Points"
+    }
 
     local stats = player:FindFirstChild("leaderstats")
 
-    local bounty = 0
-
     if stats then
 
-        local bObj =
-            stats:FindFirstChild("Bounty")
-            or stats:FindFirstChild("赏金")
-            or stats:FindFirstChild("Money")
+        for _, name in pairs(possibleNames) do
 
-        if bObj then
-            bounty = bObj.Value
+            local obj = stats:FindFirstChild(name)
+
+            if obj then
+                return obj.Value
+            end
         end
     end
 
-    local hp = 0
-    local maxHp = 100
-
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-
-        hp = math.floor(player.Character.Humanoid.Health)
-
-        maxHp = math.floor(player.Character.Humanoid.MaxHealth)
-    end
-
-    return bounty, hp, maxHp
+    return 0
 end
 
-local function RefreshList()
+--// 更新列表
+local function UpdateList()
 
-    -- 删除离开的玩家
-    for userId, entry in pairs(ActiveEntries) do
+    -- 清理离开的玩家
+    for userId, entry in pairs(PlayerUIEntries) do
 
         if not game.Players:GetPlayerByUserId(userId) then
 
-            entry:Destroy()
-            ActiveEntries[userId] = nil
+            if entry.Destroy then
+                entry:Destroy()
+            end
+
+            PlayerUIEntries[userId] = nil
         end
     end
 
-    -- 添加/更新玩家
+    -- 创建/更新玩家
     for _, player in pairs(game.Players:GetPlayers()) do
 
-        local bounty, hp, maxHp = GetPlayerData(player)
+        local bounty = GetBounty(player)
 
-        if not ActiveEntries[player.UserId] then
+        local hum =
+            player.Character
+            and player.Character:FindFirstChild("Humanoid")
 
-            local thumb, isReady = game.Players:GetUserThumbnailAsync(
-                player.UserId,
-                Enum.ThumbnailType.HeadShot,
-                Enum.ThumbnailSize.Size150x150
-            )
+        local hp = hum and math.floor(hum.Health) or 0
+
+        local maxHp =
+            hum and math.floor(hum.MaxHealth)
+            or 100
+
+        local displayInfo = string.format(
+            "💰赏金: %s | ❤️血量: %d/%d",
+            tostring(bounty),
+            hp,
+            maxHp
+        )
+
+        -- 没有UI就创建
+        if not PlayerUIEntries[player.UserId] then
+
+            local thumb, isReady =
+                game.Players:GetUserThumbnailAsync(
+                    player.UserId,
+                    Enum.ThumbnailType.HeadShot,
+                    Enum.ThumbnailSize.Size150x150
+                )
 
             local newEntry = PlayerTab:CreateButton({
-                Name = player.DisplayName,
+                Name = player.DisplayName .. " (@" .. player.Name .. ")",
 
                 Callback = function()
 
-                    setclipboard(player.Name)
+                    print("选中的玩家用户名是: " .. player.Name)
 
                     Rayfield:Notify({
-                        Title = "系统",
-                        Content = "已复制玩家用户名: " .. player.Name,
-                        Duration = 2,
+                        Title = "玩家信息",
+                        Content = "已选择玩家: " .. player.Name,
+                        Duration = 3,
                         Image = 4483362458
                     })
                 end
             })
 
             if newEntry.SetImage then
-                newEntry:SetImage(isReady and thumb or "rbxassetid://15124031024")
+                newEntry:SetImage(
+                    isReady and thumb
+                    or "rbxassetid://15124031024"
+                )
             end
 
             if newEntry.SetDesc then
-                newEntry:SetDesc(string.format(
-                    "赏金: 💰%d | 血量: %d/%d",
-                    bounty,
-                    hp,
-                    maxHp
-                ))
+                newEntry:SetDesc(displayInfo)
             end
 
-            ActiveEntries[player.UserId] = newEntry
+            PlayerUIEntries[player.UserId] = newEntry
 
         else
 
-            local existingEntry = ActiveEntries[player.UserId]
+            local entry = PlayerUIEntries[player.UserId]
 
-            if existingEntry.SetDesc then
-
-                existingEntry:SetDesc(string.format(
-                    "赏金: 💰%d | 血量: %d/%d",
-                    bounty,
-                    hp,
-                    maxHp
-                ))
+            if entry.SetDesc then
+                entry:SetDesc(displayInfo)
             end
         end
     end
 end
 
--- 初始加载
-RefreshList()
-
--- 手动刷新按钮
-PlayerTab:CreateButton({
-    Name = "手动刷新列表",
-
-    Callback = function()
-        RefreshList()
-    end
-})
-
--- 玩家加入
-game.Players.PlayerAdded:Connect(function()
-    task.wait(2)
-    RefreshList()
-end)
-
--- 玩家离开
-game.Players.PlayerRemoving:Connect(function()
-    RefreshList()
-end)
-
--- 自动刷新
+--// 自动刷新
 task.spawn(function()
 
     while true do
 
-        RefreshList()
+        local success, err = pcall(UpdateList)
 
-        task.wait(5)
+        if not success then
+            warn("刷新列表出错: " .. err)
+        end
+
+        task.wait(3)
     end
 end)
+
+Rayfield:Notify({
+    Title = "系统提示",
+    Content = "玩家列表已启动，每3秒自动同步数据",
+    Duration = 3,
+    Image = 4483362458
+})
