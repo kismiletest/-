@@ -1,13 +1,95 @@
---// EN Hub x Rayfield UI
+repeat task.wait() until game:IsLoaded()
 
+--// Rayfield Loader
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
---// Window
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- VARIABLES & LOGIC
+--------------------------------------------------
+
+-- Auto V3
+local AutoV3 = false
+local AutoV3Task = nil
+
+local function StartAutoV3()
+    if AutoV3Task then return end
+
+    AutoV3Task = task.spawn(function()
+        while AutoV3 do
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
+            task.wait(1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
+            task.wait(1)
+        end
+
+        AutoV3Task = nil
+    end)
+end
+
+-- Auto V4
+local AutoV4 = false
+local autoV4Connection = nil
+
+local function getAwakeningRemote()
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+
+    if backpack then
+        local awakening = backpack:FindFirstChild("Awakening")
+
+        if awakening then
+            return awakening:FindFirstChild("RemoteFunction")
+        end
+    end
+
+    return nil
+end
+
+local function startV4Loop()
+    if autoV4Connection then
+        autoV4Connection:Disconnect()
+    end
+
+    pcall(function()
+        local r = getAwakeningRemote()
+
+        if r then
+            r:InvokeServer(true)
+        end
+    end)
+
+    autoV4Connection = RunService.Heartbeat:Connect(function()
+        if not AutoV4 then return end
+
+        local r = getAwakeningRemote()
+
+        if r then
+            pcall(function()
+                r:InvokeServer(true)
+            end)
+        end
+    end)
+end
+
+--------------------------------------------------
+-- WINDOW
+--------------------------------------------------
+
 local Window = Rayfield:CreateWindow({
     Name = "1.en Hub",
-    LoadingTitle = "1.en Hub Loading...",
-    LoadingSubtitle = "Rayfield Interface",
-    
+    LoadingTitle = "1.en Hub",
+    LoadingSubtitle = "Rayfield UI",
+
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "1enHub",
@@ -23,20 +105,29 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false
 })
 
---// Main Tab
+--------------------------------------------------
+-- TAB
+--------------------------------------------------
+
 local MainTab = Window:CreateTab("Main", 4483362458)
 
---// Paragraph
+--------------------------------------------------
+-- SECTION
+--------------------------------------------------
+
 MainTab:CreateParagraph({
-    Title = "1.en Hub",
-    Content = "欢迎使用 1.en Hub"
+    Title = "PVP",
+    Content = "Combat Functions"
 })
 
---// Button
+--------------------------------------------------
+-- BUTTON
+--------------------------------------------------
+
 MainTab:CreateButton({
-    Name = "超高空传送",
+    Name = "全圖秒殺",
     Callback = function()
-        local char = game.Players.LocalPlayer.Character
+        local char = LocalPlayer.Character
         if not char then return end
 
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -49,10 +140,94 @@ MainTab:CreateButton({
         )
 
         Rayfield:Notify({
-            Title = "传送成功",
-            Content = "已移动到高空",
+            Title = "成功",
+            Content = "已觸發功能",
             Duration = 3,
             Image = 4483362458
         })
     end
 })
+
+--------------------------------------------------
+-- AUTO V3
+--------------------------------------------------
+
+MainTab:CreateToggle({
+    Name = "Auto V3",
+    CurrentValue = false,
+    Flag = "AutoV3",
+
+    Callback = function(Value)
+        AutoV3 = Value
+
+        if Value then
+            StartAutoV3()
+        end
+    end
+})
+
+--------------------------------------------------
+-- AUTO V4
+--------------------------------------------------
+
+MainTab:CreateToggle({
+    Name = "Auto V4",
+    CurrentValue = false,
+    Flag = "AutoV4",
+
+    Callback = function(Value)
+        AutoV4 = Value
+
+        if AutoV4 then
+            startV4Loop()
+        else
+            if autoV4Connection then
+                autoV4Connection:Disconnect()
+                autoV4Connection = nil
+            end
+        end
+    end
+})
+
+--------------------------------------------------
+-- AUTO BUSO
+--------------------------------------------------
+
+local BusoEnabled = false
+
+MainTab:CreateToggle({
+    Name = "Auto Buso",
+    CurrentValue = false,
+    Flag = "AutoBuso",
+
+    Callback = function(Value)
+        BusoEnabled = Value
+    end
+})
+
+local function ToggleBuso()
+    if BusoEnabled then
+        local Character = LocalPlayer.Character
+        if not Character then return end
+
+        if not Character:FindFirstChild("HasBuso") then
+            local remote =
+                ReplicatedStorage:FindFirstChild("Remotes")
+                and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+
+            if remote then
+                remote:InvokeServer("Buso")
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        if BusoEnabled then
+            pcall(ToggleBuso)
+        end
+
+        task.wait(1)
+    end
+end)
