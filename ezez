@@ -25,8 +25,8 @@ local Window = Rayfield:CreateWindow({
 --// Main Tab
 local MainTab = Window:CreateTab("Main", 4483362458)
 
---// 玩家管理 Tab
-local PlayerTab = Window:CreateTab("玩家管理", 4483362458)
+--// 玩家列表 Tab
+local PlayerTab = Window:CreateTab("玩家列表", 4483362458)
 
 --// 信息
 MainTab:CreateParagraph({
@@ -37,6 +37,7 @@ MainTab:CreateParagraph({
 --// 超高空传送
 MainTab:CreateButton({
     Name = "飞上天骑着你妈妈飞走",
+
     Callback = function()
 
         local char = game.Players.LocalPlayer.Character
@@ -47,7 +48,7 @@ MainTab:CreateButton({
 
         hrp.CFrame = CFrame.new(
             hrp.Position.X,
-            hrp.Position.Y + 795679695796326795679695796326,
+            hrp.Position.Y + 5000,
             hrp.Position.Z
         )
 
@@ -105,318 +106,6 @@ MainTab:CreateToggle({
         print("自动武装色状态:", state)
     end
 })
-
---// Auto V3
-local AutoV3 = {
-    Enabled = false
-}
-
-local function StartAutoV3()
-    print("V3开启")
-end
-
-local function StopAutoV3()
-    print("V3关闭")
-end
-
-MainTab:CreateToggle({
-    Name = "Auto V3",
-    CurrentValue = false,
-    Flag = "AutoV3",
-
-    Callback = function(state)
-
-        AutoV3.Enabled = state
-
-        if state then
-            StartAutoV3()
-        else
-            StopAutoV3()
-        end
-    end
-})
-
---// Auto V4
-local AutoV4 = false
-local autoV4Connection = nil
-
-local function startV4Loop()
-    print("V4开启")
-end
-
-MainTab:CreateToggle({
-    Name = "Auto V4",
-    CurrentValue = false,
-    Flag = "AutoV4",
-
-    Callback = function(state)
-
-        AutoV4 = state
-
-        if AutoV4 then
-
-            startV4Loop()
-
-        else
-
-            if autoV4Connection then
-                autoV4Connection:Disconnect()
-                autoV4Connection = nil
-            end
-        end
-    end
-})
-
---// 移速
-local TargetSpeed = 100
-local SpeedEnabled = false
-
-MainTab:CreateToggle({
-    Name = "开启移速",
-    CurrentValue = false,
-    Flag = "SpeedToggle",
-
-    Callback = function(state)
-
-        SpeedEnabled = state
-
-        local char = game.Players.LocalPlayer.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-
-        if hum then
-
-            if SpeedEnabled then
-                hum.WalkSpeed = TargetSpeed
-            else
-                hum.WalkSpeed = 16
-            end
-        end
-    end
-})
-
-MainTab:CreateSlider({
-    Name = "移动速度",
-    Range = {1, 1000},
-    Increment = 1,
-    Suffix = "Speed",
-    CurrentValue = 100,
-    Flag = "WalkSpeed",
-
-    Callback = function(Value)
-
-        TargetSpeed = Value
-
-        local char = game.Players.LocalPlayer.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-
-        if hum and SpeedEnabled then
-            hum.WalkSpeed = TargetSpeed
-        end
-    end
-})
-
-task.spawn(function()
-
-    while true do
-
-        local char = game.Players.LocalPlayer.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-
-        if hum then
-
-            if SpeedEnabled then
-
-                if hum.WalkSpeed ~= TargetSpeed then
-                    hum.WalkSpeed = TargetSpeed
-                end
-
-            else
-
-                if hum.WalkSpeed ~= 16 then
-                    hum.WalkSpeed = 16
-                end
-            end
-        end
-
-        task.wait(0.1)
-    end
-end)
-
-MainTab:CreateButton({
-    Name = "恢复默认速度",
-
-    Callback = function()
-
-        TargetSpeed = 100
-        SpeedEnabled = false
-
-        local char = game.Players.LocalPlayer.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-
-        if hum then
-            hum.WalkSpeed = 16
-        end
-
-        Rayfield:Notify({
-            Title = "移速恢复",
-            Content = "已恢复默认速度",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end
-})
-
---// 高级玩家列表
-local PlayerItems = {}
-
-local function CreatePlayerEntry(player)
-
-    local thumb, isReady = game.Players:GetUserThumbnailAsync(
-        player.UserId,
-        Enum.ThumbnailType.HeadShot,
-        Enum.ThumbnailSize.Size150x150
-    )
-
-    local level = 0
-
-    local stats = player:FindFirstChild("leaderstats")
-
-    if stats then
-
-        local lObj =
-            stats:FindFirstChild("Level")
-            or stats:FindFirstChild("Lv")
-            or stats:FindFirstChild("等级")
-
-        if lObj then
-            level = lObj.Value
-        end
-    end
-
-    local function getDesc()
-
-        local char = player.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-
-        local lpRoot =
-            game.Players.LocalPlayer.Character
-            and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-        local hp = hum and math.floor(hum.Health) or 0
-
-        local dist =
-            (root and lpRoot)
-            and math.floor((root.Position - lpRoot.Position).Magnitude)
-            or 0
-
-        return string.format(
-            "等级: %d | 血量: %d | 距离: %d studs",
-            level,
-            hp,
-            dist
-        )
-    end
-
-    local entry = PlayerTab:CreateButton({
-        Name = player.DisplayName .. " (@" .. player.Name .. ")",
-
-        Callback = function()
-
-            Rayfield:Notify({
-                Title = "玩家操作",
-                Content = "已选择玩家: " .. player.Name,
-                Duration = 3,
-                Image = 4483362458
-            })
-        end
-    })
-
-    if entry.SetImage then
-        entry:SetImage(isReady and thumb or "rbxassetid://15124031024")
-    end
-
-    if entry.SetDesc then
-        entry:SetDesc(getDesc())
-    end
-
-    PlayerItems[player.UserId] = {
-        UI = entry,
-        Player = player
-    }
-end
-
-local function Synchronize()
-
-    -- 删除离开的玩家
-    for userId, data in pairs(PlayerItems) do
-
-        if not game.Players:FindFirstChild(data.Player.Name) then
-
-            data.UI:Destroy()
-            PlayerItems[userId] = nil
-        end
-    end
-
-    -- 添加/更新玩家
-    for _, player in pairs(game.Players:GetPlayers()) do
-
-        if not PlayerItems[player.UserId] then
-
-            CreatePlayerEntry(player)
-
-        else
-
-            local data = PlayerItems[player.UserId]
-
-            local char = player.Character
-            local hum = char and char:FindFirstChild("Humanoid")
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-
-            local lpRoot =
-                game.Players.LocalPlayer.Character
-                and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-            local hp = hum and math.floor(hum.Health) or 0
-
-            local dist =
-                (root and lpRoot)
-                and math.floor((root.Position - lpRoot.Position).Magnitude)
-                or 0
-
-            if data.UI.SetDesc then
-
-                data.UI:SetDesc(string.format(
-                    "血量: %d | 距离: %d studs | 更新时间: %s",
-                    hp,
-                    dist,
-                    os.date("%X")
-                ))
-            end
-        end
-    end
-end
-
-Synchronize()
-
-game.Players.PlayerAdded:Connect(function()
-    task.wait(1)
-    Synchronize()
-end)
-
-game.Players.PlayerRemoving:Connect(function()
-    Synchronize()
-end)
-
-task.spawn(function()
-
-    while true do
-
-        Synchronize()
-
-        task.wait(5)
-    end
-end)
 
 --// 玩家ESP
 local ESP_Enabled = false
@@ -553,3 +242,144 @@ for _, p in pairs(game.Players:GetPlayers()) do
 end
 
 game.Players.PlayerAdded:Connect(updateESP)
+
+--// 玩家列表系统
+local ActiveEntries = {}
+
+local function GetPlayerData(player)
+
+    local stats = player:FindFirstChild("leaderstats")
+
+    local bounty = 0
+
+    if stats then
+
+        local bObj =
+            stats:FindFirstChild("Bounty")
+            or stats:FindFirstChild("赏金")
+            or stats:FindFirstChild("Money")
+
+        if bObj then
+            bounty = bObj.Value
+        end
+    end
+
+    local hp = 0
+    local maxHp = 100
+
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+
+        hp = math.floor(player.Character.Humanoid.Health)
+
+        maxHp = math.floor(player.Character.Humanoid.MaxHealth)
+    end
+
+    return bounty, hp, maxHp
+end
+
+local function RefreshList()
+
+    -- 删除离开的玩家
+    for userId, entry in pairs(ActiveEntries) do
+
+        if not game.Players:GetPlayerByUserId(userId) then
+
+            entry:Destroy()
+            ActiveEntries[userId] = nil
+        end
+    end
+
+    -- 添加/更新玩家
+    for _, player in pairs(game.Players:GetPlayers()) do
+
+        local bounty, hp, maxHp = GetPlayerData(player)
+
+        if not ActiveEntries[player.UserId] then
+
+            local thumb, isReady = game.Players:GetUserThumbnailAsync(
+                player.UserId,
+                Enum.ThumbnailType.HeadShot,
+                Enum.ThumbnailSize.Size150x150
+            )
+
+            local newEntry = PlayerTab:CreateButton({
+                Name = player.DisplayName,
+
+                Callback = function()
+
+                    setclipboard(player.Name)
+
+                    Rayfield:Notify({
+                        Title = "系统",
+                        Content = "已复制玩家用户名: " .. player.Name,
+                        Duration = 2,
+                        Image = 4483362458
+                    })
+                end
+            })
+
+            if newEntry.SetImage then
+                newEntry:SetImage(isReady and thumb or "rbxassetid://15124031024")
+            end
+
+            if newEntry.SetDesc then
+                newEntry:SetDesc(string.format(
+                    "赏金: 💰%d | 血量: %d/%d",
+                    bounty,
+                    hp,
+                    maxHp
+                ))
+            end
+
+            ActiveEntries[player.UserId] = newEntry
+
+        else
+
+            local existingEntry = ActiveEntries[player.UserId]
+
+            if existingEntry.SetDesc then
+
+                existingEntry:SetDesc(string.format(
+                    "赏金: 💰%d | 血量: %d/%d",
+                    bounty,
+                    hp,
+                    maxHp
+                ))
+            end
+        end
+    end
+end
+
+-- 初始加载
+RefreshList()
+
+-- 手动刷新按钮
+PlayerTab:CreateButton({
+    Name = "手动刷新列表",
+
+    Callback = function()
+        RefreshList()
+    end
+})
+
+-- 玩家加入
+game.Players.PlayerAdded:Connect(function()
+    task.wait(2)
+    RefreshList()
+end)
+
+-- 玩家离开
+game.Players.PlayerRemoving:Connect(function()
+    RefreshList()
+end)
+
+-- 自动刷新
+task.spawn(function()
+
+    while true do
+
+        RefreshList()
+
+        task.wait(5)
+    end
+end)
