@@ -25,9 +25,6 @@ local Window = Rayfield:CreateWindow({
 --// Main Tab
 local MainTab = Window:CreateTab("Main", 4483362458)
 
---// 玩家列表 Tab
-local PlayerTab = Window:CreateTab("玩家列表", 4483362458)
-
 --// 信息
 MainTab:CreateParagraph({
     Title = "1.en Hub",
@@ -48,7 +45,7 @@ MainTab:CreateButton({
 
         hrp.CFrame = CFrame.new(
             hrp.Position.X,
-            hrp.Position.Y +  795679695796326795679695796326,
+            hrp.Position.Y + 5000,
             hrp.Position.Z
         )
 
@@ -107,113 +104,192 @@ MainTab:CreateToggle({
     end
 })
 
---// 玩家ESP
+--// 全能ESP
 local ESP_Enabled = false
 
 MainTab:CreateToggle({
-    Name = "开启玩家透视",
+    Name = "开启全能透视",
     CurrentValue = false,
-    Flag = "PlayerESP",
+    Flag = "FullESP",
 
     Callback = function(State)
         ESP_Enabled = State
     end
 })
 
-local function updateESP(player)
+--// 获取果实
+local function GetPlayerFruit(player)
+
+    local char = player.Character
+
+    if char then
+
+        for _, tool in pairs(player.Backpack:GetChildren()) do
+
+            if tool:FindFirstChild("Fruit")
+            or string.find(tool.Name, "Fruit") then
+
+                return tool.Name
+            end
+        end
+
+        local tool = char:FindFirstChildOfClass("Tool")
+
+        if tool and (
+            string.find(tool.Name, "Fruit")
+            or tool:FindFirstChild("Fruit")
+        ) then
+            return tool.Name
+        end
+    end
+
+    return "无果实/未装备"
+end
+
+--// 获取赏金
+local function GetBounty(player)
+
+    local stats = player:FindFirstChild("leaderstats")
+
+    if stats then
+
+        local b =
+            stats:FindFirstChild("Bounty")
+            or stats:FindFirstChild("赏金")
+            or stats:FindFirstChild("Money")
+
+        return b and b.Value or 0
+    end
+
+    return 0
+end
+
+--// 创建ESP
+local function CreateESP(player)
 
     if player == game.Players.LocalPlayer then
         return
     end
 
-    local function setupCharacter(char)
+    local function setup(char)
 
-        local root = char:WaitForChild("HumanoidRootPart", 10)
-        local hum = char:WaitForChild("Humanoid", 10)
+        local head = char:WaitForChild("Head", 15)
+        local hum = char:WaitForChild("Humanoid", 15)
 
-        if not root or not hum then
+        if not head or not hum then
             return
         end
 
-        local highlight = char:FindFirstChild("WindHighlight")
-            or Instance.new("Highlight")
-
-        highlight.Name = "WindHighlight"
-        highlight.Parent = char
-        highlight.FillColor = Color3.fromRGB(0,255,255)
-        highlight.OutlineColor = Color3.fromRGB(255,255,255)
-
-        local head = char:WaitForChild("Head")
-
-        local billboard = head:FindFirstChild("WindESP_Tag")
+        -- Billboard
+        local billboard =
+            head:FindFirstChild("CustomESP")
             or Instance.new("BillboardGui")
 
-        billboard.Name = "WindESP_Tag"
+        billboard.Name = "CustomESP"
         billboard.Parent = head
-        billboard.Size = UDim2.new(0,150,0,70)
-        billboard.StudsOffset = Vector3.new(0,3,0)
+        billboard.Size = UDim2.new(0, 200, 0, 100)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
         billboard.AlwaysOnTop = true
 
-        local infoLabel = billboard:FindFirstChild("Info")
+        -- 文本
+        local textLabel =
+            billboard:FindFirstChild("Info")
             or Instance.new("TextLabel")
 
-        infoLabel.Name = "Info"
-        infoLabel.Parent = billboard
-        infoLabel.Size = UDim2.new(1,0,0.4,0)
-        infoLabel.BackgroundTransparency = 1
-        infoLabel.TextColor3 = Color3.new(1,1,1)
-        infoLabel.TextStrokeTransparency = 0
-        infoLabel.TextSize = 13
-        infoLabel.Font = Enum.Font.GothamBold
+        textLabel.Name = "Info"
+        textLabel.Parent = billboard
+        textLabel.Size = UDim2.new(1, 0, 0.8, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.TextColor3 = Color3.new(1, 1, 1)
+        textLabel.TextStrokeTransparency = 0
+        textLabel.TextSize = 14
+        textLabel.Font = Enum.Font.GothamBold
+        textLabel.TextYAlignment = Enum.TextYAlignment.Bottom
+        textLabel.RichText = true
 
-        local healthBarBG = billboard:FindFirstChild("HealthBG")
+        -- 血条背景
+        local barBG =
+            billboard:FindFirstChild("BarBG")
             or Instance.new("Frame")
 
-        healthBarBG.Name = "HealthBG"
-        healthBarBG.Parent = billboard
-        healthBarBG.Position = UDim2.new(0.25,0,0.5,0)
-        healthBarBG.Size = UDim2.new(0.5,0,0.1,0)
-        healthBarBG.BackgroundColor3 = Color3.new(0,0,0)
-        healthBarBG.BorderSizePixel = 0
+        barBG.Name = "BarBG"
+        barBG.Parent = billboard
+        barBG.Position = UDim2.new(0.1, 0, 0.85, 0)
+        barBG.Size = UDim2.new(0.8, 0, 0.08, 0)
+        barBG.BackgroundColor3 = Color3.new(0, 0, 0)
+        barBG.BorderSizePixel = 0
 
-        local healthBar = healthBarBG:FindFirstChild("Bar")
+        -- 血条
+        local bar =
+            barBG:FindFirstChild("Bar")
             or Instance.new("Frame")
 
-        healthBar.Name = "Bar"
-        healthBar.Parent = healthBarBG
-        healthBar.Size = UDim2.new(1,0,1,0)
-        healthBar.BackgroundColor3 = Color3.new(0,1,0)
-        healthBar.BorderSizePixel = 0
+        bar.Name = "Bar"
+        bar.Parent = barBG
+        bar.Size = UDim2.new(1, 0, 1, 0)
+        bar.BackgroundColor3 = Color3.new(0, 1, 0)
+        bar.BorderSizePixel = 0
 
+        -- Highlight
+        local highlight =
+            char:FindFirstChild("ESPHighlight")
+            or Instance.new("Highlight")
+
+        highlight.Name = "ESPHighlight"
+        highlight.Parent = char
+        highlight.FillTransparency = 0.6
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+
+        -- 循环更新
         task.spawn(function()
 
             while char and char.Parent and billboard.Parent do
 
                 if ESP_Enabled then
 
-                    local LocalCharacter = game.Players.LocalPlayer.Character
-                    local LocalRoot = LocalCharacter and LocalCharacter:FindFirstChild("HumanoidRootPart")
+                    billboard.Enabled = true
+                    highlight.Enabled = true
+
+                    local localChar =
+                        game.Players.LocalPlayer.Character
+
+                    local localRoot =
+                        localChar
+                        and localChar:FindFirstChild("HumanoidRootPart")
+
+                    local root =
+                        char:FindFirstChild("HumanoidRootPart")
 
                     local dist = 0
 
-                    if LocalRoot then
-                        dist = (root.Position - LocalRoot.Position).Magnitude
+                    if root and localRoot then
+                        dist = math.floor(
+                            (root.Position - localRoot.Position).Magnitude
+                        )
                     end
 
-                    highlight.Enabled = true
-                    billboard.Enabled = true
+                    local fruit = GetPlayerFruit(player)
+                    local bounty = GetBounty(player)
 
-                    infoLabel.Text = string.format(
-                        "%s\n[%d m]",
-                        player.Name,
-                        math.floor(dist)
+                    local hpPercent =
+                        hum.Health / hum.MaxHealth
+
+                    textLabel.Text = string.format(
+                        "%s\n<font color='rgb(255,255,0)'>果实: %s</font>\n💰赏金: %d\n📏距离: %d studs",
+                        player.DisplayName,
+                        fruit,
+                        bounty,
+                        dist
                     )
 
-                    local hpPercent = hum.Health / hum.MaxHealth
+                    bar.Size = UDim2.new(
+                        hpPercent,
+                        0,
+                        1,
+                        0
+                    )
 
-                    healthBar.Size = UDim2.new(hpPercent,0,1,0)
-
-                    healthBar.BackgroundColor3 = Color3.fromHSV(
+                    bar.BackgroundColor3 = Color3.fromHSV(
                         hpPercent * 0.3,
                         1,
                         1
@@ -221,8 +297,8 @@ local function updateESP(player)
 
                 else
 
-                    highlight.Enabled = false
                     billboard.Enabled = false
+                    highlight.Enabled = false
                 end
 
                 task.wait(0.1)
@@ -231,156 +307,15 @@ local function updateESP(player)
     end
 
     if player.Character then
-        setupCharacter(player.Character)
+        setup(player.Character)
     end
 
-    player.CharacterAdded:Connect(setupCharacter)
+    player.CharacterAdded:Connect(setup)
 end
 
+--// 初始化ESP
 for _, p in pairs(game.Players:GetPlayers()) do
-    updateESP(p)
+    CreateESP(p)
 end
 
-game.Players.PlayerAdded:Connect(updateESP)
-
---// 玩家列表系统
-local PlayerUIEntries = {}
-
---// 自动寻找赏金/金钱
-local function GetBounty(player)
-
-    local possibleNames = {
-        "Bounty",
-        "赏金",
-        "Money",
-        "Cash",
-        "金币",
-        "Points"
-    }
-
-    local stats = player:FindFirstChild("leaderstats")
-
-    if stats then
-
-        for _, name in pairs(possibleNames) do
-
-            local obj = stats:FindFirstChild(name)
-
-            if obj then
-                return obj.Value
-            end
-        end
-    end
-
-    return 0
-end
-
---// 更新列表
-local function UpdateList()
-
-    -- 清理离开的玩家
-    for userId, entry in pairs(PlayerUIEntries) do
-
-        if not game.Players:GetPlayerByUserId(userId) then
-
-            if entry.Destroy then
-                entry:Destroy()
-            end
-
-            PlayerUIEntries[userId] = nil
-        end
-    end
-
-    -- 创建/更新玩家
-    for _, player in pairs(game.Players:GetPlayers()) do
-
-        local bounty = GetBounty(player)
-
-        local hum =
-            player.Character
-            and player.Character:FindFirstChild("Humanoid")
-
-        local hp = hum and math.floor(hum.Health) or 0
-
-        local maxHp =
-            hum and math.floor(hum.MaxHealth)
-            or 100
-
-        local displayInfo = string.format(
-            "💰赏金: %s | ❤️血量: %d/%d",
-            tostring(bounty),
-            hp,
-            maxHp
-        )
-
-        -- 没有UI就创建
-        if not PlayerUIEntries[player.UserId] then
-
-            local thumb, isReady =
-                game.Players:GetUserThumbnailAsync(
-                    player.UserId,
-                    Enum.ThumbnailType.HeadShot,
-                    Enum.ThumbnailSize.Size150x150
-                )
-
-            local newEntry = PlayerTab:CreateButton({
-                Name = player.DisplayName .. " (@" .. player.Name .. ")",
-
-                Callback = function()
-
-                    print("选中的玩家用户名是: " .. player.Name)
-
-                    Rayfield:Notify({
-                        Title = "玩家信息",
-                        Content = "已选择玩家: " .. player.Name,
-                        Duration = 3,
-                        Image = 4483362458
-                    })
-                end
-            })
-
-            if newEntry.SetImage then
-                newEntry:SetImage(
-                    isReady and thumb
-                    or "rbxassetid://15124031024"
-                )
-            end
-
-            if newEntry.SetDesc then
-                newEntry:SetDesc(displayInfo)
-            end
-
-            PlayerUIEntries[player.UserId] = newEntry
-
-        else
-
-            local entry = PlayerUIEntries[player.UserId]
-
-            if entry.SetDesc then
-                entry:SetDesc(displayInfo)
-            end
-        end
-    end
-end
-
---// 自动刷新
-task.spawn(function()
-
-    while true do
-
-        local success, err = pcall(UpdateList)
-
-        if not success then
-            warn("刷新列表出错: " .. err)
-        end
-
-        task.wait(3)
-    end
-end)
-
-Rayfield:Notify({
-    Title = "系统提示",
-    Content = "玩家列表已启动，每3秒自动同步数据",
-    Duration = 3,
-    Image = 4483362458
-})
+game.Players.PlayerAdded:Connect(CreateESP)
