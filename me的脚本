@@ -1,8 +1,20 @@
---// Rayfield
-local Rayfield =
-loadstring(game:HttpGet(
-'https://sirius.menu/rayfield'
+pcall(function()
+    game.CoreGui:FindFirstChild("WindUI"):Destroy()
+end)
+
+repeat task.wait() until game:IsLoaded()
+
+--------------------------------------------------
+-- WIND UI
+--------------------------------------------------
+
+local WindUI = loadstring(game:HttpGet(
+"https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -10,427 +22,346 @@ local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 --------------------------------------------------
 -- WINDOW
 --------------------------------------------------
 
-local Window = Rayfield:CreateWindow({
+local Window = WindUI:CreateWindow({
+    Title = "1.en Hub",
+    Icon = "rbxassetid://7733960981",
+    Author = "by 1.en",
+    Folder = "1enHub",
+    Size = UDim2.fromOffset(600, 430),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 180,
 
-    Name="1.en Hub",
-    LoadingTitle="1.en Hub",
-    LoadingSubtitle="by 1.en",
-
-    ConfigurationSaving={
-        Enabled=true,
-        FolderName="1enHub",
-        FileName="Config"
-    },
-
-    KeySystem=false
+    OpenButton = {
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false
+    }
 })
 
 --------------------------------------------------
--- TAB
+-- TABS
 --------------------------------------------------
 
-local NoticeTab =
-Window:CreateTab("公告",4483362458)
+local Tabs = {
+    Notice = Window:Tab({
+        Title = "公告",
+        Icon = "book"
+    }),
 
-local DungeonTab =
-Window:CreateTab("Dungeon",4483362458)
+    Dungeon = Window:Tab({
+        Title = "Dungeon",
+        Icon = "map"
+    }),
 
-local ESPTab =
-Window:CreateTab("ESP",4483362458)
+    ESP = Window:Tab({
+        Title = "ESP",
+        Icon = "eye"
+    }),
 
-local SettingTab =
-Window:CreateTab("设置",4483362458)
+    Settings = Window:Tab({
+        Title = "设置",
+        Icon = "settings"
+    })
+}
 
 --------------------------------------------------
 -- 公告
 --------------------------------------------------
 
-NoticeTab:CreateParagraph({
-Title="公告",
-Content="制作者 1.en"
+Tabs.Notice:Paragraph({
+    Title = "公告",
+    Desc = "制作者 1.en"
 })
 
 --------------------------------------------------
 -- DUNGEON
 --------------------------------------------------
 
-local character=
-LocalPlayer.Character
-or LocalPlayer.CharacterAdded:Wait()
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
 
-local humanoidRootPart=
-character:WaitForChild("HumanoidRootPart")
-
-local humanoid=
-character:WaitForChild("Humanoid")
-
-local CONFIG={
-
-TargetTeleporterName="ExitTeleporter",
-CheckInterval=1,
-TweenTime=0.8,
-DetectionRadius=1000,
-CooldownAfterTeleport=3
-
+local CONFIG = {
+    TargetTeleporterName = "ExitTeleporter",
+    CheckInterval = 1,
+    TweenTime = 0.8,
+    DetectionRadius = 1000,
+    CooldownAfterTeleport = 3
 }
 
-local isDetecting=false
-local isTeleporting=false
-local lastTeleport=0
+local isDetecting = false
+local isTeleporting = false
+local lastTeleportTime = 0
+
+local dungeonLabel = Tabs.Dungeon:Paragraph({
+    Title = "地下城关卡",
+    Desc = "当前: 未检测"
+})
+
+Tabs.Dungeon:Toggle({
+    Title = "自动地下城",
+    Value = false,
+
+    Callback = function(v)
+        isDetecting = v
+    end
+})
 
 local function updateCharacter()
-
-character=
-LocalPlayer.Character
-or LocalPlayer.CharacterAdded:Wait()
-
-humanoidRootPart=
-character:WaitForChild("HumanoidRootPart")
-
-humanoid=
-character:WaitForChild("Humanoid")
-
+    character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
 end
 
 LocalPlayer.CharacterAdded:Connect(function()
-
-task.wait(1)
-updateCharacter()
-
+    task.wait(1)
+    updateCharacter()
 end)
-
-DungeonTab:CreateToggle({
-
-Name="自动地下城",
-CurrentValue=false,
-
-Callback=function(v)
-
-isDetecting=v
-
-end
-
-})
-
-local dungeonInfo=
-DungeonTab:CreateParagraph({
-
-Title="当前地下城",
-Content="未检测"
-
-})
 
 local function getDungeonLevel()
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return "未检测" end
 
-local map=Workspace:FindFirstChild("Map")
-if not map then return "无" end
+    local dungeon = map:FindFirstChild("Dungeon")
+    if not dungeon then return "未检测" end
 
-local dungeon=
-map:FindFirstChild("Dungeon")
+    local highest = 0
 
-if not dungeon then
-return "无"
-end
+    for _, v in pairs(dungeon:GetChildren()) do
+        local num = tonumber(v.Name:match("%d+"))
 
-local highest=0
+        if num and num > highest then
+            highest = num
+        end
+    end
 
-for _,v in pairs(dungeon:GetChildren()) do
+    if highest > 0 then
+        return tostring(highest)
+    end
 
-local num=
-tonumber(v.Name:match("%d+"))
-
-if num and num>highest then
-highest=num
-end
-
-end
-
-return tostring(highest)
-
+    return "未检测"
 end
 
 task.spawn(function()
-
-while true do
-
-dungeonInfo:Set({
-
-Title="当前地下城",
-Content=getDungeonLevel()
-
-})
-
-task.wait(1)
-
-end
-
+    while task.wait(1) do
+        dungeonLabel:SetDesc("当前: "..getDungeonLevel().." 城")
+    end
 end)
 
-local function teleportTo(root)
+local function getTeleporters()
+    local list = {}
 
-if isTeleporting then return end
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return list end
 
-if tick()-lastTeleport<
-CONFIG.CooldownAfterTeleport then
-return
+    local dungeon = map:FindFirstChild("Dungeon")
+    if not dungeon then return list end
+
+    for _, level in pairs(dungeon:GetChildren()) do
+        local tp = level:FindFirstChild(CONFIG.TargetTeleporterName)
+
+        if tp and tp:FindFirstChild("Root") then
+            table.insert(list, tp.Root)
+        end
+    end
+
+    return list
 end
 
-isTeleporting=true
-lastTeleport=tick()
+local function teleportTo(root)
+    if isTeleporting then return end
 
-local tween=
-TweenService:Create(
+    if tick() - lastTeleportTime < CONFIG.CooldownAfterTeleport then
+        return
+    end
 
-humanoidRootPart,
+    isTeleporting = true
+    lastTeleportTime = tick()
 
-TweenInfo.new(
-CONFIG.TweenTime
-),
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
 
-{
-CFrame=root.CFrame
-}
+    local tween = TweenService:Create(
+        humanoidRootPart,
+        TweenInfo.new(CONFIG.TweenTime),
+        {CFrame = root.CFrame}
+    )
 
-)
+    tween:Play()
 
-tween:Play()
-tween.Completed:Wait()
+    tween.Completed:Wait()
 
-isTeleporting=false
+    humanoid.WalkSpeed = 16
+    humanoid.JumpPower = 50
 
+    task.wait(0.5)
+
+    isTeleporting = false
 end
 
 task.spawn(function()
+    while task.wait(CONFIG.CheckInterval) do
+        if isDetecting and humanoid.Health > 0 then
 
-while task.wait(
-CONFIG.CheckInterval
-) do
+            local teleporters = getTeleporters()
 
-if isDetecting
-and humanoid.Health>0 then
+            for _, root in pairs(teleporters) do
+                local dist = (humanoidRootPart.Position - root.Position).Magnitude
 
-local map=
-Workspace:FindFirstChild("Map")
-
-local dungeon=
-map and map:FindFirstChild("Dungeon")
-
-if dungeon then
-
-for _,v in pairs(
-dungeon:GetChildren()
-) do
-
-local tp=
-v:FindFirstChild(
-CONFIG.TargetTeleporterName
-)
-
-if tp
-and tp:FindFirstChild(
-"Root"
-) then
-
-teleportTo(tp.Root)
-
-break
-
-end
-end
-end
-end
-end
+                if dist <= CONFIG.DetectionRadius then
+                    teleportTo(root)
+                    break
+                end
+            end
+        end
+    end
 end)
 
 --------------------------------------------------
 -- ESP
 --------------------------------------------------
 
-local ESPEnabled=false
-local ESPObjects={}
+local ESPEnabled = false
+local ESPObjects = {}
 
 local function removeESP(player)
+    if ESPObjects[player] then
+        if ESPObjects[player].Gui then
+            ESPObjects[player].Gui:Destroy()
+        end
 
-if ESPObjects[player] then
+        if ESPObjects[player].Connection then
+            ESPObjects[player].Connection:Disconnect()
+        end
 
-ESPObjects[player]:Destroy()
-ESPObjects[player]=nil
-
-end
-
+        ESPObjects[player] = nil
+    end
 end
 
 local function createESP(player)
+    if player == LocalPlayer then
+        return
+    end
 
-if player==LocalPlayer then
-return
+    removeESP(player)
+
+    local char = player.Character
+    if not char then return end
+
+    local head = char:FindFirstChild("Head")
+    local hum = char:FindFirstChild("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+
+    if not head or not hum or not hrp then
+        return
+    end
+
+    local bill = Instance.new("BillboardGui")
+    bill.Name = "ESP"
+    bill.Size = UDim2.new(0,200,0,50)
+    bill.AlwaysOnTop = true
+    bill.StudsOffset = Vector3.new(0,3,0)
+    bill.Adornee = head
+    bill.Parent = head
+
+    local text = Instance.new("TextLabel")
+    text.Parent = bill
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = Color3.new(1,1,1)
+    text.TextStrokeTransparency = 0
+    text.Font = Enum.Font.GothamBold
+    text.TextScaled = true
+
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+
+        if not ESPEnabled then
+            bill.Enabled = false
+            return
+        end
+
+        bill.Enabled = true
+
+        local myChar = LocalPlayer.Character
+        if not myChar then return end
+
+        local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return end
+
+        local dist = math.floor(
+            (myHRP.Position - hrp.Position).Magnitude
+        )
+
+        text.Text =
+            player.Name ..
+            "\n距离: "..dist ..
+            "\n血量: "..math.floor(hum.Health)
+    end)
+
+    ESPObjects[player] = {
+        Gui = bill,
+        Connection = connection
+    }
 end
 
-removeESP(player)
-
-local char=
-player.Character
-
-if not char then
-return
+local function refreshESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            createESP(player)
+        end
+    end
 end
 
-local head=
-char:FindFirstChild("Head")
+Tabs.ESP:Toggle({
+    Title = "玩家透视",
+    Value = false,
 
-local hum=
-char:FindFirstChild("Humanoid")
+    Callback = function(v)
+        ESPEnabled = v
 
-local hrp=
-char:FindFirstChild(
-"HumanoidRootPart"
-)
-
-if not head then
-return
-end
-
-local bill=
-Instance.new(
-"BillboardGui"
-)
-
-bill.Parent=head
-bill.Size=
-UDim2.new(0,200,0,50)
-
-bill.AlwaysOnTop=true
-bill.StudsOffset=
-Vector3.new(0,3,0)
-
-local txt=
-Instance.new("TextLabel")
-
-txt.Parent=bill
-txt.Size=
-UDim2.new(1,0,1,0)
-
-txt.BackgroundTransparency=1
-txt.TextColor3=
-Color3.new(1,1,1)
-
-txt.TextStrokeTransparency=0
-
-RunService.RenderStepped:
-Connect(function()
-
-if not ESPEnabled then
-
-bill.Enabled=false
-return
-
-end
-
-bill.Enabled=true
-
-local my=
-LocalPlayer.Character
-
-if not my then return end
-
-local myHRP=
-my:FindFirstChild(
-"HumanoidRootPart"
-)
-
-if not myHRP then
-return
-end
-
-local dist=
-math.floor(
-
-(myHRP.Position-
-hrp.Position).Magnitude
-
-)
-
-txt.Text=
-player.Name..
-"\n距离:"..dist..
-"\n血量:"..
-math.floor(hum.Health)
-
-end)
-
-ESPObjects[player]=bill
-
-end
-
-ESPTab:CreateToggle({
-
-Name="玩家透视",
-CurrentValue=false,
-
-Callback=function(v)
-
-ESPEnabled=v
-
-if v then
-
-for _,p in pairs(
-Players:GetPlayers()
-) do
-
-createESP(p)
-
-end
-
-else
-
-for _,p in pairs(
-Players:GetPlayers()
-) do
-
-removeESP(p)
-
-end
-
-end
-
-end
-
+        if v then
+            refreshESP()
+        else
+            for _, player in pairs(Players:GetPlayers()) do
+                removeESP(player)
+            end
+        end
+    end
 })
 
-Players.PlayerAdded:
-Connect(function(p)
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
 
-p.CharacterAdded:
-Connect(function()
-
-task.wait(1)
-
-if ESPEnabled then
-createESP(p)
-end
-
+        if ESPEnabled then
+            createESP(player)
+        end
+    end)
 end)
 
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
 end)
 
 --------------------------------------------------
--- 设置
+-- SETTINGS
 --------------------------------------------------
 
-SettingTab:CreateKeybind({
+Tabs.Settings:Keybind({
+    Title = "UI快捷键",
+    Value = "RightControl",
 
-Name="UI快捷键",
-CurrentKeybind="RightControl",
-
-Callback=function()
-
-Rayfield:Toggle()
-
-end
-
+    Callback = function(v)
+        Window:SetToggleKey(Enum.KeyCode[v])
+    end
 })
+
+Window:SetToggleKey(Enum.KeyCode.RightControl) 
