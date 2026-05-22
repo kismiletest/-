@@ -5,261 +5,148 @@ local Rayfield = loadstring(game:HttpGet(
 local Window = Rayfield:CreateWindow({
     Name = "1.en Hub",
     LoadingTitle = "Loading",
-    LoadingSubtitle = "TP Tool",
+    LoadingSubtitle = "Dungeon UI",
+
     ConfigurationSaving = {
         Enabled = false
-    }
-})
+    },
 
-local TP = Window:CreateTab("Teleport",4483362458)
+    Discord = {
+        Enabled = false
+    },
 
-------------------------------------------------
--- SERVICES
-------------------------------------------------
-
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local VirtualUser = game:GetService("VirtualUser")
-
-_G.Teleport=false
-_G.Teleport2=false
-_G.SelectPly=""
-
-local OffsetX=0
-local OffsetY=0
-local OffsetZ=0
-
-------------------------------------------------
--- PLAYER LIST
-------------------------------------------------
-
-local function GetPlayers()
-
-    local list={}
-
-    for _,v in pairs(Players:GetPlayers()) do
-        if v~=LocalPlayer then
-            table.insert(list,v.Name)
-        end
-    end
-
-    return list
-
-end
-
-local Dropdown=
-TP:CreateDropdown({
-
-Name="选择玩家",
-
-Options=GetPlayers(),
-
-CurrentOption=nil,
-
-Callback=function(v)
-
-_G.SelectPly=v
-
-end
-
-})
-
-Players.PlayerAdded:Connect(function()
-Dropdown:Refresh(GetPlayers())
-end)
-
-Players.PlayerRemoving:Connect(function()
-Dropdown:Refresh(GetPlayers())
-end)
-
-------------------------------------------------
--- OFFSET
-------------------------------------------------
-
-TP:CreateInput({
-
-Name="Offset X",
-
-PlaceholderText="0",
-
-Callback=function(v)
-
-OffsetX=tonumber(v) or 0
-
-end
-
-})
-
-TP:CreateInput({
-
-Name="Offset Y",
-
-PlaceholderText="0",
-
-Callback=function(v)
-
-OffsetY=tonumber(v) or 0
-
-end
-
-})
-
-TP:CreateInput({
-
-Name="Offset Z",
-
-PlaceholderText="0",
-
-Callback=function(v)
-
-OffsetZ=tonumber(v) or 0
-
-end
-
+    KeySystem = false
 })
 
 ------------------------------------------------
--- TP LOCK
+-- TAB
 ------------------------------------------------
 
-TP:CreateToggle({
-
-Name="TP",
-
-CurrentValue=false,
-
-Callback=function(state)
-
-_G.Teleport=state
-
-if state then
-
-task.spawn(function()
-
-while _G.Teleport do
-
-task.wait()
-
-pcall(function()
-
-local target=
-Players:FindFirstChild(
-_G.SelectPly
+local Dungeon =
+Window:CreateTab(
+"地下城",
+4483362458
 )
 
-if not target then return end
+------------------------------------------------
+-- 数据
+------------------------------------------------
 
-local hrp=
-target.Character.HumanoidRootPart
+local Dungeons = {
 
-LocalPlayer.Character
-.HumanoidRootPart.CFrame=
+{
+id="dg01",
+name="艾尔文防线",
+level="1-10",
+desc="哥布林聚集",
+reward="新手剑"
+},
 
-hrp.CFrame+
+{
+id="dg02",
+name="格兰之森",
+level="11-20",
+desc="变异猫妖",
+reward="魔法长袍"
+},
 
-Vector3.new(
-OffsetX,
-OffsetY,
-OffsetZ
-)
+{
+id="dg03",
+name="天空之城",
+level="21-30",
+desc="古代傀儡",
+reward="光之碎片"
+}
 
-VirtualUser:CaptureController()
-VirtualUser:Button1Down(
-Vector2.new()
-)
+}
 
-end)
+local Selected=nil
 
-end
+------------------------------------------------
+-- 输出
+------------------------------------------------
 
-end)
+local Current =
+Dungeon:CreateParagraph({
 
-end
+Title="当前地下城",
 
-end
+Content="未选择"
 
 })
 
 ------------------------------------------------
--- LOCK2
+-- 自动切换函数
 ------------------------------------------------
 
-TP:CreateToggle({
+local function ChangeDungeon(data)
 
-Name="Lock2",
+Selected=data.id
 
-CurrentValue=false,
+Current:Set({
 
-Callback=function(state)
+Title="当前地下城",
 
-_G.Teleport2=state
-
-if state then
-
-task.spawn(function()
-
-while _G.Teleport2 do
-
-task.wait(.05)
-
-pcall(function()
-
-local target=
-Players:FindFirstChild(
-_G.SelectPly
-)
-
-if not target then return end
-
-local hrp=
-target.Character.HumanoidRootPart
-
-LocalPlayer.Character
-.HumanoidRootPart.CFrame=
-
-hrp.CFrame+
-Vector3.new(
-OffsetX,
-OffsetY,
-OffsetZ
-)
-
-end)
-
-end
-
-end)
-
-end
-
-end
+Content=
+data.name..
+"\n等级:"..
+data.level..
+"\n掉落:"..
+data.reward
 
 })
 
+print(
+"[系统] 已锁定:",
+data.id
+)
+
+end
+
 ------------------------------------------------
--- REFRESH
+-- 自动默认选第一个
 ------------------------------------------------
 
-TP:CreateButton({
+ChangeDungeon(
+Dungeons[1]
+)
 
-Name="刷新玩家",
+------------------------------------------------
+-- 创建按钮
+------------------------------------------------
+
+for _,d in pairs(Dungeons) do
+
+Dungeon:CreateButton({
+
+Name=
+d.name..
+" [Lv."..
+d.level..
+"]",
+
+Info=
+d.desc..
+"\n掉落:"..
+d.reward,
 
 Callback=function()
 
-Dropdown:Refresh(
-GetPlayers()
-)
+ChangeDungeon(d)
+
+Rayfield:Notify({
+
+Title="地下城",
+
+Content=
+"已选择 "..d.name,
+
+Duration=3
+
+})
 
 end
 
 })
 
-Rayfield:Notify({
-
-Title="Loaded",
-
-Content="TP Tool 已启动",
-
-Duration=4
-
-})
+end
