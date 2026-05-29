@@ -3,12 +3,12 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- [[ 2. 创建主窗口 ]]
 local Window = Rayfield:CreateWindow({
-   Name = "FPS 射击辅助 (Rayfield 版)",
+   Name = "谋杀决斗 专属辅助 (Rayfield)",
    LoadingTitle = "正在加载脚本...",
    LoadingSubtitle = "by 开发者",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "Rayfield_Aimbot_Config", -- 配置文件保存的文件夹名称
+      FolderName = "Rayfield_MurderDuel_Config",
       FileName = "Aimbot_Settings"
    },
    Discord = {
@@ -16,11 +16,11 @@ local Window = Rayfield:CreateWindow({
       Invite = "noinvite",
       RememberJoins = true
    },
-   KeySystem = false -- 默认关闭卡密系统
+   KeySystem = false
 })
 
--- [[ 3. 创建自瞄功能选项卡 ]]
-local AimbotTab = Window:CreateTab("自动瞄准", 4483362458) -- 使用准星/目标图标
+-- [[ 3. 创建核心选项卡 ]]
+local MainTab = Window:CreateTab("核心自瞄", 4483362458)
 
 -- ==========================================
 -- 变量与配置初始化
@@ -28,55 +28,106 @@ local AimbotTab = Window:CreateTab("自动瞄准", 4483362458) -- 使用准星/�
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
-local AimbotConfig = {
+local Config = {
     Enabled = false,
-    TeamCheck = true,
-    AliveCheck = true,
-    TargetPart = "Head",    -- 默认锁头
-    Smoothness = 0.2,       -- 平滑度 (0-1)
-    FOV = 150               -- 瞄准范围大小
+    TargetMode = "Smart",            -- Smart(智能识别), Murderer(只锁杀手), Everyone(所有人)
+    TargetPart = "HumanoidRootPart", -- 决斗游戏建议锁躯干，命中率最高
+    Smoothness = 0.15,               -- 平滑度
+    
+    -- FOV 圈配置
+    FOV = 150,
+    ShowFOV = true,
+    FOVColor = Color3.fromRGB(0, 255, 120), -- 翠绿色圈
+    FOVThickness = 2
 }
 
 -- ==========================================
--- 核心逻辑：获取最近的敌人
+-- 创建可视化 FOV 圆圈 (Drawing API)
 -- ==========================================
-local function GetClosestPlayer()
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+local function UpdateFOVCircle()
+    if Config.ShowFOV and Config.Enabled then
+        local mousePos = UserInputService:GetMouseLocation()
+        FOVCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
+        FOVCircle.Radius = Config.FOV
+        FOVCircle.Color = Config.FOVColor
+        FOVCircle.Thickness = Config.FOVThickness
+        FOVCircle.Visible = true
+    else
+        FOVCircle.Visible = false
+    end
+end
+
+-- ==========================================
+-- 决斗游戏专属：身份与状态检查
+-- ==========================================
+local function IsMurderer(player)
+    local backpack = player:FindFirstChild("Backpack")
+    local character = player.Character
+    
+    local function checkKnife(container)
+        if container then
+            if container:FindFirstChild("Knife") or container:FindFirstChild("KnifeTool") or container:FindFirstChild("刀") then
+                return true
+            end
+        end
+        return false
+    end
+
+    if checkKnife(backpack) or checkKnife(character) then return true end
+    
+    if player:FindFirstChild("Role") and player.Role.Value == "Murderer" then return true end
+    if player:FindFirstChild("tempRole") and player.tempRole.Value == "Murderer" then return true end
+    
+    return false
+end
+
+local function IsValidTarget(player)
+    if player == LocalPlayer then return false end
+    
+    local char = player.Character
+    if not char or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
+        return false
+    end
+    
+    if Config.TargetMode == "Murderer" then
+        return IsMurderer(player)
+    elseif Config.TargetMode == "Smart" then
+        local amIMurderer = IsMurderer(LocalPlayer)
+        if amIMurderer then
+            return true
+        else
+            return IsMurderer(player)
+        end
+    end
+    
+    return true
+end
+
+-- ==========================================
+-- 获取 FOV 圈内最近的合法目标
+-- ==========================================
+local function GetClosestTarget()
     local closestPlayer = nil
     local shortestDistance = math.huge
+    local mousePos = UserInputService:GetMouseLocation()
 
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local isValid = true
+        if IsValidTarget(player) and player.Character and player.Character:FindFirstChild(Config.TargetPart) then
+            local part = player.Character[Config.TargetPart]
+            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
             
-            -- 团队检查
-            if AimbotConfig.TeamCheck and player.Team == LocalPlayer.Team then
-                isValid = false
-            end
-            
-            -- 存活检查
-            if AimbotConfig.AliveCheck then
-                local character = player.Character
-                if not character or not character:FindFirstChild("Humanoid") or character.Humanoid.Health <= 0 then
-                    isValid = false
-                end
-            end
-            
-            -- 计算屏幕距离与 FOV 检查
-            if isValid and player.Character and player.Character:FindFirstChild(AimbotConfig.TargetPart) then
-                local targetPart = player.Character[AimbotConfig.TargetPart]
-                local screenPosition, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                
-                if onScreen then
-                    -- 计算鼠标指针到敌人屏幕位置的距离
-                    local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-                    local distance = (Vector2.new(screenPosition.X, screenPosition.Y) - mousePos).Magnitude
-                    
-                    -- 判断是否在自瞄范围内，且是最近的目标
-                    if distance < AimbotConfig.FOV and distance < shortestDistance then
-                        closestPlayer = player
-                        shortestDistance = distance
-                    end
+            if onScreen then
+                local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if distance < Config.FOV and distance < shortestDistance then
+                    closestPlayer = player
+                    shortestDistance = distance
                 end
             end
         end
@@ -88,97 +139,100 @@ end
 -- Rayfield 界面元件绑定
 -- ==========================================
 
--- 1. 主控制分组
-local MainSection = AimbotTab:CreateSection("主控制开关")
+-- 1. 主开关 Section
+local SectionMain = MainTab:CreateSection("核心功能开关")
 
-AimbotTab:CreateToggle({
-   Name = "启用自瞄 (Aimbot)",
-   CurrentValue = AimbotConfig.Enabled,
-   Flag = "AimbotEnabled", 
+MainTab:CreateToggle({
+   Name = "启用自瞄锁头",
+   CurrentValue = Config.Enabled,
+   Flag = "MD_AimbotEnabled",
    Callback = function(Value)
-      AimbotConfig.Enabled = Value
+      Config.Enabled = Value
    end,
 })
 
--- 2. 过滤条件分组
-local FilterSection = AimbotTab:CreateSection("过滤设置")
+-- 2. 决斗游戏定制策略 Section
+local SectionMode = MainTab:CreateSection("决斗防暴毙策略")
 
-AimbotTab:CreateToggle({
-   Name = "团队检查 (Team Check)",
-   CurrentValue = AimbotConfig.TeamCheck,
-   Flag = "TeamCheck",
-   Callback = function(Value)
-      AimbotConfig.TeamCheck = Value
-   end,
-})
-
-AimbotTab:CreateToggle({
-   Name = "存活检查 (Alive Check)",
-   CurrentValue = AimbotConfig.AliveCheck,
-   Flag = "AliveCheck",
-   Callback = function(Value)
-      AimbotConfig.AliveCheck = Value
-   end,
-})
-
--- 3. 精细调节分组
-local AdjustSection = AimbotTab:CreateSection("高级参数调节")
-
-AimbotTab:CreateDropdown({
-   Name = "瞄准部位",
-   Options = {"Head", "UpperTorso", "HumanoidRootPart"},
-   CurrentOption = {AimbotConfig.TargetPart},
+MainTab:CreateDropdown({
+   Name = "自瞄目标模式",
+   Options = {"Smart", "Murderer", "Everyone"},
+   CurrentOption = {Config.TargetMode},
    MultipleOptions = false,
-   Flag = "TargetPart",
+   Flag = "MD_TargetMode",
    Callback = function(Option)
-      AimbotConfig.TargetPart = Option[1] -- Rayfield 返回的是一个包含选中项的数组
+      Config.TargetMode = Option[1]
    end,
 })
 
-AimbotTab:CreateSlider({
-   Name = "平滑度 (Smoothness)",
-   Range = {5, 100}, -- Rayfield 滑动条不支持浮点数步长，这里用整数放大100倍处理
-   Increment = 5,
-   CurrentValue = AimbotConfig.Smoothness * 100,
-   Flag = "Smoothness",
+MainTab:CreateDropdown({
+   Name = "锁定部位",
+   Options = {"HumanoidRootPart", "Head", "UpperTorso"},
+   CurrentOption = {Config.TargetPart},
+   MultipleOptions = false,
+   Flag = "MD_TargetPart",
+   Callback = function(Option)
+      Config.TargetPart = Option[1]
+   end,
+})
+
+-- 3. FOV 范围调节 Section
+local SectionVisual = MainTab:CreateSection("自瞄范围 (FOV) 视效")
+
+MainTab:CreateToggle({
+   Name = "显示 FOV 锁定圈",
+   CurrentValue = Config.ShowFOV,
+   Flag = "MD_ShowFOV",
    Callback = function(Value)
-      AimbotConfig.Smoothness = Value / 100 -- 实际应用时再缩小回去
+      Config.ShowFOV = Value
    end,
 })
 
-AimbotTab:CreateSlider({
-   Name = "自瞄范围 (FOV)",
-   Range = {50, 800},
+MainTab:CreateSlider({
+   Name = "自瞄范围半径",
+   Range = {50, 600},
    Increment = 10,
-   CurrentValue = AimbotConfig.FOV,
-   Flag = "AimbotFOV",
+   CurrentValue = Config.FOV,
+   Flag = "MD_FOV",
    Callback = function(Value)
-      AimbotConfig.FOV = Value
+      Config.FOV = Value
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "平滑拉枪系数 (Smoothness)",
+   Range = {5, 100}, -- 通过 100 倍整数化解决 Rayfield 无法处理小数滑块的问题
+   Increment = 5,
+   CurrentValue = Config.Smoothness * 100,
+   Flag = "MD_Smoothness",
+   Callback = function(Value)
+      Config.Smoothness = Value / 100
    end,
 })
 
 -- ==========================================
--- 帧循环驱动自瞄 (RunService)
+-- 帧驱动循环
 -- ==========================================
-game:GetService("RunService").RenderStepped:Connect(function()
-    if AimbotConfig.Enabled then
-        local targetPlayer = GetClosestPlayer()
-        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild(AimbotConfig.TargetPart) then
-            local targetPos = targetPlayer.Character[AimbotConfig.TargetPart].Position
+RunService.RenderStepped:Connect(function()
+    UpdateFOVCircle()
+    
+    if Config.Enabled then
+        local target = GetClosestTarget()
+        if target and target.Character and target.Character:FindFirstChild(Config.TargetPart) then
+            local targetPos = target.Character[Config.TargetPart].Position
             
-            -- 使用 CFrame.lookAt 实现平滑插值移动视角 (Lerp)
             Camera.CFrame = Camera.CFrame:Lerp(
                 CFrame.lookAt(Camera.CFrame.Position, targetPos), 
-                AimbotConfig.Smoothness
+                Config.Smoothness
             )
         end
     end
 end)
 
--- 通知提示：加载成功
+-- 通知提示
 Rayfield:Notify({
-   Title = "辅助加载成功",
-   Content = "自瞄功能已成功绑定到 Rayfield 菜单！",
+   Title = "决斗辅助已就绪",
+   Content = "防暴毙自瞄逻辑已成功注入！",
    Duration = 5,
    Image = 4483362458,
 })
