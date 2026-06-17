@@ -1,129 +1,40 @@
--- 初始化 WindUI 库
-local WindUI = loadstring(game:HttpGet("https://treehub.cc/WindUI.lua"))() -- 确保你的执行器支持该链接
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
--- 创建 ree hub 窗口
 local Window = WindUI:CreateWindow({
-    Title = "ree hub —— 培养花园 2",
-    Icon = "rbxassetid://10821631580", -- 可以替换为你喜欢的图标 ID
-    Author = "Script Developer",
-    Folder = "ree_hub_Garden2_Config" -- 配置文件保存路径
+    Title = "培养花园2 复制种子",
+    Icon = "sprout",  -- 或其他 icon
+    Theme = "Dark",   -- Dark / Light / Violet 等
 })
 
--- 创建主标签页
-local MainTab = Window:CreateTab({
-    Name = "宠物复制",
-    Icon = "rbxassetid://10821673819"
-})
+local Tab = Window:Tab({ Title = "复制种子", Icon = "copy" })
 
--- ==================== 核心变量定义 ====================
-local SelectedPet = nil
-local CopyAmount = 1
-local IsSafeMode = true
-local IsLoopCopy = false
-
--- 后端逻辑与远程事件对接
-local function ExecuteCopyLogic()
-    if not SelectedPet then
-        WindUI:Notify({Title = "错误", Desc = "请先选择需要复制的宠物！", Type = "Error"})
-        return
-    end
-
-    print("【ree hub】正在尝试复制宠物: " .. tostring(SelectedPet) .. " | 数量: " .. tostring(CopyAmount))
-    
-    -- 【请根据游戏的实际远程事件修改下方代码】
-    local Remote = game:GetService("ReplicatedStorage"):FindFirstChild("PetRemote") -- 需替换为真实 Remote 路径
-    
-    if Remote then
-        for i = 1, CopyAmount do
-            Remote:FireServer("Duplicate", SelectedPet) 
-        end
-        WindUI:Notify({Title = "成功", Desc = "复制指令已发送，请检查背包", Type = "Success"})
-    else
-        WindUI:Notify({Title = "失败", Desc = "未找到游戏宠物远程事件，请检查解密路径", Type = "Error"})
-    end
-end 
-
--- ==================== UI 元件构建 ====================
-
--- 提示公告栏
-MainTab:AddBanner({
-    Text = "欢迎使用 ree hub！请确保背包有足够空位，建议开启安全模式防回档/检测。",
-    Type = "Info"
-})
-
-MainTab:AddLabel({
-    Text = "核心操作功能",
-    Weight = "Bold"
-})
-
--- 1. 宠物选择下拉菜单
-local PetDropdown = MainTab:AddDropdown({
-    Title = "选择目标宠物",
-    Desc = "请选择你想复制的背包宠物",
-    Options = {"[神话] 黄金幼龙", "[史诗] 幽灵猫", "[稀有] 冰霜史莱姆", "[普通] 萌萌兔"},
-    Default = nil,
-    Callback = function(value)
-        SelectedPet = value
-        WindUI:Notify({Title = "已选择宠物", Desc = "当前目标: " .. tostring(value), Type = "Success"})
-    end
-})
-
--- 2. 复制数量滑动条
-MainTab:AddSlider({
-    Title = "单次复制数量",
-    Desc = "建议单次不超过 10 个以防卡死",
-    Min = 1,
-    Max = 10,
-    Default = 1,
-    Callback = function(value)
-        CopyAmount = value
-    end
-})
-
--- 3. 安全模式开关
-MainTab:AddToggle({
-    Title = "安全防检测模式",
-    Desc = "开启后自动添加随机延迟，防止触发封禁",
-    Default = true,
-    Callback = function(state)
-        IsSafeMode = state
-    end
-})
-
-MainTab:AddSeparator()
-
-MainTab:AddLabel({
-    Text = "执行控制",
-    Weight = "Bold"
-})
-
--- 4. 循环复制开关 (挂机用)
-MainTab:AddToggle({
-    Title = "无限循环复制",
-    Desc = "开启后将按照设定的数量不间断复制",
-    Default = false,
-    Callback = function(state)
-        IsLoopCopy = state
-        if IsLoopCopy then
-            task.spawn(function()
-                while IsLoopCopy do
-                    ExecuteCopyLogic()
-                    if IsSafeMode then
-                        task.wait(math.random(2, 5)) -- 安全模式随机延迟 2-5 秒
-                    else
-                        task.wait(0.5) -- 极速模式延迟 0.5 秒
-                    end
-                end
-            end)
-        end
-    end
-})
-
--- 5. 单次手动执行按钮
-MainTab:AddButton({
-    Title = "立即开始复制 (单次)",
-    Desc = "按照当前配置立即执行一次复制远程事件",
+-- 示例：复制按钮 + 参数
+Tab:Button({
+    Title = "开始复制当前选中种子",
     Callback = function()
-        ExecuteCopyLogic()
+        -- 这里放你的复制逻辑（firetouch 等或 Remote 调用）
+        print("开始复制种子...")
+        -- 示例：重复 dupe
+        for i = 1, 10 do
+            -- 你的 dupe 代码...
+            task.wait(0.5)  -- 防检测间隔，建议 3-5 秒根据游戏调整
+        end
+    end
+})
+
+Tab:Slider({
+    Title = "复制数量",
+    Min = 1,
+    Max = 100,
+    Default = 10,
+    Callback = function(value)
+        print("设置复制数量:", value)
+    end
+})
+
+Tab:Toggle({
+    Title = "自动循环复制",
+    Callback = function(state)
+        -- 循环逻辑
     end
 })
