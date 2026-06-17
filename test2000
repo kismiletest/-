@@ -1,40 +1,31 @@
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+<Window
+    x:Class="WindUiTranslator.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.open-design.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="WindUI 中文翻译工具">
 
-local Window = WindUI:CreateWindow({
-    Title = "培养花园2 复制种子",
-    Icon = "sprout",  -- 或其他 icon
-    Theme = "Dark",   -- Dark / Light / Violet 等
-})
+    <Grid Padding="30">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-local Tab = Window:Tab({ Title = "复制种子", Icon = "copy" })
+        <!-- 标题 -->
+        <TextBlock Text="WindUI 自动化汉化工具" FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
 
--- 示例：复制按钮 + 参数
-Tab:Button({
-    Title = "开始复制当前选中种子",
-    Callback = function()
-        -- 这里放你的复制逻辑（firetouch 等或 Remote 调用）
-        print("开始复制种子...")
-        -- 示例：重复 dupe
-        for i = 1, 10 do
-            -- 你的 dupe 代码...
-            task.wait(0.5)  -- 防检测间隔，建议 3-5 秒根据游戏调整
-        end
-    end
-})
+        <!-- 按钮触发区 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,20">
+            <Button x:Name="TranslateButton" Content="开始汉化指定目录" Click="TranslateButton_Click" Style="{ThemeResource AccentButtonStyle}"/>
+            <TextBlock x:Name="StatusText" Text="准备就绪" VerticalAlignment="Center" Foreground="Gray"/>
+        </StackPanel>
 
-Tab:Slider({
-    Title = "复制数量",
-    Min = 1,
-    Max = 100,
-    Default = 10,
-    Callback = function(value)
-        print("设置复制数量:", value)
-    end
-})
-
-Tab:Toggle({
-    Title = "自动循环复制",
-    Callback = function(state)
-        -- 循环逻辑
-    end
-})
+        <!-- 日志输出框 -->
+        <ScrollViewer Grid.Row="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" CornerRadius="4" Padding="10">
+            <TextBlock x:Name="LogOutput" Text="等待任务开始..." TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+        </ScrollViewer>
+    </Grid>
+</Window>
