@@ -1,31 +1,25 @@
-<Window
-    x:Class="WindUiTranslator.MainWindow"
-    xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.open-design.org/markup-compatibility/2006"
-    mc:Ignorable="d"
-    Title="WindUI 中文翻译工具">
-
-    <Grid Padding="30">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <!-- 标题 -->
-        <TextBlock Text="WindUI 自动化汉化工具" FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
-
-        <!-- 按钮触发区 -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,20">
-            <Button x:Name="TranslateButton" Content="开始汉化指定目录" Click="TranslateButton_Click" Style="{ThemeResource AccentButtonStyle}"/>
-            <TextBlock x:Name="StatusText" Text="准备就绪" VerticalAlignment="Center" Foreground="Gray"/>
-        </StackPanel>
-
-        <!-- 日志输出框 -->
-        <ScrollViewer Grid.Row="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" CornerRadius="4" Padding="10">
-            <TextBlock x:Name="LogOutput" Text="等待任务开始..." TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
-        </ScrollViewer>
-    </Grid>
-</Window>
+{
+"TextureCompositorActiveJobs": "0",
+"RenderShadowmapBias": "75",
+"CSGLevelOfDetailSwitchingDistanceL34": "0",
+"CSGLevelOfDetailSwitchingDistanceL23": "0",
+"CSGLevelOfDetailSwitchingDistanceL12": "0",
+"CSGLevelOfDetailSwitchingDistance": "0",
+"TerrainArraySliceSize": "0",
+"PerformanceControlTextureQualityBestUtility": "-1",
+"RenderUseTextureManager224": "False",
+"IncludePowerSaverMode": "True",
+"EnablePowerTraceModule": "True",
+"DebugForceFSMCPULightCulling": "True",
+"DoNotSkipMipsBasedOnSystemMemoryPS": "True",
+"DebugLimitMinTextureResolutionWhenSkipMips": "9999999999999999",
+"TM2SkipMipsForUnstreamable2": "True",
+"DebugTextureManagerSkipMips": "10",
+"TextureQualityOverride": "0",
+"TextureQualityOverrideEnabled": "True",
+"DisablePostFx": "True",
+"TaskSchedulerTargetFps": "9999999",
+"TaskSchedulerLimitTargetFpsTo2402": "False",
+"DebugSkyGray": "False",
+"DFIntDebugTextureManagerSkipMips": "10"
+}
