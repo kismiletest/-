@@ -1,0 +1,34 @@
+#Requires AutoHotkey v2.0
+#SingleInstance Force
+
+MainGui := Gui("+AlwaysOnTop -MaximizeBox", "WindUI - Defend Your Base")
+MainGui.BackColor := "FFFFFF"
+MainGui.SetFont("s10", "Segoe UI")
+
+; 左侧导航栏
+MainGui.Add("Text", "x0 y0 w180 h600 BackgroundEDEDED")
+MainGui.SetFont("s14 w700")
+MainGui.Add("Text", "x20 y20", "WindUI")
+
+MainGui.SetFont("s10")
+BtnTab1 := MainGui.Add("Button", "x20 y70 w140 h35", "主页")
+BtnTab2 := MainGui.Add("Button", "x20 y115 w140 h35", "设置")
+
+; 右侧内容区
+MainGui.SetFont("s12 w600")
+MainGui.Add("Text", "x210 y25", "Anime Base Assistant")
+
+ChkRoll := MainGui.Add("Checkbox", "x220 y80", "启用自动抽奖")
+ChkBuy := MainGui.Add("Checkbox", "x220 y120", "启用自动购买")
+
+MainGui.Add("Text", "x220 y170", "抽奖间隔")
+EditRollDelay := MainGui.Add("Edit", "x320 y166 w80", "2.5")
+
+MainGui.Add("Text", "x220 y210", "购买间隔")
+EditBuyDelay := MainGui.Add("Edit", "x320 y206 w80", "1.0")
+
+BtnStart := MainGui.Add("Button", "x220 y280 w120 h40", "启动")
+BtnStop := MainGui.Add("Button", "x360 y280 w120 h40", "停止")
+
+MainGui.Show("w650 h420")
+MainGui.OnEvent("Close", (*) => ExitApp())
