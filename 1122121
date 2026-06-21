@@ -1,23 +1,41 @@
-repeat wait() until game:IsLoaded() and game.Players.LocalPlayer
-getgenv().Key = ""
-getgenv().config =   {
-    team = "Pirates", -- "Pirates" "Marines"
-    hpTimeout = 15,
-    targetTimeout = 20,
-    lowHealth = 4000,
-    safeHealth = 4500,
-    blackScreen = false,
-    useSkill = false, -- only x f gas fruit
-    equipPaleScarf = false,
-    webhookurl = "",
-    webhookEnable = false,
-    webhookSendMinutes = 5,
-    attackSpeed = 0.001,
-    mode = 1, -- 2 or 1 
-    sea = 3,
-    region = "Singapore",
-    trans = false, -- auto press V t rex 
-    bltween = true, -- bypass may thang di chuyen toc do cao lien tuc > 7s - kho gay dame 
-    bpsit = true, -- khong hunt may thang ngoi thuyen - kho gay dame 
-}
-loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/refs/heads/main/Bountynew.lua"))()
+    getgenv().Key = "" 
+    getgenv().Config = {
+        -- Pets to look for. true = search for this pet. Use the exact in-game key (PetName).
+        ["Pet"] = {
+            ["IceSerpent"]      = true,
+            ["Raccoon"]         = true,
+            ["Unicorn"]         = true,
+            ["GoldenDragonfly"] = true,
+            ["BlackDragon"]     = true,
+            ["Monkey"]          = false,
+            ["Bee"]             = false,
+            ["Robin"]           = false,
+            ["Deer"]            = false,
+            ["Owl"]             = false,
+            ["Bunny"]           = false,
+            ["Frog"]            = true,
+        },
+
+        ["ScanIntervalSec"] = 4,      -- seconds between scans
+        ["HopOnNotFound"]   = true,   -- no wanted pet -> hop server
+        ["AutoBuyPet"]      = true,   -- found wanted pet -> buy it (needs game modules)
+        ["MoveMode"]        = "spam", -- "spam" (small TP hops, anti-tp safe) or "tween" (slide)
+        ["StopOnFound"]     = false,  -- false = keep running (buy more / hop); true = stop after first
+        ["RejoinIfFail"]    = true,   -- if server API fails -> random teleport in same game
+
+        -- Auto re-load this script after a server hop (executor must support
+        -- queue_on_teleport). If you load via loadstring(game:HttpGet(URL))(),
+        -- set LoaderURL so the re-loaded run re-fetches the script.
+        ["AutoReloadScript"] = {
+            ["Enable"]    = false,
+            ["LoaderURL"] = "https://raw.githubusercontent.com/obiiyeuem/vthangsitink/refs/heads/main/petfindergag2.lua",   -- e.g. "https://raw.githubusercontent.com/.../petfinder.lua"
+        },
+
+        -- Webhook notify on found pet (optional). Leave URL "" to disable.
+        ["Webhook"] = {
+            ["Enable"]   = false,
+            ["URL"]      = "",
+            ["Username"] = "PetFinder",
+        },
+    }
+loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/refs/heads/main/petfindergag2.lua"))()
