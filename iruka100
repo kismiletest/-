@@ -27,35 +27,35 @@ local Config = {
 	["CircleSpeed"] = 20,
 	["CircleRadius"] = 30,
 	["HideTween"] = false,
-	["BypassYTween"] = false,
-	["UseOffset"] = false,
+	["跟随"] = false,
+	["傻逼"] = false,
 	["OffsetX"] = 0,
 	["OffsetY"] = 0,
 	["OffsetZ"] = 0,
-	["RemoveAnimation"] = false,
-	["NoClip"] = false,
+	["僵硬"] = false,
+	["旋转"] = false,
 	["Spin"] = false,
-	["SpeedHackV2"] = false,
-	["SpeedHack"] = false,
+	["速度V2"] = false,
+	["速度V1"] = false,
 	["SpeedValue"] = 16,
-	["JumpHack"] = false,
-	["JumpValue"] = 50,
-	["StatsGui"] = false,
-	["RemoveLava"] = false,
-	["InfJump"] = false,
+	["跳高高"] = false,
+	["跳高高"] = 50,
+	["看fps"] = false,
+	["移除岩浆伤害"] = false,
+	["无限跳跃"] = false,
 	["CameraFOV"] = 70,
 	["CameraMaxZoom"] = 200,
-	["TpGui"] = false,
+	["传送UI"] = false,
 	["TpYOffset"] = 50,
-	["AutoBuso"] = false,
-	["WalkWater"] = false,
-	["SkillAimbot"] = false,
-	["GunAimbot"] = false,
-	["TeamCheckAimbot"] = false,
-	["MobAimbot"] = false,
-	["MaxAimbotRange"] = 1000,
+	["自动武装色"] = false,
+	["走在海上"] = false,
+	["技能自瞄"] = false,
+	["枪自瞄"] = false,
+	["检查盟友自瞄"] = false,
+	["怪物自瞄"] = false,
+	["无限自瞄满"] = 1000,
 	["Unbreakable"] = false,
-	["NoSkillCD"] = false,
+	["无限cd"] = false,
 	["NoStun"] = false,
 	["DashDistance"] = 100,
 	["SuperDash"] = false,
@@ -66,31 +66,31 @@ local Config = {
 	["NormalRange"] = 380,
 	["BuddhaRange"] = 3000,
 	["FastAttackDelay"] = 0.1,
-	["FruitM1Aura"] = false,
-	["GuitarAura"] = false,
+	["果实m1"] = false,
+	["吉他m1"] = false,
 	["TridentAutoKill"] = false,
 	["LightningAutoKill"] = false,
-	["SaishiAutoKill"] = false,
-	["BuddhaAutoKill"] = false,
+	["shashi秒杀"] = false,
+	["大佛秒杀"] = false,
 	["TrapKill"] = false,
-	["AutoV3"] = false,
-	["AutoV4"] = false,
+	["自动v3"] = false,
+	["自动v4"] = false,
 	["AutoEscape"] = false,
 	["EscapeHealthThreshold"] = 30,
 	["SafeVoid"] = false,
-	["NameESP"] = false,
-	["BoxESPV1"] = false,
-	["BoxESPV2"] = false,
+	["名字透视"] = false,
+	["碰撞箱透视V1"] = false,
+	["碰撞箱透视V2"] = false,
 	["TracerESP"] = false,
-	["HighlightESP"] = false,
-	["KenESP"] = false,
-	["AntiOneShotV1"] = false,
-	["AntiOneShotV2"] = false,
+	["亮度透视"] = false,
+	["敌人见闻透视"] = false,
+	["防秒杀V1"] = false,
+	["防秒杀V2"] = false,
 	["FFlags"] = "{}",
 	["FFlagEnabled"] = false,
 	["Language"] = false,
-	["AutoSave"] = true,
-	["AutoRejoin"] = false
+	["自动保存功能"] = true,
+	["自动重进"] = false
 }
 
 if not isfolder(FOLDER) then
@@ -599,15 +599,15 @@ function switchPage(page)
 end
 
 homeButton.MouseButton1Click:Connect(function()
-	switchPage("Home")
+	switchPage("原本功能")
 end)
 
 espButton.MouseButton1Click:Connect(function()
-	switchPage("ESP")
+	switchPage("透视功能")
 end)
 
 otherButton.MouseButton1Click:Connect(function()
-	switchPage("Other")
+	switchPage("菜单功能")
 end)
 
 bloxfruitsButton.MouseButton1Click:Connect(function()
@@ -619,7 +619,7 @@ configButton.MouseButton1Click:Connect(function()
 end)
 
 visualButton.MouseButton1Click:Connect(function()
-	switchPage("Visual")
+	switchPage("切换语言功能")
 end)
 
 switchPage("Home")
