@@ -4,7 +4,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 --// 创建窗口
 local Window = Rayfield:CreateWindow({
     Name = "kyoo hub",
-    LoadingTitle = "嘉登 Hub",
+    LoadingTitle = "kyoo hub",
     LoadingSubtitle = "Rayfield UI",
 
     ConfigurationSaving = {
