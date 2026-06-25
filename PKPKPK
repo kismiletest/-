@@ -9,7 +9,7 @@ local Window = Rayfield:CreateWindow({
 
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "嘉登Hub",
+        FolderName = "kyoo hub",
         FileName = "Config"
     },
 
