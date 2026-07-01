@@ -1,0 +1,337 @@
+-- [[ 服務與基礎變數 ]]
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- [[ 確保目標 GUI 路徑存在 ]]
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+local codesGui = playerGui:WaitForChild("Codes"):WaitForChild("Codes")
+local codeRedeemTextBox = codesGui:WaitForChild("CodeRedeem"):WaitForChild("TextBox")
+local topNotificationGui = playerGui:WaitForChild("TopNotification"):WaitForChild("TopNotification")
+
+-- [[ 建立 UI 介面 ]]
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "XuAutoRedeemHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = playerGui
+
+-- 主視窗
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 260, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -130, 0.4, -170)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+-- 圓角效果
+local FrameCorner = Instance.new("UICorner")
+FrameCorner.CornerRadius = UDim.new(0, 8)
+FrameCorner.Parent = MainFrame
+
+-- 頂部標題列
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -60, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "Xu-Hub : Auto Redeem"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.TextSize = 14
+TitleLabel.Parent = TitleBar
+
+-- 縮小按鈕
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+MinimizeBtn.Position = UDim2.new(1, -55, 0, 2.5)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MinimizeBtn.Font = Enum.Font.SourceSansBold
+MinimizeBtn.TextSize = 20
+MinimizeBtn.Parent = TitleBar
+
+-- 關閉按鈕
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(1, -27.5, 0, 2.5)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 16
+CloseBtn.Parent = TitleBar
+
+-- 功能內容區塊
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -30)
+ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+-- 1. ON/OFF 開關按鈕
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 200, 0, 40)
+ToggleBtn.Position = UDim2.new(0.5, -100, 0, 15)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+ToggleBtn.Text = "Auto Redeem: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = ContentFrame
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+ToggleCorner.Parent = ToggleBtn
+
+-- 2. 固定測試按鈕 (已與開關狀態綁定)
+local TestSendBtn = Instance.new("TextButton")
+TestSendBtn.Size = UDim2.new(0, 200, 0, 35)
+TestSendBtn.Position = UDim2.new(0.5, -100, 0, 70)
+TestSendBtn.BackgroundColor3 = Color3.fromRGB(60, 110, 180)
+TestSendBtn.Text = "Test: CODEISREAL999"
+TestSendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TestSendBtn.Font = Enum.Font.SourceSansBold
+TestSendBtn.TextSize = 15
+TestSendBtn.Parent = ContentFrame
+
+local SendCorner = Instance.new("UICorner")
+SendCorner.CornerRadius = UDim.new(0, 4)
+SendCorner.Parent = TestSendBtn
+
+-- 歷史紀錄標題與滾動清單
+local HistoryLabel = Instance.new("TextLabel")
+HistoryLabel.Size = UDim2.new(1, -60, 0, 20)
+HistoryLabel.Position = UDim2.new(0, 30, 0, 120)
+HistoryLabel.BackgroundTransparency = 1
+HistoryLabel.Text = "─ 歷史紀錄 (點擊可複製) ─"
+HistoryLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+HistoryLabel.Font = Enum.Font.SourceSansBold
+HistoryLabel.TextSize = 12
+HistoryLabel.Parent = ContentFrame
+
+local HistoryScroll = Instance.new("ScrollingFrame")
+HistoryScroll.Name = "HistoryScroll"
+HistoryScroll.Size = UDim2.new(0, 200, 0, 150)
+HistoryScroll.Position = UDim2.new(0.5, -100, 0, 145)
+HistoryScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+HistoryScroll.BorderSizePixel = 0
+HistoryScroll.ScrollBarThickness = 4
+HistoryScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+HistoryScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+HistoryScroll.Parent = ContentFrame
+
+local ScrollCorner = Instance.new("UICorner")
+ScrollCorner.CornerRadius = UDim.new(0, 4)
+ScrollCorner.Parent = HistoryScroll
+
+local HistoryLayout = Instance.new("UIListLayout")
+HistoryLayout.Parent = HistoryScroll
+HistoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
+HistoryLayout.Padding = UDim.new(0, 4)
+
+-- 自動調整滾動內容高度
+HistoryLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    HistoryScroll.CanvasSize = UDim2.new(0, 0, 0, HistoryLayout.AbsoluteContentSize.Y + 10)
+end)
+
+
+-- [[ 邏輯功能實作 ]]
+
+-- 全域開關變數
+local autoRedeemEnabled = false
+
+-- 核心文字填入處理函數
+local function updateTargetTextBox(newText)
+    if not newText or newText == "" then return end
+    
+    -- 去除前後空格，並強制轉換為大寫
+    newText = string.gsub(newText, "^%s*(.-)%s*$", "%1")
+    newText = string.upper(newText)
+    
+    local currentText = codeRedeemTextBox.Text
+    if currentText == "" then
+        codeRedeemTextBox.Text = newText
+    else
+        codeRedeemTextBox.Text = currentText .. " " .. newText
+    end
+end
+
+-- 歷史紀錄紀錄防重複快取
+local recordedCodes = {}
+
+-- 歷史紀錄添加函數
+local historyCount = 0
+local function addHistory(text)
+    if not text or text == "" then return end
+    
+    -- 去除前後空格，並強制轉換為大寫
+    text = string.gsub(text, "^%s*(.-)%s*$", "%1")
+    text = string.upper(text)
+    
+    if recordedCodes[text] then return end 
+    recordedCodes[text] = true -- 標記已記錄
+    
+    historyCount = historyCount + 1
+    
+    local LogBtn = Instance.new("TextButton")
+    LogBtn.Size = UDim2.new(1, -8, 0, 28)
+    LogBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    LogBtn.BorderSizePixel = 0
+    LogBtn.Text = "  " .. text
+    LogBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    LogBtn.TextXAlignment = Enum.TextXAlignment.Left
+    LogBtn.Font = Enum.Font.SourceSans
+    LogBtn.TextSize = 14
+    LogBtn.LayoutOrder = -historyCount -- 最新的排最上面
+    LogBtn.Parent = HistoryScroll
+    
+    local LogCorner = Instance.new("UICorner")
+    LogCorner.CornerRadius = UDim.new(0, 4)
+    LogCorner.Parent = LogBtn
+    
+    -- 點擊歷史紀錄行為
+    LogBtn.MouseButton1Click:Connect(function()
+        -- 點擊歷史紀錄直接填入（不受 ON/OFF 開關限制）
+        updateTargetTextBox(text) 
+        if setclipboard then
+            setclipboard(text)
+        end
+    end)
+end
+
+-- 1. 拖曳功能 (Drag)
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- 2. 縮小/展開功能 (Minimize)
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 260, 0, 30) or UDim2.new(0, 260, 0, 340)
+    TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+    MinimizeBtn.Text = isMinimized and "+" or "-"
+end)
+
+-- 3. 關閉功能 (Close)
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- 4. 自動監聽與填入序號邏輯 (Auto Redeem)
+local listenerConnection = nil
+
+local function startListening()
+    listenerConnection = topNotificationGui.ChildAdded:Connect(function(child)
+        if child.Name == "Template" then
+            task.wait(0.05)
+            local codeText = ""
+            
+            if child:IsA("TextLabel") then
+                codeText = child.Text
+            elseif child:FindFirstChildOfClass("TextLabel") then
+                codeText = child:FindFirstChildOfClass("TextLabel").Text
+            else
+                pcall(function() codeText = child.Text end)
+            end
+
+            if codeText and codeText ~= "" then
+                updateTargetTextBox(codeText)
+                addHistory(codeText)
+            end
+        end
+    end)
+end
+
+local function stopListening()
+    if listenerConnection then
+        listenerConnection:Disconnect()
+        listenerConnection = nil
+    end
+end
+
+-- 開關切換
+ToggleBtn.MouseButton1Click:Connect(function()
+    autoRedeemEnabled = not autoRedeemEnabled
+    if autoRedeemEnabled then
+        ToggleBtn.Text = "Auto Redeem: ON"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        startListening()
+    else
+        ToggleBtn.Text = "Auto Redeem: OFF"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        stopListening()
+    end
+end)
+
+-- 5. 測試按鈕事件 (新增開關條件檢查)
+TestSendBtn.MouseButton1Click:Connect(function()
+    -- 檢查開關，如果不是 ON 狀態，直接返回不執行任何事
+    if not autoRedeemEnabled then return end
+    
+    local testCode = "CODEISREAL999"
+    
+    updateTargetTextBox(testCode) -- 填入遊戲目標輸入框
+    addHistory(testCode)          -- 記錄至 UI 歷史清單
+    
+    -- 生成一個虛擬 Template 僅用於模擬通知行為
+    local success, err = pcall(function()
+        local mockTemplate = Instance.new("TextLabel")
+        mockTemplate.Name = "NotTemplate"
+        mockTemplate.Text = testCode
+        mockTemplate.Size = UDim2.new(0, 100, 0, 30)
+        mockTemplate.Visible = false
+        mockTemplate.Parent = topNotificationGui 
+        
+        task.delay(1, function()
+            mockTemplate:Destroy()
+        end)
+    end)
+    
+    if not success then
+        warn("測試發送通知模擬失敗：" .. tostring(err))
+    end
+end)
