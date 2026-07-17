@@ -1,12 +1,14 @@
--- ================= WindUI + 自动通关脚本 =================
--- 这是一个客户端脚本 (LocalScript)
+-- =============================================
+-- WindUI + 自动通关脚本（通用跑酷/闯关）
+-- =============================================
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
+
 local LocalPlayer = Players.LocalPlayer
 
--- ================= WindUI 加载 =================
+-- ================== 加载 WindUI ==================
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
 local Window = WindUI:CreateWindow({
@@ -15,7 +17,7 @@ local Window = WindUI:CreateWindow({
     Author = "by Grok",
     Folder = "AutoWinHub",
     Theme = "Dark",
-    Size = UDim2.fromOffset(680, 520),
+    Size = UDim2.fromOffset(700, 560),
     Resizable = true,
     ToggleKey = Enum.KeyCode.RightShift,
 })
@@ -25,93 +27,97 @@ local MainTab = Window:Tab({
     Icon = "play",
 })
 
--- ================= 配置参数 =================
-local TELEPORT_SPEED = 50
-local TWEEN_MODE = true
-local STAGE_FOLDER_NAMES = {"Checkpoints", "Stages", "Spawns", "Parts"}
+local SettingsTab = Window:Tab({
+    Title = "设置",
+    Icon = "settings",
+})
 
--- 变量
-local autoWinRunning = false
+-- ================== 配置 ==================
+local CONFIG = {
+    Speed = 60,
+    UseTween = true,
+    HeightOffset = 4,
+    Delay = 0.4,
+    AutoStart = false,
+}
+
+local autoRunning = false
 local currentStage = 0
 
--- ================= 自动寻找关卡 =================
-local function findStagesFolder()
-    for _, name in ipairs(STAGE_FOLDER_NAMES) do
-        local folder = Workspace:FindFirstChild(name) or Workspace:FindFirstChild(name, true)
+-- ================== 核心函数 ==================
+local function findStageFolder()
+    local names = {"Checkpoints", "Stages", "Spawns", "Levels", "Parts", "Map"}
+    for _, name in ipairs(names) do
+        local folder = Workspace:FindFirstChild(name, true)
         if folder then return folder end
     end
-    return nil
+    return Workspace
 end
 
 local function getSortedStages(folder)
     local stages = {}
-    for _, part in ipairs(folder:GetChildren()) do
-        if part:IsA("BasePart") or part:IsA("SpawnLocation") or part:IsA("Model") then
-            local stageNumber = tonumber(part.Name) or (#stages + 1)
-            stages[stageNumber] = part
+    for _, obj in ipairs(folder:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("SpawnLocation") then
+            local num = tonumber(obj.Name:match("%d+")) or tonumber(obj.Name)
+            if num then
+                stages[num] = obj
+            end
         end
     end
-    return stages
+    
+    local sorted = {}
+    for i = 1, 500 do
+        if stages[i] then table.insert(sorted, stages[i]) end
+    end
+    return sorted
 end
 
--- ================= 移动函数 =================
-local function moveToPart(targetPart)
+local function teleportTo(part)
     local character = LocalPlayer.Character
-    if not character then return false end
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return false end
+    if not character then return end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
 
-    local targetCFrame = targetPart.CFrame + Vector3.new(0, 4, 0)
+    local target = part.CFrame * CFrame.new(0, CONFIG.HeightOffset, 0)
 
-    if TWEEN_MODE then
-        local distance = (rootPart.Position - targetPart.Position).Magnitude
-        local duration = distance / TELEPORT_SPEED
-        local tween = TweenService:Create(rootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    if CONFIG.UseTween then
+        local dist = (root.Position - part.Position).Magnitude
+        local tween = TweenService:Create(root, TweenInfo.new(dist / CONFIG.Speed, Enum.EasingStyle.Linear), {CFrame = target})
         tween:Play()
         tween.Completed:Wait()
     else
-        rootPart.CFrame = targetCFrame
+        root.CFrame = target
     end
-    task.wait(0.3)
-    return true
+    task.wait(CONFIG.Delay)
 end
 
--- ================= 主自动通关函数 =================
 local function startAutoWin()
-    if autoWinRunning then return end
-    autoWinRunning = true
+    if autoRunning then return end
+    autoRunning = true
 
-    local stagesFolder = findStagesFolder()
-    if not stagesFolder then
-        WindUI:Notify({
-            Title = "错误",
-            Content = "未找到关卡文件夹！",
-            Type = "Error"
-        })
-        autoWinRunning = false
+    local folder = findStageFolder()
+    local stages = getSortedStages(folder)
+
+    if #stages == 0 then
+        WindUI:Notify({Title = "错误", Content = "未找到关卡点！", Type = "Error"})
+        autoRunning = false
         return
     end
 
-    local sortedStages = getSortedStages(stagesFolder)
-    WindUI:Notify({Title = "开始", Content = "找到 " .. #sortedStages .. " 个关卡，开始自动通关...", Type = "Success"})
+    WindUI:Notify({Title = "开始", Content = "找到 " .. #stages .. " 个关卡，开始自动通关...", Type = "Success"})
 
-    for stageNumber = 1, #sortedStages do
-        if not autoWinRunning then break end
-        
-        local stagePart = sortedStages[stageNumber]
-        currentStage = stageNumber
-        
-        if stagePart then
-            MainTab:Label({Title = "当前进度: 第 " .. stageNumber .. " 关"})
-            moveToPart(stagePart)
-        end
+    for i, stage in ipairs(stages) do
+        if not autoRunning then break end
+        currentStage = i
+        MainTab:Label({Title = "当前进度：第 " .. i .. " / " .. #stages .. " 关"})
+        teleportTo(stage)
     end
 
-    WindUI:Notify({Title = "完成", Content = "已完成所有关卡！", Type = "Success"})
-    autoWinRunning = false
+    WindUI:Notify({Title = "完成", Content = "自动通关已结束！", Type = "Success"})
+    autoRunning = false
 end
 
--- ================= UI 控件 =================
+-- ================== UI 控件 ==================
 MainTab:Toggle({
     Title = "启用自动通关",
     Value = false,
@@ -119,32 +125,13 @@ MainTab:Toggle({
         if state then
             task.spawn(startAutoWin)
         else
-            autoWinRunning = false
-            WindUI:Notify({Title = "已停止", Content = "自动通关已停止", Type = "Warning"})
+            autoRunning = false
         end
     end
 })
 
-MainTab:Slider({
-    Title = "移动速度",
-    Min = 20,
-    Max = 120,
-    Default = 50,
-    Callback = function(value)
-        TELEPORT_SPEED = value
-    end
-})
-
-MainTab:Toggle({
-    Title = "平滑移动 (Tween)",
-    Value = true,
-    Callback = function(state)
-        TWEEN_MODE = state
-    end
-})
-
 MainTab:Button({
-    Title = "立即开始自动通关",
+    Title = "立即开始",
     Callback = function()
         task.spawn(startAutoWin)
     end
@@ -153,10 +140,41 @@ MainTab:Button({
 MainTab:Button({
     Title = "停止",
     Callback = function()
-        autoWinRunning = false
+        autoRunning = false
     end
 })
 
-MainTab:Label({Title = "提示：按 RightShift 切换窗口"})
+-- 设置页面
+SettingsTab:Slider({
+    Title = "移动速度",
+    Min = 20,
+    Max = 120,
+    Default = 60,
+    Callback = function(v) CONFIG.Speed = v end
+})
 
-print("🎮 WindUI 自动通关助手已加载！")
+SettingsTab:Toggle({
+    Title = "平滑移动 (Tween)",
+    Value = true,
+    Callback = function(v) CONFIG.UseTween = v end
+})
+
+SettingsTab:Slider({
+    Title = "每关停顿时间",
+    Min = 0.1,
+    Max = 1.5,
+    Default = 0.4,
+    Callback = function(v) CONFIG.Delay = v end
+})
+
+SettingsTab:Slider({
+    Title = "抬高高度",
+    Min = 2,
+    Max = 8,
+    Default = 4,
+    Callback = function(v) CONFIG.HeightOffset = v end
+})
+
+MainTab:Label({Title = "快捷键：RightShift 打开/关闭窗口"})
+
+print("🎉 WindUI 自动通关助手已成功加载！")
