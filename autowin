@@ -1,175 +1,174 @@
--- The Mimic WindUI 辅助脚本
--- 自动加载 WindUI + 完整控制面板
+-- The Mimic Monster ESP + WindUI 界面
+-- 执行此脚本即可使用漂亮的 GUI
 
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Camera = Workspace.CurrentCamera
 
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local RootPart = Character:WaitForChild("HumanoidRootPart")
+local LocalPlayer = Players.LocalPlayer
 
--- ==================== WindUI 加载 ====================
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+-- ==================== WindUI ====================
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Edgeiy/WindUI/main/source"))()
 
 local Window = WindUI:CreateWindow({
-    Title = "The Mimic 自动辅助",
-    Icon = "skull",
-    Theme = "Dark",           -- 可选: Dark, Light, Rose, Violet 等
-    Folder = "TheMimicHub",   -- 保存配置用
-    Size = UDim2.fromOffset(620, 460)
+    Title = "The Mimic | 怪物透视",
+    Size = UDim2.new(0, 420, 0, 320),
+    Theme = "Dark",
+    Keybind = Enum.KeyCode.RightShift
 })
 
--- ==================== 主 Tab ====================
-local MainTab = Window:Tab({
-    Title = "主要功能",
-    Icon = "home"
+local Tab = Window:CreateTab({
+    Title = "主界面",
+    Icon = "👁️"
 })
 
--- 状态变量
-local flyEnabled = false
-local bv, bg
-local noclipConnection
+local Section = Tab:CreateSection("怪物透视 ESP")
 
--- 飞行
-local function toggleFly()
-    flyEnabled = not flyEnabled
-    if flyEnabled then
-        bv = Instance.new("BodyVelocity")
-        bg = Instance.new("BodyGyro")
-        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-        bv.Parent = RootPart
-        bg.Parent = RootPart
+local ESP_Enabled = true
+local ESP_Color = Color3.fromRGB(255, 0, 0)
 
-        spawn(function()
-            while flyEnabled and RootPart do
-                local cam = Workspace.CurrentCamera
-                local moveDir = Vector3.new()
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += cam.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= cam.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= cam.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += cam.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0,1,0) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.new(0,1,0) end
+-- ESP 存储
+local ESPObjects = {}
+
+local function createESP(target)
+    if ESPObjects[target] then return end
+    
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Filled = false
+    box.Transparency = 1
+    box.Color = ESP_Color
+    
+    local nameText = Drawing.new("Text")
+    nameText.Size = 16
+    nameText.Center = true
+    nameText.Outline = true
+    nameText.Color = ESP_Color
+    nameText.Font = 2
+    
+    local distText = Drawing.new("Text")
+    distText.Size = 14
+    distText.Center = true
+    distText.Outline = true
+    distText.Color = Color3.fromRGB(255, 255, 255)
+    distText.Font = 2
+    
+    ESPObjects[target] = {Box = box, Name = nameText, Distance = distText, Target = target}
+end
+
+local function removeESP(target)
+    local esp = ESPObjects[target]
+    if esp then
+        esp.Box:Remove()
+        esp.Name:Remove()
+        esp.Distance:Remove()
+        ESPObjects[target] = nil
+    end
+end
+
+local function updateESP()
+    for target, esp in pairs(ESPObjects) do
+        if not target or not target.Parent or not target:FindFirstChild("HumanoidRootPart") then
+            removeESP(target)
+        else
+            local root = target.HumanoidRootPart
+            local vector, onScreen = Camera:WorldToViewportPoint(root.Position)
+            
+            if onScreen then
+                local size = (Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0)).Y - 
+                             Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0)).Y) / 2
                 
-                bv.Velocity = moveDir.Unit * MainTab:GetValue("FlySpeed") or 100
-                bg.CFrame = cam.CFrame
-                RunService.Heartbeat:Wait()
+                local pos2D = Vector2.new(vector.X, vector.Y)
+                
+                esp.Box.Size = Vector2.new(size * 1.6, size * 3.2)
+                esp.Box.Position = pos2D - Vector2.new(esp.Box.Size.X/2, esp.Box.Size.Y/2)
+                esp.Box.Color = ESP_Color
+                esp.Box.Visible = true
+                
+                esp.Name.Text = target.Name
+                esp.Name.Position = pos2D - Vector2.new(0, esp.Box.Size.Y/2 + 18)
+                esp.Name.Color = ESP_Color
+                esp.Name.Visible = true
+                
+                local dist = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
+                    (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude) or 0)
+                esp.Distance.Text = dist .. " studs"
+                esp.Distance.Position = pos2D + Vector2.new(0, esp.Box.Size.Y/2 + 8)
+                esp.Distance.Visible = true
+            else
+                esp.Box.Visible = false
+                esp.Name.Visible = false
+                esp.Distance.Visible = false
             end
-        end)
-    else
-        if bv then bv:Destroy() end
-        if bg then bg:Destroy() end
-    end
-end
-
--- 无碰撞
-local function toggleNoclip(state)
-    if state then
-        noclipConnection = RunService.Stepped:Connect(function()
-            if Character then
-                for _, part in pairs(Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end
-        end)
-    else
-        if noclipConnection then noclipConnection:Disconnect() end
-    end
-end
-
--- 添加怪物 ESP
-local function addESP()
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:FindFirstChild("Humanoid") and v ~= Character and not v:FindFirstChild("Highlight") then
-            local hl = Instance.new("Highlight")
-            hl.FillColor = Color3.fromRGB(255, 0, 0)
-            hl.OutlineColor = Color3.fromRGB(255, 100, 100)
-            hl.Parent = v
         end
     end
-    WindUI:Notify({Title = "ESP", Content = "怪物高亮已添加！", Duration = 3})
 end
 
--- UI 控件
-MainTab:Toggle({
-    Title = "飞行模式 (F)",
-    Value = false,
-    Callback = toggleFly
-})
-
-MainTab:Slider({
-    Title = "飞行速度",
-    Value = {Min = 50, Max = 300, Default = 100},
-    Step = 10,
-    Callback = function(val) end  -- 实时读取
-})
-
-MainTab:Toggle({
-    Title = "无碰撞 (Noclip)",
-    Value = false,
-    Callback = toggleNoclip
-})
-
-MainTab:Slider({
-    Title = "行走速度",
-    Value = {Min = 16, Max = 200, Default = 50},
-    Step = 1,
-    Callback = function(val)
-        if Humanoid then Humanoid.WalkSpeed = val end
-    end
-})
-
-MainTab:Button({
-    Title = "添加怪物 ESP",
-    Icon = "eye",
-    Callback = addESP
-})
-
-MainTab:Button({
-    Title = "God Mode (无敌)",
-    Callback = function()
-        if Humanoid then
-            Humanoid.MaxHealth = 9e9
-            Humanoid.Health = 9e9
+local function scanMonsters()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") and not Players:FindFirstChild(obj.Name) then
+            createESP(obj)
         end
-        WindUI:Notify({Title = "God Mode", Content = "已开启无敌！"})
+    end
+end
+
+-- ==================== WindUI 控件 ====================
+
+Section:CreateToggle({
+    Name = "开启怪物透视",
+    Default = true,
+    Callback = function(state)
+        ESP_Enabled = state
+        print("怪物 ESP 已" .. (state and "启用" or "禁用"))
     end
 })
 
-MainTab:Button({
-    Title = "Full Bright (全亮)",
+Section:CreateColorPicker({
+    Name = "ESP 颜色",
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(color)
+        ESP_Color = color
+    end
+})
+
+Section:CreateButton({
+    Name = "立即扫描怪物",
     Callback = function()
-        game:GetService("Lighting").Brightness = 3
-        game:GetService("Lighting").ClockTime = 14
-        game:GetService("Lighting").FogEnd = 1e5
-        game:GetService("Lighting").GlobalShadows = false
+        scanMonsters()
+        WindUI:Notify("扫描完成", "已尝试标记所有怪物", "Success")
     end
 })
 
--- 传送 Tab
-local TeleportTab = Window:Tab({
-    Title = "传送",
-    Icon = "map"
-})
-
-TeleportTab:Button({
-    Title = "传送到出生点",
+Section:CreateButton({
+    Name = "清除所有 ESP",
     Callback = function()
-        if RootPart then RootPart.CFrame = CFrame.new(0, 50, 0) end
+        for target, _ in pairs(ESPObjects) do
+            removeESP(target)
+        end
+        WindUI:Notify("已清除", "所有 ESP 已移除", "Info")
     end
 })
 
--- 提示
-WindUI:Notify({
-    Title = "The Mimic 脚本已加载",
-    Content = "欢迎使用 WindUI 版本！按 F 飞行，N 无碰撞",
-    Duration = 6
-})
+-- ==================== 主循环 ====================
+RunService.RenderStepped:Connect(function()
+    if ESP_Enabled then
+        updateESP()
+    end
+end)
 
-print("🎉 The Mimic WindUI 脚本加载成功！")
+-- 自动扫描新怪物
+Workspace.DescendantAdded:Connect(function()
+    task.wait(0.3)
+    scanMonsters()
+end)
+
+-- 初始扫描
+task.spawn(function()
+    task.wait(2)
+    scanMonsters()
+end)
+
+print("🎉 The Mimic WindUI 怪物透视已加载！")
+print("按 RightShift 打开/关闭菜单")
