@@ -1,174 +1,212 @@
--- The Mimic Monster ESP + WindUI 界面
--- 执行此脚本即可使用漂亮的 GUI
+-- Roblox Luau 静默自瞄 + WinUI 界面
+-- 按 RightShift 显示/隐藏菜单
 
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Camera = Workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- ==================== WindUI ====================
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Edgeiy/WindUI/main/source"))()
+local aimEnabled = false
+local aimPart = "Head"
+local FOV = 150
+local TEAM_CHECK = true
+local target = nil
 
-local Window = WindUI:CreateWindow({
-    Title = "The Mimic | 怪物透视",
-    Size = UDim2.new(0, 420, 0, 320),
-    Theme = "Dark",
-    Keybind = Enum.KeyCode.RightShift
-})
+-- ==================== 创建 WinUI 界面 ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "WinUI_Aimbot"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
 
-local Tab = Window:CreateTab({
-    Title = "主界面",
-    Icon = "👁️"
-})
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 220)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -110)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
-local Section = Tab:CreateSection("怪物透视 ESP")
+-- 标题栏
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
 
-local ESP_Enabled = true
-local ESP_Color = Color3.fromRGB(255, 0, 0)
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -80, 1, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "WinUI • Silent Aimbot"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextSize = 16
+Title.Font = Enum.Font.GothamBold
+Title.Parent = TitleBar
 
--- ESP 存储
-local ESPObjects = {}
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 40, 0, 40)
+CloseBtn.Position = UDim2.new(1, -40, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.new(1, 1, 1)
+CloseBtn.TextSize = 18
+CloseBtn.Parent = TitleBar
 
-local function createESP(target)
-    if ESPObjects[target] then return end
-    
-    local box = Drawing.new("Square")
-    box.Thickness = 2
-    box.Filled = false
-    box.Transparency = 1
-    box.Color = ESP_Color
-    
-    local nameText = Drawing.new("Text")
-    nameText.Size = 16
-    nameText.Center = true
-    nameText.Outline = true
-    nameText.Color = ESP_Color
-    nameText.Font = 2
-    
-    local distText = Drawing.new("Text")
-    distText.Size = 14
-    distText.Center = true
-    distText.Outline = true
-    distText.Color = Color3.fromRGB(255, 255, 255)
-    distText.Font = 2
-    
-    ESPObjects[target] = {Box = box, Name = nameText, Distance = distText, Target = target}
+-- 内容区域
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -20, 1, -60)
+Content.Position = UDim2.new(0, 10, 0, 50)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+-- 开关
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(1, 0, 0, 50)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+ToggleBtn.Text = "自瞄状态: 关闭"
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleBtn.TextSize = 16
+ToggleBtn.Font = Enum.Font.GothamSemibold
+ToggleBtn.Parent = Content
+
+-- 目标部位
+local PartLabel = Instance.new("TextLabel")
+PartLabel.Size = UDim2.new(0.5, -5, 0, 40)
+PartLabel.Position = UDim2.new(0, 0, 0.4, 0)
+PartLabel.BackgroundTransparency = 1
+PartLabel.Text = "目标部位:"
+PartLabel.TextColor3 = Color3.new(1, 1, 1)
+PartLabel.TextXAlignment = Enum.TextXAlignment.Left
+PartLabel.Parent = Content
+
+local PartBtn = Instance.new("TextButton")
+PartBtn.Size = UDim2.new(0.5, 0, 0, 40)
+PartBtn.Position = UDim2.new(0.5, 5, 0.4, 0)
+PartBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+PartBtn.Text = "Head"
+PartBtn.TextColor3 = Color3.new(1, 1, 1)
+PartBtn.Parent = Content
+
+-- 提示
+local Hint = Instance.new("TextLabel")
+Hint.Size = UDim2.new(1, 0, 0, 30)
+Hint.Position = UDim2.new(0, 0, 0.75, 0)
+Hint.BackgroundTransparency = 1
+Hint.Text = "RightShift 显示/隐藏 • E 键快速开关"
+Hint.TextColor3 = Color3.fromRGB(180, 180, 180)
+Hint.TextSize = 13
+Hint.Parent = Content
+
+-- 圆角
+local function addCorner(obj)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = obj
 end
 
-local function removeESP(target)
-    local esp = ESPObjects[target]
-    if esp then
-        esp.Box:Remove()
-        esp.Name:Remove()
-        esp.Distance:Remove()
-        ESPObjects[target] = nil
-    end
-end
+addCorner(MainFrame)
+addCorner(TitleBar)
+addCorner(ToggleBtn)
+addCorner(PartBtn)
 
-local function updateESP()
-    for target, esp in pairs(ESPObjects) do
-        if not target or not target.Parent or not target:FindFirstChild("HumanoidRootPart") then
-            removeESP(target)
-        else
-            local root = target.HumanoidRootPart
-            local vector, onScreen = Camera:WorldToViewportPoint(root.Position)
-            
-            if onScreen then
-                local size = (Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0)).Y - 
-                             Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0)).Y) / 2
-                
-                local pos2D = Vector2.new(vector.X, vector.Y)
-                
-                esp.Box.Size = Vector2.new(size * 1.6, size * 3.2)
-                esp.Box.Position = pos2D - Vector2.new(esp.Box.Size.X/2, esp.Box.Size.Y/2)
-                esp.Box.Color = ESP_Color
-                esp.Box.Visible = true
-                
-                esp.Name.Text = target.Name
-                esp.Name.Position = pos2D - Vector2.new(0, esp.Box.Size.Y/2 + 18)
-                esp.Name.Color = ESP_Color
-                esp.Name.Visible = true
-                
-                local dist = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
-                    (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude) or 0)
-                esp.Distance.Text = dist .. " studs"
-                esp.Distance.Position = pos2D + Vector2.new(0, esp.Box.Size.Y/2 + 8)
-                esp.Distance.Visible = true
-            else
-                esp.Box.Visible = false
-                esp.Name.Visible = false
-                esp.Distance.Visible = false
+-- ==================== 自瞄核心逻辑 ====================
+local function getClosestTarget()
+    local closest = nil
+    local shortest = math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+            local hum = player.Character.Humanoid
+            if hum.Health > 0 and (not TEAM_CHECK or player.Team ~= LocalPlayer.Team) then
+                local part = player.Character:FindFirstChild(aimPart) or player.Character:FindFirstChild("HumanoidRootPart")
+                if part then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                        if dist < FOV and dist < shortest then
+                            shortest = dist
+                            closest = part
+                        end
+                    end
+                end
             end
         end
     end
+    return closest
 end
 
-local function scanMonsters()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") and not Players:FindFirstChild(obj.Name) then
-            createESP(obj)
+-- Hook (静默自瞄)
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if aimEnabled and target and (method == "Fire" or method == "FireServer") then
+        if string.find(self.Name:lower(), "fire") or string.find(self.Name:lower(), "shoot") or self.Parent.Name:find("Gun") then
+            if args[1] and typeof(args[1]) == "Vector3" then
+                args[1] = target.Position + (target.Velocity * 0.04)  -- 轻微预判
+            end
         end
     end
+    return oldNamecall(self, unpack(args))
+end)
+
+setreadonly(mt, true)
+
+-- 更新目标
+RunService.Heartbeat:Connect(function()
+    target = aimEnabled and getClosestTarget() or nil
+end)
+
+-- ==================== UI 交互 ====================
+local function updateUI()
+    ToggleBtn.Text = "自瞄状态: " .. (aimEnabled and "已开启" or "已关闭")
+    ToggleBtn.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 170, 80) or Color3.fromRGB(45, 45, 45)
 end
 
--- ==================== WindUI 控件 ====================
+ToggleBtn.MouseButton1Click:Connect(function()
+    aimEnabled = not aimEnabled
+    updateUI()
+end)
 
-Section:CreateToggle({
-    Name = "开启怪物透视",
-    Default = true,
-    Callback = function(state)
-        ESP_Enabled = state
-        print("怪物 ESP 已" .. (state and "启用" or "禁用"))
+PartBtn.MouseButton1Click:Connect(function()
+    if aimPart == "Head" then
+        aimPart = "UpperTorso"
+        PartBtn.Text = "UpperTorso"
+    else
+        aimPart = "Head"
+        PartBtn.Text = "Head"
     end
-})
+end)
 
-Section:CreateColorPicker({
-    Name = "ESP 颜色",
-    Default = Color3.fromRGB(255, 0, 0),
-    Callback = function(color)
-        ESP_Color = color
-    end
-})
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui.Enabled = false
+end)
 
-Section:CreateButton({
-    Name = "立即扫描怪物",
-    Callback = function()
-        scanMonsters()
-        WindUI:Notify("扫描完成", "已尝试标记所有怪物", "Success")
-    end
-})
-
-Section:CreateButton({
-    Name = "清除所有 ESP",
-    Callback = function()
-        for target, _ in pairs(ESPObjects) do
-            removeESP(target)
+-- 快捷键
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+    elseif input.KeyCode == Enum.KeyCode.E then
+        aimEnabled = not aimEnabled
+        updateUI()
+    elseif input.KeyCode == Enum.KeyCode.F then
+        if aimPart == "Head" then
+            aimPart = "UpperTorso"
+        else
+            aimPart = "Head"
         end
-        WindUI:Notify("已清除", "所有 ESP 已移除", "Info")
-    end
-})
-
--- ==================== 主循环 ====================
-RunService.RenderStepped:Connect(function()
-    if ESP_Enabled then
-        updateESP()
+        PartBtn.Text = aimPart
     end
 end)
 
--- 自动扫描新怪物
-Workspace.DescendantAdded:Connect(function()
-    task.wait(0.3)
-    scanMonsters()
-end)
-
--- 初始扫描
-task.spawn(function()
-    task.wait(2)
-    scanMonsters()
-end)
-
-print("🎉 The Mimic WindUI 怪物透视已加载！")
-print("按 RightShift 打开/关闭菜单")
+updateUI()
+print("WinUI 静默自瞄已加载！按 RightShift 打开菜单")
