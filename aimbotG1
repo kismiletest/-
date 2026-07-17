@@ -1,31 +1,88 @@
 -- 这是一个客户端脚本 (LocalScript)
--- 放置位置: StarterPlayer -> StarterPlayerScripts
+-- 放置位置推荐: StarterPlayer -> StarterPlayerScripts （脚本会自动生成UI）
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- ================= 配置参数 =================
-local AIM_KEY = Enum.UserInputType.MouseButton2 -- 右键瞄准 (可以改为 Enum.KeyCode.E 等)
-local FOV_RADIUS = 200 -- 自瞄的范围（屏幕像素半径），只有在这个圆圈内的敌人会被锁定
-local LOCK_PART = "Head" -- 锁头 ("Head") 或 锁胸口 ("UpperTorso" / "Torso")
-local SMOOTHNESS = 0.2 -- 平滑度 (0-1)，数值越小越平滑/慢，1为瞬间锁定（防抖/防封微调）
-local TEAM_CHECK = true -- 是否开启队友检查 (true = 不锁队友)
+local AIM_KEY = Enum.UserInputType.MouseButton2 -- 瞄准热键（右键）
+local FOV_RADIUS = 200                         -- 自瞄范围
+local LOCK_PART = "Head"                       -- 锁头
+local SMOOTHNESS = 0.2                         -- 平滑度
+local TEAM_CHECK = true                        -- 检查队友
 -- =============================================
 
-local isAiming = false
+-- 自瞄总开关状态
+local AimbotEnabled = false
+local isKeyDown = false
 local currentTarget = nil
 
--- 获取屏幕中心点
+-- ================= 创建 GUI 界面 =================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AimbotMenu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- 主框架
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 160, 0, 50)
+Frame.Position = UDim2.new(0.05, 0, 0.1, 0) -- 屏幕左上角
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true -- 允许玩家在屏幕上拖动这个菜单
+Frame.Parent = ScreenGui
+
+-- 圆角效果
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = Frame
+
+-- 开关按钮
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(1, -10, 1, -10)
+ToggleButton.Position = UDim2.new(0, 5, 0, 5)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40) -- 默认红色 (关闭)
+ToggleButton.Text = "自瞄: 关闭"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.TextSize = 16
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Parent = Frame
+
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 6)
+ButtonCorner.Parent = ToggleButton
+
+-- 按钮点击事件（切换开关）
+ToggleButton.MouseButton1Click:Connect(function()
+	AimbotEnabled = not AimbotEnabled
+	
+	-- 动感颜色渐变切换
+	local targetColor = AimbotEnabled and Color3.fromRGB(40, 180, 40) or Color3.fromRGB(180, 40, 40)
+	local targetText = AimbotEnabled and "自瞄: 开启" or "自瞄: 关闭"
+	
+	ToggleButton.Text = targetText
+	TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = targetColor}):Play()
+	
+	-- 关闭开关时清除当前目标
+	if not AimbotEnabled then
+		currentTarget = nil
+	end
+end)
+
+-- ================= 自瞄核心逻辑 =================
+
 local function getScreenCenter()
 	return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
 
--- 检查目标是否合法且存活
 local function isValidTarget(player)
 	if not player or player == LocalPlayer then return false end
 	if TEAM_CHECK and player.Team == LocalPlayer.Team then return false end
@@ -36,12 +93,9 @@ local function isValidTarget(player)
 	end
 	
 	if character:FindFirstChildOfClass("Humanoid").Health <= 0 then return false end
-	
-	-- 检查目标是否在掩体后面（可选射线检测，这里留空以保持核心逻辑清晰）
 	return true
 end
 
--- 获取距离准星最近的合法敌人
 local function getClosestPlayerToCrosshair()
 	local closestPlayer = nil
 	local shortestDistance = FOV_RADIUS
@@ -50,11 +104,9 @@ local function getClosestPlayerToCrosshair()
 	for _, player in ipairs(Players:GetPlayers()) do
 		if isValidTarget(player) then
 			local targetPart = player.Character[LOCK_PART]
-			-- 将敌人的3D坐标转换为2D屏幕坐标
 			local screenPosition, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
 
 			if onScreen then
-				-- 计算敌人与屏幕中心的距离
 				local distance = (Vector2.new(screenPosition.X, screenPosition.Y) - center).Magnitude
 				if distance < shortestDistance then
 					shortestDistance = distance
@@ -67,39 +119,33 @@ local function getClosestPlayerToCrosshair()
 	return closestPlayer
 end
 
--- 监听按键按下
+-- 监听按键
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 	if input.UserInputType == AIM_KEY or input.KeyCode == AIM_KEY then
-		isAiming = true
+		isKeyDown = true
 	end
 end)
 
--- 监听按键释放
 UserInputService.InputEnded:Connect(function(input)
 	if input.UserInputType == AIM_KEY or input.KeyCode == AIM_KEY then
-		isAiming = false
+		isKeyDown = false
 		currentTarget = nil
 	end
 end)
 
--- 每帧渲染前执行自瞄逻辑
+-- 每帧死循环逻辑
 RunService.RenderStepped:Connect(function()
-	if not isAiming then return end
+	-- 核心修改：不仅要按下按键，GUI的自瞄开关也必须为 true 才会执行锁定
+	if not AimbotEnabled or not isKeyDown then return end
 	
-	-- 如果当前没有目标，或者当前目标死掉了/跑远了，重新寻找目标
 	if not currentTarget or not isValidTarget(currentTarget) then
 		currentTarget = getClosestPlayerToCrosshair()
 	end
 
-	-- 如果找到目标，将摄像机转向目标
 	if currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild(LOCK_PART) then
 		local targetPosition = currentTarget.Character[LOCK_PART].Position
-		
-		-- 计算摄像机需要朝向的新 CFrame
 		local targetCFrame = CFrame.new(Camera.CFrame.Position, targetPosition)
-		
-		-- 使用 Lerp（线性插值）实现平滑转向，防止画面瞬间瞬移显得太假
 		Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, SMOOTHNESS)
 	end
 end)
