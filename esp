@@ -1,0 +1,174 @@
+-- The Mimic Monster ESP + WindUI 界面
+-- 执行此脚本即可使用漂亮的 GUI
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = Workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ==================== WindUI ====================
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Edgeiy/WindUI/main/source"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "The Mimic | 怪物透视",
+    Size = UDim2.new(0, 420, 0, 320),
+    Theme = "Dark",
+    Keybind = Enum.KeyCode.RightShift
+})
+
+local Tab = Window:CreateTab({
+    Title = "主界面",
+    Icon = "👁️"
+})
+
+local Section = Tab:CreateSection("怪物透视 ESP")
+
+local ESP_Enabled = true
+local ESP_Color = Color3.fromRGB(255, 0, 0)
+
+-- ESP 存储
+local ESPObjects = {}
+
+local function createESP(target)
+    if ESPObjects[target] then return end
+    
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Filled = false
+    box.Transparency = 1
+    box.Color = ESP_Color
+    
+    local nameText = Drawing.new("Text")
+    nameText.Size = 16
+    nameText.Center = true
+    nameText.Outline = true
+    nameText.Color = ESP_Color
+    nameText.Font = 2
+    
+    local distText = Drawing.new("Text")
+    distText.Size = 14
+    distText.Center = true
+    distText.Outline = true
+    distText.Color = Color3.fromRGB(255, 255, 255)
+    distText.Font = 2
+    
+    ESPObjects[target] = {Box = box, Name = nameText, Distance = distText, Target = target}
+end
+
+local function removeESP(target)
+    local esp = ESPObjects[target]
+    if esp then
+        esp.Box:Remove()
+        esp.Name:Remove()
+        esp.Distance:Remove()
+        ESPObjects[target] = nil
+    end
+end
+
+local function updateESP()
+    for target, esp in pairs(ESPObjects) do
+        if not target or not target.Parent or not target:FindFirstChild("HumanoidRootPart") then
+            removeESP(target)
+        else
+            local root = target.HumanoidRootPart
+            local vector, onScreen = Camera:WorldToViewportPoint(root.Position)
+            
+            if onScreen then
+                local size = (Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0)).Y - 
+                             Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0)).Y) / 2
+                
+                local pos2D = Vector2.new(vector.X, vector.Y)
+                
+                esp.Box.Size = Vector2.new(size * 1.6, size * 3.2)
+                esp.Box.Position = pos2D - Vector2.new(esp.Box.Size.X/2, esp.Box.Size.Y/2)
+                esp.Box.Color = ESP_Color
+                esp.Box.Visible = true
+                
+                esp.Name.Text = target.Name
+                esp.Name.Position = pos2D - Vector2.new(0, esp.Box.Size.Y/2 + 18)
+                esp.Name.Color = ESP_Color
+                esp.Name.Visible = true
+                
+                local dist = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
+                    (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude) or 0)
+                esp.Distance.Text = dist .. " studs"
+                esp.Distance.Position = pos2D + Vector2.new(0, esp.Box.Size.Y/2 + 8)
+                esp.Distance.Visible = true
+            else
+                esp.Box.Visible = false
+                esp.Name.Visible = false
+                esp.Distance.Visible = false
+            end
+        end
+    end
+end
+
+local function scanMonsters()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") and not Players:FindFirstChild(obj.Name) then
+            createESP(obj)
+        end
+    end
+end
+
+-- ==================== WindUI 控件 ====================
+
+Section:CreateToggle({
+    Name = "开启怪物透视",
+    Default = true,
+    Callback = function(state)
+        ESP_Enabled = state
+        print("怪物 ESP 已" .. (state and "启用" or "禁用"))
+    end
+})
+
+Section:CreateColorPicker({
+    Name = "ESP 颜色",
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(color)
+        ESP_Color = color
+    end
+})
+
+Section:CreateButton({
+    Name = "立即扫描怪物",
+    Callback = function()
+        scanMonsters()
+        WindUI:Notify("扫描完成", "已尝试标记所有怪物", "Success")
+    end
+})
+
+Section:CreateButton({
+    Name = "清除所有 ESP",
+    Callback = function()
+        for target, _ in pairs(ESPObjects) do
+            removeESP(target)
+        end
+        WindUI:Notify("已清除", "所有 ESP 已移除", "Info")
+    end
+})
+
+-- ==================== 主循环 ====================
+RunService.RenderStepped:Connect(function()
+    if ESP_Enabled then
+        updateESP()
+    end
+end)
+
+-- 自动扫描新怪物
+Workspace.DescendantAdded:Connect(function()
+    task.wait(0.3)
+    scanMonsters()
+end)
+
+-- 初始扫描
+task.spawn(function()
+    task.wait(2)
+    scanMonsters()
+end)
+
+print("🎉 The Mimic WindUI 怪物透视已加载！")
+print("按 RightShift 打开/关闭菜单")
