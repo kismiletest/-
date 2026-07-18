@@ -1,209 +1,158 @@
--- Auto Obby + WinUI 控制面板
-local Players = game.Players
-local player = Players.LocalPlayer
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+-- Roblox Luau Flying Script with WindUI
+-- Paste as LocalScript in StarterPlayerScripts or similar
 
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
-local root = character:WaitForChild("HumanoidRootPart")
+local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- ================== 配置 ==================
-local AUTO_WALK_SPEED = 50
-local checkpoints = {
-    Vector3.new(0, 5, 0),      -- 示例起点
-    Vector3.new(50, 10, 100),
-    Vector3.new(120, 20, 200),
-    Vector3.new(300, 5, 350),
-    Vector3.new(500, 50, 600)  -- 示例终点
-    -- 添加更多检查点...
-}
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
-local currentCheckpoint = 1
-local moving = true
-local autoJump = true
-local antiFall = true
--- =========================================
+local Window = WindUI:CreateWindow({
+    Title = "飞行脚本 | Fly Script",
+    Icon = "plane",  -- 可选图标
+    Theme = "Dark",  -- Dark / Light / Rose 等
+})
 
--- 创建 WinUI 风格 ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AutoObbyWinUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
+local Tab = Window:Tab({
+    Title = "飞行控制",
+    Icon = "plane"
+})
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 320, 0, 420)
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
+-- 飞行变量
+local isFlying = false
+local flySpeed = 50
+local bodyVelocity
+local bodyGyro
 
--- 标题栏
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 40)
-titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-titleBar.BorderSizePixel = 0
-titleBar.Parent = mainFrame
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -80, 1, 0)
-title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "Auto Obby WinUI"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextScaled = true
-title.Font = Enum.Font.GothamBold
-title.Parent = titleBar
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 5)
-closeBtn.BackgroundColor3 = Color3.fromRGB(232, 17, 35)
-closeBtn.Text = "✕"
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 18
-closeBtn.Parent = titleBar
-
--- 内容区域
-local content = Instance.new("Frame")
-content.Size = UDim2.new(1, -20, 1, -60)
-content.Position = UDim2.new(0, 10, 0, 50)
-content.BackgroundTransparency = 1
-content.Parent = mainFrame
-
--- 切换按钮模板
-local function createToggle(name, default, callback)
-    local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(1, 0, 0, 50)
-    toggleFrame.BackgroundTransparency = 1
-    toggleFrame.Parent = content
+local function startFlying()
+    if isFlying then return end
+    isFlying = true
     
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.6, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = Color3.new(1,1,1)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 16
-    label.Parent = toggleFrame
+    humanoid.PlatformStand = true
     
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 80, 0, 30)
-    btn.Position = UDim2.new(1, -90, 0.5, -15)
-    btn.BackgroundColor3 = default and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 70)
-    btn.Text = default and "ON" or "OFF"
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.GothamBold
-    btn.Parent = toggleFrame
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = rootPart
     
-    local enabled = default
-    btn.MouseButton1Click:Connect(function()
-        enabled = not enabled
-        btn.BackgroundColor3 = enabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 70)
-        btn.Text = enabled and "ON" or "OFF"
-        callback(enabled)
-    end)
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.P = 10000
+    bodyGyro.Parent = rootPart
     
-    return btn
+    print("飞行已启用 | Flying Enabled")
 end
 
--- 创建切换
-createToggle("自动行走", true, function(state) moving = state end)
-createToggle("自动跳跃", true, function(state) autoJump = state end)
-createToggle("防掉落", true, function(state) antiFall = state end)
-
--- 速度滑块
-local speedLabel = Instance.new("TextLabel")
-speedLabel.Size = UDim2.new(1, 0, 0, 30)
-speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "行走速度: 50"
-speedLabel.TextColor3 = Color3.new(1,1,1)
-speedLabel.Font = Enum.Font.Gotham
-speedLabel.TextSize = 16
-speedLabel.Parent = content
-
-local speedSlider = Instance.new("TextButton")  -- 简化滑块
-speedSlider.Size = UDim2.new(1, 0, 0, 20)
-speedSlider.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-speedSlider.Parent = content
-speedSlider.Position = UDim2.new(0, 0, 0, 80)
-
-local sliderKnob = Instance.new("Frame")
-sliderKnob.Size = UDim2.new(0, 20, 1, 0)
-sliderKnob.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-sliderKnob.Parent = speedSlider
-
-local speedValue = AUTO_WALK_SPEED
-speedSlider.MouseButton1Down:Connect(function()
-    local conn
-    conn = RunService.RenderStepped:Connect(function()
-        if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            conn:Disconnect()
-            return
-        end
-        local mouseX = UserInputService:GetMouseLocation().X
-        local relX = math.clamp((mouseX - speedSlider.AbsolutePosition.X) / speedSlider.AbsoluteSize.X, 0, 1)
-        speedValue = math.floor(20 + relX * 80)
-        sliderKnob.Position = UDim2.new(relX - 0.05, 0, 0, 0)
-        speedLabel.Text = "行走速度: " .. speedValue
-        AUTO_WALK_SPEED = speedValue
-    end)
-end)
-
--- 关闭按钮
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
--- ================== 核心逻辑 ==================
-local function setupInfiniteJump()
-    humanoid.JumpPower = 50
+local function stopFlying()
+    if not isFlying then return end
+    isFlying = false
+    
+    humanoid.PlatformStand = false
+    
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+    
+    print("飞行已禁用 | Flying Disabled")
 end
 
-RunService.Heartbeat:Connect(function()
-    if not character or not root or not humanoid or humanoid.Health <= 0 then return end
+-- 飞行循环
+local connection
+connection = RunService.RenderStepped:Connect(function()
+    if not isFlying or not rootPart then return end
     
-    -- 防掉落
-    if antiFall and root.Position.Y < -100 then
-        if checkpoints[currentCheckpoint] then
-            root.CFrame = CFrame.new(checkpoints[currentCheckpoint] + Vector3.new(0, 5, 0))
-        end
+    local moveDirection = Vector3.new(0, 0, 0)
+    local camera = workspace.CurrentCamera
+    
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+        moveDirection = moveDirection + camera.CFrame.LookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+        moveDirection = moveDirection - camera.CFrame.LookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+        moveDirection = moveDirection - camera.CFrame.RightVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+        moveDirection = moveDirection + camera.CFrame.RightVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+        moveDirection = moveDirection + Vector3.new(0, 1, 0)
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        moveDirection = moveDirection - Vector3.new(0, 1, 0)
     end
     
-    -- 自动行走
-    if moving then
-        local moveDir = root.CFrame.LookVector * AUTO_WALK_SPEED
-        humanoid:Move(moveDir, false)
-        
-        if autoJump and math.random(1, 12) == 1 then
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    if moveDirection.Magnitude > 0 then
+        moveDirection = moveDirection.Unit
+    end
+    
+    bodyVelocity.Velocity = moveDirection * flySpeed
+    bodyGyro.CFrame = camera.CFrame
+end)
+
+-- UI 元素
+local flyToggle = Tab:Toggle({
+    Title = "启用飞行",
+    Value = false,
+    Callback = function(state)
+        if state then
+            startFlying()
+        else
+            stopFlying()
         end
+    end
+})
+
+Tab:Slider({
+    Title = "飞行速度",
+    Min = 10,
+    Max = 200,
+    Default = 50,
+    Callback = function(value)
+        flySpeed = value
+    end
+})
+
+Tab:Button({
+    Title = "重置角色",
+    Callback = function()
+        stopFlying()
+        flyToggle:Set(false)
+        if character and character:FindFirstChild("Humanoid") then
+            character.Humanoid.Health = 0
+        end
+    end
+})
+
+Tab:Button({
+    Title = "销毁 UI",
+    Callback = function()
+        stopFlying()
+        if connection then
+            connection:Disconnect()
+        end
+        Window:Destroy()
+    end
+})
+
+-- 键盘快捷键 (F 键切换飞行)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        local newState = not isFlying
+        flyToggle:Set(newState)
     end
 end)
 
--- 检查点更新
-RunService.Heartbeat:Connect(function()
-    for i, pos in ipairs(checkpoints) do
-        if (root.Position - pos).Magnitude < 20 then
-            currentCheckpoint = math.max(currentCheckpoint, i)
-        end
-    end
-end)
-
--- 角色重生处理
-player.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    humanoid = newChar:WaitForChild("Humanoid")
-    root = newChar:WaitForChild("HumanoidRootPart")
-    setupInfiniteJump()
-end)
-
-setupInfiniteJump()
-
-print("✅ WinUI Auto Obby 控制面板已加载！")
-print("拖拽标题栏可移动窗口 • 按 T 键也可快速切换自动行走")
+print("飞行脚本加载完成 | Fly Script Loaded - 按 F 切换飞行")
