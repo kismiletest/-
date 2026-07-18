@@ -1,92 +1,209 @@
--- =============================================
---  调试版 + WindUI 自动通关脚本
--- =============================================
-
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-
+-- Auto Obby + WinUI 控制面板
+local Players = game.Players
 local player = Players.LocalPlayer
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-
-local Window = WindUI:CreateWindow({Title = "自动通关调试版", Icon = "magnifying-glass", Theme = "Dark"})
-local Tab = Window:Tab({Title = "调试", Icon = "bug"})
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 local root = character:WaitForChild("HumanoidRootPart")
 
-local autoEnabled = false
-local folderName = "Levels"
+-- ================== 配置 ==================
+local AUTO_WALK_SPEED = 50
+local checkpoints = {
+    Vector3.new(0, 5, 0),      -- 示例起点
+    Vector3.new(50, 10, 100),
+    Vector3.new(120, 20, 200),
+    Vector3.new(300, 5, 350),
+    Vector3.new(500, 50, 600)  -- 示例终点
+    -- 添加更多检查点...
+}
 
-Tab:Toggle({
-    Title = "启用自动通关",
-    Default = false,
-    Callback = function(v) autoEnabled = v end
-})
+local currentCheckpoint = 1
+local moving = true
+local autoJump = true
+local antiFall = true
+-- =========================================
 
-Tab:Textbox({
-    Title = "关卡文件夹名称",
-    Default = "Levels",
-    Callback = function(text)
-        folderName = text
-        WindUI:Notify({Title = "已更新", Content = "文件夹名称 → " .. text})
-    end
-})
+-- 创建 WinUI 风格 ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoObbyWinUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
-Tab:Button({
-    Title = "🔍 扫描 Workspace 结构",
-    Callback = function()
-        print("=== Workspace 子对象扫描 ===")
-        for _, obj in ipairs(Workspace:GetChildren()) do
-            print(obj.Name, "->", obj.ClassName)
-            WindUI:Notify({Title = obj.Name, Content = obj.ClassName, Duration = 2})
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 320, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- 标题栏
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -80, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Auto Obby WinUI"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(232, 17, 35)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 18
+closeBtn.Parent = titleBar
+
+-- 内容区域
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -20, 1, -60)
+content.Position = UDim2.new(0, 10, 0, 50)
+content.BackgroundTransparency = 1
+content.Parent = mainFrame
+
+-- 切换按钮模板
+local function createToggle(name, default, callback)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = UDim2.new(1, 0, 0, 50)
+    toggleFrame.BackgroundTransparency = 1
+    toggleFrame.Parent = content
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.new(1,1,1)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 16
+    label.Parent = toggleFrame
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 80, 0, 30)
+    btn.Position = UDim2.new(1, -90, 0.5, -15)
+    btn.BackgroundColor3 = default and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 70)
+    btn.Text = default and "ON" or "OFF"
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = toggleFrame
+    
+    local enabled = default
+    btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        btn.BackgroundColor3 = enabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 70)
+        btn.Text = enabled and "ON" or "OFF"
+        callback(enabled)
+    end)
+    
+    return btn
+end
+
+-- 创建切换
+createToggle("自动行走", true, function(state) moving = state end)
+createToggle("自动跳跃", true, function(state) autoJump = state end)
+createToggle("防掉落", true, function(state) antiFall = state end)
+
+-- 速度滑块
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(1, 0, 0, 30)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "行走速度: 50"
+speedLabel.TextColor3 = Color3.new(1,1,1)
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextSize = 16
+speedLabel.Parent = content
+
+local speedSlider = Instance.new("TextButton")  -- 简化滑块
+speedSlider.Size = UDim2.new(1, 0, 0, 20)
+speedSlider.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+speedSlider.Parent = content
+speedSlider.Position = UDim2.new(0, 0, 0, 80)
+
+local sliderKnob = Instance.new("Frame")
+sliderKnob.Size = UDim2.new(0, 20, 1, 0)
+sliderKnob.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+sliderKnob.Parent = speedSlider
+
+local speedValue = AUTO_WALK_SPEED
+speedSlider.MouseButton1Down:Connect(function()
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            conn:Disconnect()
+            return
+        end
+        local mouseX = UserInputService:GetMouseLocation().X
+        local relX = math.clamp((mouseX - speedSlider.AbsolutePosition.X) / speedSlider.AbsoluteSize.X, 0, 1)
+        speedValue = math.floor(20 + relX * 80)
+        sliderKnob.Position = UDim2.new(relX - 0.05, 0, 0, 0)
+        speedLabel.Text = "行走速度: " .. speedValue
+        AUTO_WALK_SPEED = speedValue
+    end)
+end)
+
+-- 关闭按钮
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- ================== 核心逻辑 ==================
+local function setupInfiniteJump()
+    humanoid.JumpPower = 50
+end
+
+RunService.Heartbeat:Connect(function()
+    if not character or not root or not humanoid or humanoid.Health <= 0 then return end
+    
+    -- 防掉落
+    if antiFall and root.Position.Y < -100 then
+        if checkpoints[currentCheckpoint] then
+            root.CFrame = CFrame.new(checkpoints[currentCheckpoint] + Vector3.new(0, 5, 0))
         end
     end
-})
-
-Tab:Button({
-    Title = "📍 显示我当前位置",
-    Callback = function()
-        if root then
-            print("当前位置:", root.Position)
-            WindUI:Notify({
-                Title = "当前位置",
-                Content = string.format("X: %.1f, Y: %.1f, Z: %.1f", root.Position.X, root.Position.Y, root.Position.Z),
-                Duration = 5
-            })
+    
+    -- 自动行走
+    if moving then
+        local moveDir = root.CFrame.LookVector * AUTO_WALK_SPEED
+        humanoid:Move(moveDir, false)
+        
+        if autoJump and math.random(1, 12) == 1 then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end
-    end
-})
-
--- 自动检测附近对象
-task.spawn(function()
-    while true do
-        if autoEnabled and root then
-            local found = false
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("BasePart") or obj:IsA("Model") then
-                    local dist = (obj:GetPivot().Position - root.Position).Magnitude
-                    if dist < 100 and dist > 1 then
-                        if not found then
-                            WindUI:Notify({
-                                Title = "附近物体",
-                                Content = obj.Name .. " (" .. math.floor(dist) .. " studs)",
-                                Duration = 3
-                            })
-                            print("附近:", obj.Name, obj.ClassName, dist)
-                            found = true
-                        end
-                    end
-                end
-            end
-        end
-        task.wait(2)
     end
 end)
 
-player.CharacterAdded:Connect(function(ch)
-    character = ch
-    root = ch:WaitForChild("HumanoidRootPart")
+-- 检查点更新
+RunService.Heartbeat:Connect(function()
+    for i, pos in ipairs(checkpoints) do
+        if (root.Position - pos).Magnitude < 20 then
+            currentCheckpoint = math.max(currentCheckpoint, i)
+        end
+    end
 end)
 
-print("调试脚本已加载，请点击 '扫描 Workspace 结构'")
+-- 角色重生处理
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    root = newChar:WaitForChild("HumanoidRootPart")
+    setupInfiniteJump()
+end)
+
+setupInfiniteJump()
+
+print("✅ WinUI Auto Obby 控制面板已加载！")
+print("拖拽标题栏可移动窗口 • 按 T 键也可快速切换自动行走")
