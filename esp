@@ -1,212 +1,183 @@
--- Roblox Luau 静默自瞄 + WinUI 界面
--- 按 RightShift 显示/隐藏菜单
+-- =============================================
+--  Roblox Luau 自动通关脚本 + WindUI
+-- =============================================
 
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
 
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
-local aimEnabled = false
-local aimPart = "Head"
-local FOV = 150
-local TEAM_CHECK = true
-local target = nil
+-- ================== WindUI 加载 ==================
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
--- ==================== 创建 WinUI 界面 ====================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "WinUI_Aimbot"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = CoreGui
+local Window = WindUI:CreateWindow({
+    Title = "自动通关助手",
+    Icon = "rocket",
+    Theme = "Dark",        -- 可选: Dark / Light / Violet / Ocean 等
+})
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 320, 0, 220)
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -110)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
+local MainTab = Window:Tab({
+    Title = "主控制",
+    Icon = "home"
+})
 
--- 标题栏
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 40)
-TitleBar.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
+local SettingsTab = Window:Tab({
+    Title = "设置",
+    Icon = "settings"
+})
+-- =============================================
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -80, 1, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "WinUI • Silent Aimbot"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.TextSize = 16
-Title.Font = Enum.Font.GothamBold
-Title.Parent = TitleBar
+-- ================== 配置区 ==================
+local LEVELS_FOLDER_NAME = "Levels"   -- 修改成你游戏里的关卡文件夹名
+local TELEPORT_OFFSET = Vector3.new(0, 5, 0)
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 40, 0, 40)
-CloseBtn.Position = UDim2.new(1, -40, 0, 0)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.new(1, 1, 1)
-CloseBtn.TextSize = 18
-CloseBtn.Parent = TitleBar
+local autoEnabled = false
+local currentLevel = 1
 
--- 内容区域
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, -20, 1, -60)
-Content.Position = UDim2.new(0, 10, 0, 50)
-Content.BackgroundTransparency = 1
-Content.Parent = MainFrame
+local levelOrder = {
+    "Level1", "Level2", "Level3", "Level4", "Level5", "Boss"
+}
+-- =============================================
 
--- 开关
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(1, 0, 0, 50)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-ToggleBtn.Text = "自瞄状态: 关闭"
-ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
-ToggleBtn.TextSize = 16
-ToggleBtn.Font = Enum.Font.GothamSemibold
-ToggleBtn.Parent = Content
+local function findCurrentLevel()
+    if not humanoidRootPart then return nil end
+    local folder = Workspace:FindFirstChild(LEVELS_FOLDER_NAME)
+    if not folder then return nil end
 
--- 目标部位
-local PartLabel = Instance.new("TextLabel")
-PartLabel.Size = UDim2.new(0.5, -5, 0, 40)
-PartLabel.Position = UDim2.new(0, 0, 0.4, 0)
-PartLabel.BackgroundTransparency = 1
-PartLabel.Text = "目标部位:"
-PartLabel.TextColor3 = Color3.new(1, 1, 1)
-PartLabel.TextXAlignment = Enum.TextXAlignment.Left
-PartLabel.Parent = Content
-
-local PartBtn = Instance.new("TextButton")
-PartBtn.Size = UDim2.new(0.5, 0, 0, 40)
-PartBtn.Position = UDim2.new(0.5, 5, 0.4, 0)
-PartBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-PartBtn.Text = "Head"
-PartBtn.TextColor3 = Color3.new(1, 1, 1)
-PartBtn.Parent = Content
-
--- 提示
-local Hint = Instance.new("TextLabel")
-Hint.Size = UDim2.new(1, 0, 0, 30)
-Hint.Position = UDim2.new(0, 0, 0.75, 0)
-Hint.BackgroundTransparency = 1
-Hint.Text = "RightShift 显示/隐藏 • E 键快速开关"
-Hint.TextColor3 = Color3.fromRGB(180, 180, 180)
-Hint.TextSize = 13
-Hint.Parent = Content
-
--- 圆角
-local function addCorner(obj)
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = obj
+    for _, obj in ipairs(folder:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local dist = (obj:GetPivot().Position - humanoidRootPart.Position).Magnitude
+            if dist < 60 then
+                return obj.Name
+            end
+        end
+    end
+    return nil
 end
 
-addCorner(MainFrame)
-addCorner(TitleBar)
-addCorner(ToggleBtn)
-addCorner(PartBtn)
+local function teleportToLevel(levelName: string)
+    local folder = Workspace:FindFirstChild(LEVELS_FOLDER_NAME)
+    if not folder then return end
 
--- ==================== 自瞄核心逻辑 ====================
-local function getClosestTarget()
-    local closest = nil
-    local shortest = math.huge
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
-            local hum = player.Character.Humanoid
-            if hum.Health > 0 and (not TEAM_CHECK or player.Team ~= LocalPlayer.Team) then
-                local part = player.Character:FindFirstChild(aimPart) or player.Character:FindFirstChild("HumanoidRootPart")
-                if part then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                    if onScreen then
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                        if dist < FOV and dist < shortest then
-                            shortest = dist
-                            closest = part
-                        end
+    local target = folder:FindFirstChild(levelName, true)
+    if target then
+        humanoidRootPart.CFrame = target:GetPivot() + TELEPORT_OFFSET
+        WindUI:Notify({
+            Title = "传送成功",
+            Content = "已传送到 " .. levelName,
+            Duration = 3
+        })
+    else
+        WindUI:Notify({
+            Title = "传送失败",
+            Content = "未找到关卡: " .. levelName,
+            Duration = 4
+        })
+    end
+end
+
+-- ================== UI 控件 ==================
+MainTab:Toggle({
+    Title = "启用自动通关",
+    Default = false,
+    Callback = function(value)
+        autoEnabled = value
+        if value then
+            WindUI:Notify({Title = "自动模式", Content = "已开启，正在检测关卡...", Duration = 3})
+        end
+    end
+})
+
+MainTab:Button({
+    Title = "立即传送到下一个关卡",
+    Callback = function()
+        local current = findCurrentLevel()
+        if current then
+            local nextLevel = nil
+            for i, lvl in ipairs(levelOrder) do
+                if lvl == current then
+                    nextLevel = levelOrder[i + 1]
+                    break
+                end
+            end
+            if not nextLevel then
+                nextLevel = tonumber(current:match("%d+")) and "Level_" .. (tonumber(current:match("%d+")) + 1) or "NextLevel"
+            end
+            teleportToLevel(nextLevel or "Level1")
+        else
+            WindUI:Notify({Title = "错误", Content = "未检测到当前关卡位置", Duration = 3})
+        end
+    end
+})
+
+MainTab:Slider({
+    Title = "传送偏移高度 (Y轴)",
+    Min = 0,
+    Max = 20,
+    Default = 5,
+    Callback = function(value)
+        TELEPORT_OFFSET = Vector3.new(0, value, 0)
+    end
+})
+
+SettingsTab:Textbox({
+    Title = "关卡文件夹名称",
+    Default = LEVELS_FOLDER_NAME,
+    Callback = function(text)
+        LEVELS_FOLDER_NAME = text
+        WindUI:Notify({Title = "设置更新", Content = "关卡文件夹已改为: " .. text, Duration = 3})
+    end
+})
+
+SettingsTab:Button({
+    Title = "重置所有设置",
+    Callback = function()
+        autoEnabled = false
+        LEVELS_FOLDER_NAME = "Levels"
+        WindUI:Notify({Title = "已重置", Content = "所有设置已恢复默认", Duration = 3})
+    end
+})
+
+-- ================== 自动循环 ==================
+task.spawn(function()
+    while true do
+        RunService.Heartbeat:Wait()
+        
+        if autoEnabled and humanoidRootPart then
+            local current = findCurrentLevel()
+            if current then
+                -- 查找下一个关卡
+                local nextLevel = nil
+                for i, lvl in ipairs(levelOrder) do
+                    if lvl == current then
+                        nextLevel = levelOrder[i + 1]
+                        break
                     end
+                end
+                
+                if nextLevel then
+                    teleportToLevel(nextLevel)
+                    task.wait(2)  -- 防止刷屏传送
                 end
             end
         end
-    end
-    return closest
-end
-
--- Hook (静默自瞄)
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
-
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    
-    if aimEnabled and target and (method == "Fire" or method == "FireServer") then
-        if string.find(self.Name:lower(), "fire") or string.find(self.Name:lower(), "shoot") or self.Parent.Name:find("Gun") then
-            if args[1] and typeof(args[1]) == "Vector3" then
-                args[1] = target.Position + (target.Velocity * 0.04)  -- 轻微预判
-            end
-        end
-    end
-    return oldNamecall(self, unpack(args))
-end)
-
-setreadonly(mt, true)
-
--- 更新目标
-RunService.Heartbeat:Connect(function()
-    target = aimEnabled and getClosestTarget() or nil
-end)
-
--- ==================== UI 交互 ====================
-local function updateUI()
-    ToggleBtn.Text = "自瞄状态: " .. (aimEnabled and "已开启" or "已关闭")
-    ToggleBtn.BackgroundColor3 = aimEnabled and Color3.fromRGB(0, 170, 80) or Color3.fromRGB(45, 45, 45)
-end
-
-ToggleBtn.MouseButton1Click:Connect(function()
-    aimEnabled = not aimEnabled
-    updateUI()
-end)
-
-PartBtn.MouseButton1Click:Connect(function()
-    if aimPart == "Head" then
-        aimPart = "UpperTorso"
-        PartBtn.Text = "UpperTorso"
-    else
-        aimPart = "Head"
-        PartBtn.Text = "Head"
+        
+        task.wait(0.8)
     end
 end)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui.Enabled = false
+-- 角色重生处理
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
 end)
 
--- 快捷键
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        ScreenGui.Enabled = not ScreenGui.Enabled
-    elseif input.KeyCode == Enum.KeyCode.E then
-        aimEnabled = not aimEnabled
-        updateUI()
-    elseif input.KeyCode == Enum.KeyCode.F then
-        if aimPart == "Head" then
-            aimPart = "UpperTorso"
-        else
-            aimPart = "Head"
-        end
-        PartBtn.Text = aimPart
-    end
-end)
-
-updateUI()
-print("WinUI 静默自瞄已加载！按 RightShift 打开菜单")
+print("🚀 自动通关脚本 + WindUI 已成功加载！")
+WindUI:Notify({
+    Title = "欢迎使用",
+    Content = "自动通关助手已准备就绪",
+    Duration = 5
+})
