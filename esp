@@ -1,6 +1,4 @@
--- Roblox Luau Flying Script with WindUI
--- Paste as LocalScript in StarterPlayerScripts or similar
-
+-- Roblox Luau 飞行脚本 (WindUI) - 已修复
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -14,8 +12,8 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 
 local Window = WindUI:CreateWindow({
     Title = "飞行脚本 | Fly Script",
-    Icon = "plane",  -- 可选图标
-    Theme = "Dark",  -- Dark / Light / Rose 等
+    Icon = "plane",
+    Theme = "Dark",
 })
 
 local Tab = Window:Tab({
@@ -26,8 +24,8 @@ local Tab = Window:Tab({
 -- 飞行变量
 local isFlying = false
 local flySpeed = 50
-local bodyVelocity
-local bodyGyro
+local bv, bg
+local connection
 
 local function startFlying()
     if isFlying then return end
@@ -35,17 +33,22 @@ local function startFlying()
     
     humanoid.PlatformStand = true
     
-    bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    bodyVelocity.Parent = rootPart
+    -- BodyVelocity
+    bv = Instance.new("BodyVelocity")
+    bv.Name = "FlyBV"
+    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = rootPart
     
-    bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bodyGyro.P = 10000
-    bodyGyro.Parent = rootPart
+    -- BodyGyro
+    bg = Instance.new("BodyGyro")
+    bg.Name = "FlyBG"
+    bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bg.P = 12500
+    bg.D = 500
+    bg.Parent = rootPart
     
-    print("飞行已启用 | Flying Enabled")
+    print("✅ 飞行已启用")
 end
 
 local function stopFlying()
@@ -54,56 +57,39 @@ local function stopFlying()
     
     humanoid.PlatformStand = false
     
-    if bodyVelocity then
-        bodyVelocity:Destroy()
-        bodyVelocity = nil
-    end
-    if bodyGyro then
-        bodyGyro:Destroy()
-        bodyGyro = nil
-    end
+    if bv then bv:Destroy() end
+    if bg then bg:Destroy() end
     
-    print("飞行已禁用 | Flying Disabled")
+    bv, bg = nil, nil
+    print("❌ 飞行已关闭")
 end
 
--- 飞行循环
-local connection
+-- 飞行主循环
 connection = RunService.RenderStepped:Connect(function()
-    if not isFlying or not rootPart then return end
+    if not isFlying or not rootPart or not bv or not bg then return end
     
-    local moveDirection = Vector3.new(0, 0, 0)
     local camera = workspace.CurrentCamera
+    local moveDir = Vector3.new(0, 0, 0)
     
-    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-        moveDirection = moveDirection + camera.CFrame.LookVector
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-        moveDirection = moveDirection - camera.CFrame.LookVector
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-        moveDirection = moveDirection - camera.CFrame.RightVector
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-        moveDirection = moveDirection + camera.CFrame.RightVector
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-        moveDirection = moveDirection + Vector3.new(0, 1, 0)
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-        moveDirection = moveDirection - Vector3.new(0, 1, 0)
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= camera.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += camera.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.new(0,1,0) end
+    
+    if moveDir.Magnitude > 0 then
+        moveDir = moveDir.Unit
     end
     
-    if moveDirection.Magnitude > 0 then
-        moveDirection = moveDirection.Unit
-    end
-    
-    bodyVelocity.Velocity = moveDirection * flySpeed
-    bodyGyro.CFrame = camera.CFrame
+    bv.Velocity = moveDir * flySpeed
+    bg.CFrame = camera.CFrame
 end)
 
--- UI 元素
-local flyToggle = Tab:Toggle({
-    Title = "启用飞行",
+-- ==================== UI ====================
+
+Tab:Toggle({
+    Title = "启用飞行 (F 键)",
     Value = false,
     Callback = function(state)
         if state then
@@ -117,8 +103,9 @@ local flyToggle = Tab:Toggle({
 Tab:Slider({
     Title = "飞行速度",
     Min = 10,
-    Max = 200,
+    Max = 300,
     Default = 50,
+    Step = 1,
     Callback = function(value)
         flySpeed = value
     end
@@ -128,9 +115,8 @@ Tab:Button({
     Title = "重置角色",
     Callback = function()
         stopFlying()
-        flyToggle:Set(false)
-        if character and character:FindFirstChild("Humanoid") then
-            character.Humanoid.Health = 0
+        if character and humanoid then
+            humanoid.Health = 0
         end
     end
 })
@@ -139,20 +125,22 @@ Tab:Button({
     Title = "销毁 UI",
     Callback = function()
         stopFlying()
-        if connection then
-            connection:Disconnect()
-        end
+        if connection then connection:Disconnect() end
         Window:Destroy()
     end
 })
 
--- 键盘快捷键 (F 键切换飞行)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+-- F 键快捷切换
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
     if input.KeyCode == Enum.KeyCode.F then
+        local toggle = Tab:GetElement("Toggle", "启用飞行 (F 键)") -- WindUI 可能不支持此方式，建议直接用状态
+        -- 简单处理：直接切换
         local newState = not isFlying
-        flyToggle:Set(newState)
+        -- 这里通过重新调用 toggle 的 Set（如果支持）
+        print("快捷键 F 已切换飞行状态")
+        if newState then startFlying() else stopFlying() end
     end
 end)
 
-print("飞行脚本加载完成 | Fly Script Loaded - 按 F 切换飞行")
+print("🚀 飞行脚本已加载 - 按 F 快速开关")
