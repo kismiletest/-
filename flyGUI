@@ -1,0 +1,178 @@
+-- Roblox Luau Flying Script with WindUI
+-- LocalScript (Place in StarterPlayer > StarterPlayerScripts)
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- WindUI Loader
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
+-- Create Window
+local Window = WindUI:CreateWindow({
+    Title = "飞行脚本",
+    Icon = "plane",  -- or "rocket", "cloud" 等可用图标
+    Theme = "Dark",
+    Size = UDim2.fromOffset(420, 380)
+})
+
+local Tab = Window:Tab({
+    Title = "飞行控制",
+    Icon = "plane"
+})
+
+-- Variables for flying
+local flying = false
+local flySpeed = 100
+local connection = nil
+local bodyVelocity = nil
+local bodyGyro = nil
+
+local character = nil
+local humanoid = nil
+local rootPart = nil
+
+-- Function to setup character references
+local function setupCharacter()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    
+    -- Cleanup old attachments if any
+    if bodyVelocity then bodyVelocity:Destroy() end
+    if bodyGyro then bodyGyro:Destroy() end
+end
+
+player.CharacterAdded:Connect(setupCharacter)
+if player.Character then setupCharacter() end
+
+-- Main flying logic
+local function startFlying()
+    if not rootPart then return end
+    
+    flying = true
+    
+    -- Create BodyVelocity and BodyGyro
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Name = "FlyVelocity"
+    bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = rootPart
+    
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.Name = "FlyGyro"
+    bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bodyGyro.P = 12500
+    bodyGyro.Parent = rootPart
+    
+    -- Disable default movement
+    humanoid.PlatformStand = true
+    
+    -- Flying loop
+    connection = RunService.RenderStepped:Connect(function(dt)
+        if not flying or not rootPart or not bodyVelocity or not bodyGyro then return end
+        
+        local moveDirection = Vector3.new(0, 0, 0)
+        
+        -- WASD + Space/Shift control
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+        end
+        
+        -- Normalize and apply speed
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit
+        end
+        
+        bodyVelocity.Velocity = moveDirection * flySpeed
+        
+        -- Smooth rotation to face movement direction
+        bodyGyro.CFrame = camera.CFrame
+    end)
+end
+
+local function stopFlying()
+    flying = false
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+    
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+    
+    if humanoid then
+        humanoid.PlatformStand = false
+    end
+end
+
+-- UI Elements
+local flyToggle = Tab:Toggle({
+    Title = "启用飞行",
+    Description = "按 W/A/S/D + 空格/Shift 飞行",
+    Value = false,
+    Callback = function(state)
+        if state then
+            startFlying()
+        else
+            stopFlying()
+        end
+    end
+})
+
+Tab:Slider({
+    Title = "飞行速度",
+    Min = 20,
+    Max = 300,
+    Default = 100,
+    Step = 5,
+    Callback = function(value)
+        flySpeed = value
+    end
+})
+
+Tab:Button({
+    Title = "重置角色位置",
+    Callback = function()
+        if rootPart then
+            rootPart.CFrame = CFrame.new(0, 50, 0)
+        end
+    end
+})
+
+-- Notification on load
+WindUI:Notify({
+    Title = "飞行脚本",
+    Content = "已加载！使用UI切换飞行模式。",
+    Duration = 5
+})
+
+-- Cleanup on destroy
+script.Destroying:Connect(function()
+    stopFlying()
+end)
