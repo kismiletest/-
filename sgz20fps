@@ -1,0 +1,47 @@
+-- LocalScript
+-- 使用 Sanguine Art (血魔拳) Z 技能时自动降低约 20 FPS
+
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local TARGET_FPS = 40          -- 降低后的目标帧率（60 - 20 = 40）
+local DURATION = 2             -- 降低帧率持续的秒数（可自行调整）
+local isCapping = false
+local capConnection = nil
+local originalClock = 0
+
+local function startFPSCap()
+	if isCapping then return end
+	isCapping = true
+	
+	originalClock = os.clock()
+	
+	capConnection = RunService.PreRender:Connect(function()
+		-- 忙等待，强制限制帧率
+		while os.clock() - originalClock < (1 / TARGET_FPS) do end
+		originalClock = os.clock()
+	end)
+	
+	-- 持续时间结束后自动恢复
+	task.delay(DURATION, function()
+		if capConnection then
+			capConnection:Disconnect()
+			capConnection = nil
+		end
+		isCapping = false
+	end)
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	
+	-- 检测 Z 键（血魔拳 Z 技能）
+	if input.KeyCode == Enum.KeyCode.Z then
+		startFPSCap()
+	end
+end)
+
+-- 可选：打印提示
+print("[血拳Z FPS] 脚本已加载 | 按下 Z 时临时降低帧率到 " .. TARGET_FPS)
