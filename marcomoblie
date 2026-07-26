@@ -1,0 +1,325 @@
+-- LocalScript
+-- 手机版 Marco 技能系统 (Z / X / C)
+-- 可调整技能释放速度 + 完整手机 UI
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+--==================== 配置 ====================--
+local SkillConfig = {
+	Z = {
+		Name = "技能Z",
+		Cooldown = 3,          -- 基础冷却（秒）
+		Color = Color3.fromRGB(80, 160, 255),
+		Key = Enum.KeyCode.Z,
+	},
+	X = {
+		Name = "技能X",
+		Cooldown = 5,
+		Color = Color3.fromRGB(255, 120, 80),
+		Key = Enum.KeyCode.X,
+	},
+	C = {
+		Name = "技能C",
+		Cooldown = 8,
+		Color = Color3.fromRGB(120, 255, 120),
+		Key = Enum.KeyCode.C,
+	},
+}
+
+-- 全局速度倍率（1 = 正常，0.5 = 更快释放，2 = 更慢）
+local SpeedMultiplier = 1
+
+--==================== 创建 UI ====================--
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MarcoSkillUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = playerGui
+
+-- 主容器（右下角技能按钮）
+local skillFrame = Instance.new("Frame")
+skillFrame.Name = "SkillFrame"
+skillFrame.Size = UDim2.new(0, 220, 0, 240)
+skillFrame.Position = UDim2.new(1, -240, 1, -280)
+skillFrame.BackgroundTransparency = 1
+skillFrame.Parent = screenGui
+
+-- 速度调节面板（左下角）
+local speedFrame = Instance.new("Frame")
+speedFrame.Name = "SpeedFrame"
+speedFrame.Size = UDim2.new(0, 200, 0, 90)
+speedFrame.Position = UDim2.new(0, 20, 1, -120)
+speedFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+speedFrame.BackgroundTransparency = 0.2
+speedFrame.BorderSizePixel = 0
+speedFrame.Parent = screenGui
+
+local speedCorner = Instance.new("UICorner")
+speedCorner.CornerRadius = UDim.new(0, 12)
+speedCorner.Parent = speedFrame
+
+local speedTitle = Instance.new("TextLabel")
+speedTitle.Size = UDim2.new(1, 0, 0, 28)
+speedTitle.BackgroundTransparency = 1
+speedTitle.Text = "技能释放速度"
+speedTitle.TextColor3 = Color3.fromRGB(220, 220, 220)
+speedTitle.Font = Enum.Font.GothamBold
+speedTitle.TextSize = 15
+speedTitle.Parent = speedFrame
+
+local speedValueLabel = Instance.new("TextLabel")
+speedValueLabel.Size = UDim2.new(1, 0, 0, 20)
+speedValueLabel.Position = UDim2.new(0, 0, 0, 26)
+speedValueLabel.BackgroundTransparency = 1
+speedValueLabel.Text = "当前倍率: 1.00x"
+speedValueLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
+speedValueLabel.Font = Enum.Font.Gotham
+speedValueLabel.TextSize = 13
+speedValueLabel.Parent = speedFrame
+
+-- 滑块背景
+local sliderBg = Instance.new("Frame")
+sliderBg.Size = UDim2.new(0.85, 0, 0, 8)
+sliderBg.Position = UDim2.new(0.075, 0, 0, 55)
+sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+sliderBg.BorderSizePixel = 0
+sliderBg.Parent = speedFrame
+
+local sliderBgCorner = Instance.new("UICorner")
+sliderBgCorner.CornerRadius = UDim.new(1, 0)
+sliderBgCorner.Parent = sliderBg
+
+-- 滑块填充
+local sliderFill = Instance.new("Frame")
+sliderFill.Size = UDim2.new(0.5, 0, 1, 0) -- 默认 1.0x 对应中间
+sliderFill.BackgroundColor3 = Color3.fromRGB(80, 160, 255)
+sliderFill.BorderSizePixel = 0
+sliderFill.Parent = sliderBg
+
+local sliderFillCorner = Instance.new("UICorner")
+sliderFillCorner.CornerRadius = UDim.new(1, 0)
+sliderFillCorner.Parent = sliderFill
+
+-- 滑块按钮
+local sliderButton = Instance.new("TextButton")
+sliderButton.Size = UDim2.new(0, 22, 0, 22)
+sliderButton.Position = UDim2.new(0.5, -11, 0.5, -11)
+sliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sliderButton.Text = ""
+sliderButton.BorderSizePixel = 0
+sliderButton.AutoButtonColor = false
+sliderButton.Parent = sliderBg
+
+local sliderBtnCorner = Instance.new("UICorner")
+sliderBtnCorner.CornerRadius = UDim.new(1, 0)
+sliderBtnCorner.Parent = sliderButton
+
+--==================== 技能按钮创建 ====================--
+local skillButtons = {}
+local cooldowns = {Z = 0, X = 0, C = 0}
+local isOnCooldown = {Z = false, X = false, C = false}
+
+local function createSkillButton(key, order)
+	local config = SkillConfig[key]
+	
+	local btn = Instance.new("TextButton")
+	btn.Name = key .. "Button"
+	btn.Size = UDim2.new(0, 70, 0, 70)
+	btn.Position = UDim2.new(0, (order - 1) * 75, 0, 0)
+	btn.BackgroundColor3 = config.Color
+	btn.Text = key
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 28
+	btn.BorderSizePixel = 0
+	btn.AutoButtonColor = false
+	btn.Parent = skillFrame
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 16)
+	corner.Parent = btn
+	
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(255, 255, 255)
+	stroke.Thickness = 2
+	stroke.Transparency = 0.6
+	stroke.Parent = btn
+	
+	-- 冷却遮罩
+	local cdOverlay = Instance.new("Frame")
+	cdOverlay.Name = "CooldownOverlay"
+	cdOverlay.Size = UDim2.new(1, 0, 1, 0)
+	cdOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	cdOverlay.BackgroundTransparency = 0.45
+	cdOverlay.Visible = false
+	cdOverlay.Parent = btn
+	
+	local cdCorner = Instance.new("UICorner")
+	cdCorner.CornerRadius = UDim.new(0, 16)
+	cdCorner.Parent = cdOverlay
+	
+	local cdText = Instance.new("TextLabel")
+	cdText.Name = "CDText"
+	cdText.Size = UDim2.new(1, 0, 1, 0)
+	cdText.BackgroundTransparency = 1
+	cdText.Text = ""
+	cdText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	cdText.Font = Enum.Font.GothamBold
+	cdText.TextSize = 22
+	cdText.Parent = cdOverlay
+	
+	skillButtons[key] = {
+		Button = btn,
+		Overlay = cdOverlay,
+		CDText = cdText,
+		Config = config
+	}
+	
+	return btn
+end
+
+createSkillButton("Z", 1)
+createSkillButton("X", 2)
+createSkillButton("C", 3)
+
+--==================== 技能释放逻辑 ====================--
+local function castSkill(key)
+	if isOnCooldown[key] then return end
+	
+	local config = SkillConfig[key]
+	local realCooldown = config.Cooldown * SpeedMultiplier
+	
+	isOnCooldown[key] = true
+	cooldowns[key] = realCooldown
+	
+	-- 这里写你的真实技能逻辑
+	print("[Marco] 释放技能:", config.Name, " | 当前速度倍率:", string.format("%.2f", SpeedMultiplier))
+	
+	-- 示例：播放特效 / 动画 / 远程事件
+	-- 例如：
+	-- local character = player.Character
+	-- if character then
+	--     local humanoid = character:FindFirstChildOfClass("Humanoid")
+	--     -- 播放动画、生成特效等
+	-- end
+	
+	-- 也可以 fire RemoteEvent 到服务器
+	-- game.ReplicatedStorage.SkillRemote:FireServer(key)
+	
+	-- 按钮按下反馈
+	local btn = skillButtons[key].Button
+	local originalSize = btn.Size
+	TweenService:Create(btn, TweenInfo.new(0.08), {
+		Size = UDim2.new(0, 62, 0, 62)
+	}):Play()
+	task.wait(0.08)
+	TweenService:Create(btn, TweenInfo.new(0.1), {
+		Size = originalSize
+	}):Play()
+end
+
+--==================== 冷却更新 ====================--
+RunService.Heartbeat:Connect(function(dt)
+	for key, remaining in pairs(cooldowns) do
+		if remaining > 0 then
+			cooldowns[key] = remaining - dt
+			local data = skillButtons[key]
+			data.Overlay.Visible = true
+			data.CDText.Text = string.format("%.1f", math.max(0, cooldowns[key]))
+			
+			if cooldowns[key] <= 0 then
+				cooldowns[key] = 0
+				isOnCooldown[key] = false
+				data.Overlay.Visible = false
+				data.CDText.Text = ""
+			end
+		end
+	end
+end)
+
+--==================== 输入绑定 ====================--
+-- 手机按钮点击
+for key, data in pairs(skillButtons) do
+	data.Button.MouseButton1Click:Connect(function()
+		castSkill(key)
+	end)
+	
+	-- 触摸支持（手机）
+	data.Button.TouchTap:Connect(function()
+		castSkill(key)
+	end)
+end
+
+-- 键盘支持（PC）
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	
+	if input.KeyCode == Enum.KeyCode.Z then
+		castSkill("Z")
+	elseif input.KeyCode == Enum.KeyCode.X then
+		castSkill("X")
+	elseif input.KeyCode == Enum.KeyCode.C then
+		castSkill("C")
+	end
+end)
+
+--==================== 速度滑块逻辑 ====================--
+local dragging = false
+
+local function updateSpeed(relativeX)
+	relativeX = math.clamp(relativeX, 0, 1)
+	
+	-- 0 ~ 1 映射到 0.4x ~ 2.0x（可自行调整范围）
+	SpeedMultiplier = 0.4 + relativeX * 1.6
+	
+	sliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
+	sliderButton.Position = UDim2.new(relativeX, -11, 0.5, -11)
+	speedValueLabel.Text = string.format("当前倍率: %.2fx", SpeedMultiplier)
+end
+
+sliderButton.MouseButton1Down:Connect(function()
+	dragging = true
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if not dragging then return end
+	
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		local absPos = input.Position.X
+		local bgAbsPos = sliderBg.AbsolutePosition.X
+		local bgSize = sliderBg.AbsoluteSize.X
+		local relative = (absPos - bgAbsPos) / bgSize
+		updateSpeed(relative)
+	end
+end)
+
+-- 点击滑块背景也能跳转
+sliderBg.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		local absPos = input.Position.X
+		local bgAbsPos = sliderBg.AbsolutePosition.X
+		local bgSize = sliderBg.AbsoluteSize.X
+		local relative = (absPos - bgAbsPos) / bgSize
+		updateSpeed(relative)
+		dragging = true
+	end
+end)
+
+-- 初始化滑块到 1.0x（中间位置）
+updateSpeed(0.375) -- (1.0 - 0.4) / 1.6 ≈ 0.375
+
+print("✅ Marco 技能系统已加载（手机 + PC）")
+print("技能键：Z / X / C")
+print("可通过左下角滑块调整技能释放速度")
