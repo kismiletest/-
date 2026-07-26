@@ -25,6 +25,18 @@ _G.G_TeleportOffsetX = _G.G_TeleportOffsetX or 0
 _G.G_TeleportOffsetY = _G.G_TeleportOffsetY or 0
 _G.G_TeleportOffsetZ = _G.G_TeleportOffsetZ or 0
 
+-- 初始化 ESP 变量
+_G.G_ESPEnabled = _G.G_ESPEnabled ~= false
+_G.G_ESP_Name = _G.G_ESP_Name ~= false
+_G.G_ESP_Level = _G.G_ESP_Level ~= false
+_G.G_ESP_Bounty = _G.G_ESP_Bounty ~= false
+_G.G_ESP_Fruit = _G.G_ESP_Fruit ~= false
+_G.G_ESP_Distance = _G.G_ESP_Distance ~= false
+_G.G_ESP_HP = _G.G_ESP_HP ~= false
+_G.G_ESP_TextSize = _G.G_ESP_TextSize or 14
+_G.G_ESP_Highlight = _G.G_ESP_Highlight or false
+_G.G_ESP_HighlightColor = _G.G_ESP_HighlightColor or "FF0000"
+
 -- 初始化 Wind UI
 local WindUI = loadstring(request({
     Url = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
@@ -45,6 +57,7 @@ local Window = WindUI:CreateWindow({
 })
 
 local FOVTab = Window:Tab({ Title = "FOV & 自瞄", Icon = "pen-tool" })
+local ESPTab = Window:Tab({ Title = "透视 ESP", Icon = "eye" })
 
 -- ================= 工具函数 =================
 local function IsAlive(character)
@@ -568,6 +581,235 @@ local function StopAutoSoru()
     AutoSoruConn = nil
 end
 
+-- ================= 透视 ESP 逻辑 =================
+local ESPRunning = false
+local espObjects = {}
+local espUpdateConnection = nil
+
+local function getTeamInfo(player)
+    if not player.Team then return "Unknown", Color3.fromRGB(255,255,255) end
+    if player.Team.Name == "Marines" then return "海军", Color3.fromRGB(0,170,255)
+    else return "海贼", Color3.fromRGB(255,70,70) end
+end
+
+local function hexToColor3(hex)
+    local r = tonumber(hex:sub(1,2), 16) / 255 or 0
+    local g = tonumber(hex:sub(3,4), 16) / 255 or 1
+    local b = tonumber(hex:sub(5,6), 16) / 255 or 0
+    return Color3.new(r, g, b)
+end
+
+local function removeESP(player)
+    if espObjects[player] then
+        pcall(function()
+            espObjects[player].gui:Destroy()
+            if espObjects[player].highlight then espObjects[player].highlight:Destroy() end
+        end)
+        espObjects[player] = nil
+    end
+end
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+    local char = player.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    local team, color = getTeamInfo(player)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0,200,0,70)
+    billboard.StudsOffset = Vector3.new(0,3,0)
+    billboard.AlwaysOnTop = true
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.TextScaled = false
+    text.TextSize = _G.G_ESP_TextSize
+    text.RichText = true
+    text.Font = Enum.Font.SourceSansBold
+    text.TextStrokeTransparency = 0
+    text.TextColor3 = color
+    text.Parent = billboard
+    billboard.Parent = head
+
+    local highlight = nil
+    if _G.G_ESP_Highlight then
+        local hlColor = hexToColor3(_G.G_ESP_HighlightColor)
+        highlight = Instance.new("Highlight")
+        highlight.Name = "ESP_PlayerHighlight"
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillColor = hlColor
+        highlight.FillTransparency = 0.5
+        highlight.OutlineColor = hlColor
+        highlight.OutlineTransparency = 0
+        highlight.Parent = char
+    end
+
+    espObjects[player] = { gui = billboard, label = text, char = char, highlight = highlight }
+end
+
+local lastESPUpdate = 0
+local ESP_UPDATE_INTERVAL = 0.1
+local playerCache = {}
+
+local function getPlayerData(player)
+    if not playerCache[player] then
+        playerCache[player] = { level = "?", fruit = "None", bounty = 0, team = "Unknown", color = Color3.fromRGB(255, 255, 255), lastUpdate = 0 }
+    end
+    local data = playerCache[player]
+    local now = tick()
+    if now - data.lastUpdate > 5 then
+        pcall(function() data.level = player.Data.Level.Value end)
+        pcall(function() data.fruit = player.Data.DevilFruit.Value end)
+        pcall(function() data.bounty = player.leaderstats["Bounty/Honor"].Value end)
+        data.team, data.color = getTeamInfo(player)
+        data.lastUpdate = now
+    end
+    return data
+end
+
+local function updateESP()
+    local now = tick()
+    if now - lastESPUpdate < ESP_UPDATE_INTERVAL then return end
+    lastESPUpdate = now
+
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+    local myPos = myRoot.Position
+
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            local head = char and char:FindFirstChild("Head")
+            local data = espObjects[player]
+
+            if char and head then
+                if not data or data.char ~= char or not data.gui.Parent then
+                    removeESP(player)
+                    createESP(player)
+                    data = espObjects[player]
+                end
+            else
+                if data then removeESP(player) end
+                continue
+            end
+
+            if not data then continue end
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if hum and root then
+                    local distance = math.floor((root.Position - myPos).Magnitude)
+                    local hp = math.floor((hum.Health/hum.MaxHealth)*100)
+                    local pData = getPlayerData(player)
+                    local level = pData.level
+                    local fruit = pData.fruit
+                    local bounty = pData.bounty
+                    local team = pData.team
+                    local color = pData.color
+
+                    local warnTag = bounty > 10000000 and "⚠ " or ""
+                    local pvpState = "⚔ PVP已开启 "
+                    local pvpIcon = "🔴 "
+                    local isPvpDisabled = player:GetAttribute("PvpDisabled") == true
+
+                    if isPvpDisabled then
+                        pvpState = "PvP已关闭 "
+                        pvpIcon = "🟢 "
+                    end
+
+                    data.label.TextColor3 = color
+                    if data.label.TextSize ~= _G.G_ESP_TextSize then data.label.TextSize = _G.G_ESP_TextSize end
+
+                    local parts = {}
+                    if _G.G_ESP_Name then parts[#parts+1] = warnTag .. "[" .. team .. "] <font color=\"rgb(255,255,0)\">" .. player.Name .. "</font>" end
+                    if _G.G_ESP_Level then parts[#parts+1] = " [Lv." .. level .. "]" end
+                    if isPvpDisabled then
+                        parts[#parts+1] = "\n<font color=\"rgb(0,255,0)\">" .. pvpIcon .. pvpState .. "</font>\n"
+                    else
+                        parts[#parts+1] = "\n" .. pvpIcon .. pvpState .. "\n"
+                    end
+                    if _G.G_ESP_Fruit then parts[#parts+1] = "水果: " .. fruit .. "\n" end
+                    if _G.G_ESP_Bounty then parts[#parts+1] = "赏金: " .. math.floor(bounty/1000000) .. "M\n" end
+                    if _G.G_ESP_Distance then parts[#parts+1] = distance .. "米 | " end
+                    if _G.G_ESP_HP then parts[#parts+1] = "生命 " .. hp .. "%" end
+
+                    data.label.Text = table.concat(parts)
+
+                    if _G.G_ESP_Highlight then
+                        local hlColor = hexToColor3(_G.G_ESP_HighlightColor)
+                        pcall(function()
+                            for _, child in ipairs(char:GetChildren()) do
+                                if child:IsA("Highlight") and child.Name ~= "ESP_PlayerHighlight" then
+                                    child.FillColor = hlColor
+                                    child.OutlineColor = hlColor
+                                    child.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                                end
+                            end
+                        end)
+                        if not data.highlight or not data.highlight.Parent then
+                            local hl = Instance.new("Highlight")
+                            hl.Name = "ESP_PlayerHighlight"
+                            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                            hl.FillColor = hlColor
+                            hl.FillTransparency = 0.5
+                            hl.OutlineColor = hlColor
+                            hl.OutlineTransparency = 0
+                            hl.Parent = char
+                            data.highlight = hl
+                        else
+                            data.highlight.FillColor = hlColor
+                            data.highlight.OutlineColor = hlColor
+                            data.highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        end
+                    else
+                        if data.highlight then
+                            data.highlight:Destroy()
+                            data.highlight = nil
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+function EnableESP()
+    if ESPRunning then return end
+    ESPRunning = true
+    for _, player in ipairs(Players:GetPlayers()) do createESP(player) end
+    espUpdateConnection = task.spawn(function()
+        while ESPRunning do
+            pcall(updateESP)
+            task.wait(ESP_UPDATE_INTERVAL)
+        end
+    end)
+end
+
+function DisableESP()
+    ESPRunning = false
+    espUpdateConnection = nil
+    for player, _ in pairs(espObjects) do removeESP(player) end
+    espObjects = {}
+end
+
+if not _G.ESP_Initialized then
+    _G.ESP_Initialized = true
+    Players.PlayerRemoving:Connect(function(player)
+        removeESP(player)
+        playerCache[player] = nil
+    end)
+end
+
+task.spawn(function()
+    task.wait(1)
+    if _G.G_ESPEnabled then EnableESP() end
+end)
+
 -- ================= 构建 WindUI 界面 =================
 local FOVSection = FOVTab:Section({ Title = "自瞄范围设置" })
 
@@ -717,3 +959,50 @@ FOVTab:Toggle({
 })
 
 if _G.G_AutoSoru then StartAutoSoru() end
+
+-- ================= ESP 界面 =================
+ESPTab:Toggle({
+    Title = "ESP 开关",
+    Value = _G.G_ESPEnabled,
+    Callback = function(state)
+        _G.G_ESPEnabled = state
+        if state then EnableESP() else DisableESP() end
+    end
+})
+
+ESPTab:Toggle({ Title = "显示玩家名字", Value = _G.G_ESP_Name, Callback = function(v) _G.G_ESP_Name = v end })
+ESPTab:Toggle({ Title = "显示玩家等级", Value = _G.G_ESP_Level, Callback = function(v) _G.G_ESP_Level = v end })
+ESPTab:Toggle({ Title = "显示玩家赏金", Value = _G.G_ESP_Bounty, Callback = function(v) _G.G_ESP_Bounty = v end })
+ESPTab:Toggle({ Title = "显示恶魔果实", Value = _G.G_ESP_Fruit, Callback = function(v) _G.G_ESP_Fruit = v end })
+ESPTab:Toggle({ Title = "显示距离", Value = _G.G_ESP_Distance, Callback = function(v) _G.G_ESP_Distance = v end })
+ESPTab:Toggle({ Title = "显示血量", Value = _G.G_ESP_HP, Callback = function(v) _G.G_ESP_HP = v end })
+
+ESPTab:Toggle({
+    Title = "高亮显示玩家",
+    Value = _G.G_ESP_Highlight,
+    Callback = function(v) _G.G_ESP_Highlight = v end
+})
+
+ESPTab:Colorpicker({
+    Title = "高亮颜色",
+    Default = hexToColor3(_G.G_ESP_HighlightColor),
+    Transparency = 0,
+    Callback = function(color)
+        _G.G_ESP_HighlightColor = string.format("%02X%02X%02X",
+            math.floor(color.R * 255 + 0.5),
+            math.floor(color.G * 255 + 0.5),
+            math.floor(color.B * 255 + 0.5))
+    end
+})
+
+ESPTab:Slider({
+    Title = "ESP 字体大小",
+    Value = {
+        Min = 8,
+        Max = 32,
+        Default = _G.G_ESP_TextSize
+    },
+    Callback = function(v)
+        _G.G_ESP_TextSize = v
+    end
+})
