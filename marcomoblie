@@ -1,103 +1,129 @@
--- 手机端 Blox Fruits Z/X/C 技能速度调节 UI
--- 放到 LocalScript 中执行
+-- 手机端 Blox Fruits - Marco Z/X/C 自动放技能 + 速度调节 UI
+-- 增强版（自动放技能强化）
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- ==================== 配置 ====================
 local Config = {
+    MasterEnabled = false,          -- 总开关
+    
     Z_Enabled = false,
     X_Enabled = false,
     C_Enabled = false,
     
-    Z_Delay = 0.8,   -- 默认秒
-    X_Delay = 1.2,
-    C_Delay = 1.5,
+    Z_Delay = 0.85,
+    X_Delay = 1.25,
+    C_Delay = 1.55,
     
-    MinDelay = 0.15, -- 最快限制（防止过快导致检测或卡顿）
-    MaxDelay = 5.0,
+    MinDelay = 0.18,                -- 最快限制
+    MaxDelay = 6.0,
+    
+    UseRandomDelay = true,          -- 是否添加随机波动（防固定间隔）
+    RandomRange = 0.08,             -- 随机波动范围（±0.08秒）
 }
 
 -- ==================== 创建 UI ====================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MarcoSkillSpeedUI"
+ScreenGui.Name = "MarcoAutoSkillUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = playerGui
 
--- 主框架
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 280, 0, 320)
-MainFrame.Position = UDim2.new(0.5, -140, 0.5, -160)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+MainFrame.Size = UDim2.new(0, 300, 0, 390)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -195)
+MainFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.CornerRadius = UDim.new(0, 14)
 UICorner.Parent = MainFrame
 
 local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(80, 120, 255)
-UIStroke.Thickness = 1.5
+UIStroke.Color = Color3.fromRGB(70, 130, 255)
+UIStroke.Thickness = 1.8
 UIStroke.Parent = MainFrame
 
 -- 标题
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Size = UDim2.new(1, -50, 0, 42)
+Title.Position = UDim2.new(0, 12, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Marco 技能速度调节"
+Title.Text = "Marco 自动放技能"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
+Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
 
 -- 关闭按钮
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -35, 0, 5)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.Text = "X"
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(1, -38, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 55, 55)
+CloseBtn.Text = "×"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 16
+CloseBtn.TextSize = 20
 CloseBtn.Parent = MainFrame
 
 local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.CornerRadius = UDim.new(0, 8)
 CloseCorner.Parent = CloseBtn
 
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
+-- 状态文字
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -20, 0, 22)
+StatusLabel.Position = UDim2.new(0, 10, 0, 42)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "状态：未开启自动"
+StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 180)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 13
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = MainFrame
 
--- 创建技能控制行的函数
-local function CreateSkillRow(name, yPos, key, defaultDelay)
+-- ==================== 总开关 ====================
+local MasterBtn = Instance.new("TextButton")
+MasterBtn.Size = UDim2.new(1, -20, 0, 40)
+MasterBtn.Position = UDim2.new(0, 10, 0, 68)
+MasterBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+MasterBtn.Text = "总开关：关闭"
+MasterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MasterBtn.Font = Enum.Font.GothamBold
+MasterBtn.TextSize = 16
+MasterBtn.Parent = MainFrame
+
+local MasterCorner = Instance.new("UICorner")
+MasterCorner.CornerRadius = UDim.new(0, 8)
+MasterCorner.Parent = MasterBtn
+
+-- ==================== 创建技能行 ====================
+local function CreateSkillRow(name, yPos, defaultDelay)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -20, 0, 70)
+    Frame.Size = UDim2.new(1, -20, 0, 68)
     Frame.Position = UDim2.new(0, 10, 0, yPos)
-    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    Frame.BackgroundColor3 = Color3.fromRGB(32, 32, 48)
     Frame.BorderSizePixel = 0
     Frame.Parent = MainFrame
     
     local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.CornerRadius = UDim.new(0, 9)
     Corner.Parent = Frame
     
-    -- 开关按钮
     local Toggle = Instance.new("TextButton")
-    Toggle.Size = UDim2.new(0, 50, 0, 28)
+    Toggle.Size = UDim2.new(0, 52, 0, 28)
     Toggle.Position = UDim2.new(0, 10, 0, 8)
-    Toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    Toggle.BackgroundColor3 = Color3.fromRGB(55, 55, 75)
     Toggle.Text = "关"
     Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
     Toggle.Font = Enum.Font.GothamBold
@@ -108,50 +134,46 @@ local function CreateSkillRow(name, yPos, key, defaultDelay)
     ToggleCorner.CornerRadius = UDim.new(0, 6)
     ToggleCorner.Parent = Toggle
     
-    -- 技能名
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0, 80, 0, 28)
+    Label.Size = UDim2.new(0, 90, 0, 28)
     Label.Position = UDim2.new(0, 70, 0, 8)
     Label.BackgroundTransparency = 1
     Label.Text = name .. " 技能"
-    Label.TextColor3 = Color3.fromRGB(220, 220, 255)
+    Label.TextColor3 = Color3.fromRGB(210, 210, 255)
     Label.Font = Enum.Font.Gotham
     Label.TextSize = 15
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Frame
     
-    -- 延迟显示
     local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(0, 100, 0, 20)
+    DelayLabel.Size = UDim2.new(0, 110, 0, 20)
     DelayLabel.Position = UDim2.new(0, 10, 0, 40)
     DelayLabel.BackgroundTransparency = 1
     DelayLabel.Text = string.format("间隔: %.2fs", defaultDelay)
-    DelayLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+    DelayLabel.TextColor3 = Color3.fromRGB(170, 170, 200)
     DelayLabel.Font = Enum.Font.Gotham
     DelayLabel.TextSize = 13
     DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
     DelayLabel.Parent = Frame
     
-    -- 减速按钮 -
     local MinusBtn = Instance.new("TextButton")
-    MinusBtn.Size = UDim2.new(0, 36, 0, 26)
-    MinusBtn.Position = UDim2.new(1, -90, 0, 38)
-    MinusBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 100)
-    MinusBtn.Text = "-"
+    MinusBtn.Size = UDim2.new(0, 38, 0, 26)
+    MinusBtn.Position = UDim2.new(1, -92, 0, 36)
+    MinusBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+    MinusBtn.Text = "−"
     MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     MinusBtn.Font = Enum.Font.GothamBold
-    MinusBtn.TextSize = 18
+    MinusBtn.TextSize = 20
     MinusBtn.Parent = Frame
     
     local MinusCorner = Instance.new("UICorner")
-    MinusCorner.CornerRadius = UDim.new(0, 5)
+    MinusCorner.CornerRadius = UDim.new(0, 6)
     MinusCorner.Parent = MinusBtn
     
-    -- 加速按钮 +
     local PlusBtn = Instance.new("TextButton")
-    PlusBtn.Size = UDim2.new(0, 36, 0, 26)
-    PlusBtn.Position = UDim2.new(1, -48, 0, 38)
-    PlusBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 100)
+    PlusBtn.Size = UDim2.new(0, 38, 0, 26)
+    PlusBtn.Position = UDim2.new(1, -48, 0, 36)
+    PlusBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
     PlusBtn.Text = "+"
     PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     PlusBtn.Font = Enum.Font.GothamBold
@@ -159,119 +181,172 @@ local function CreateSkillRow(name, yPos, key, defaultDelay)
     PlusBtn.Parent = Frame
     
     local PlusCorner = Instance.new("UICorner")
-    PlusCorner.CornerRadius = UDim.new(0, 5)
+    PlusCorner.CornerRadius = UDim.new(0, 6)
     PlusCorner.Parent = PlusBtn
     
     return {
         Toggle = Toggle,
         DelayLabel = DelayLabel,
         MinusBtn = MinusBtn,
-        PlusBtn = PlusBtn,
-        Frame = Frame
+        PlusBtn = PlusBtn
     }
 end
 
-local ZRow = CreateSkillRow("Z", 50, "Z", Config.Z_Delay)
-local XRow = CreateSkillRow("X", 130, "X", Config.X_Delay)
-local CRow = CreateSkillRow("C", 210, "C", Config.C_Delay)
+local ZRow = CreateSkillRow("Z", 120, Config.Z_Delay)
+local XRow = CreateSkillRow("X", 198, Config.X_Delay)
+local CRow = CreateSkillRow("C", 276, Config.C_Delay)
 
--- ==================== 逻辑 ====================
-local function UpdateDelayLabel(row, delay)
-    row.DelayLabel.Text = string.format("间隔: %.2fs", delay)
+-- 底部提示
+local TipLabel = Instance.new("TextLabel")
+TipLabel.Size = UDim2.new(1, -20, 0, 30)
+TipLabel.Position = UDim2.new(0, 10, 1, -35)
+TipLabel.BackgroundTransparency = 1
+TipLabel.Text = "提示：速度过快容易被检测，建议根据技能冷却调整"
+TipLabel.TextColor3 = Color3.fromRGB(140, 140, 160)
+TipLabel.Font = Enum.Font.Gotham
+TipLabel.TextSize = 11
+TipLabel.TextWrapped = true
+TipLabel.Parent = MainFrame
+
+-- ==================== 逻辑部分 ====================
+local function UpdateStatus()
+    if Config.MasterEnabled then
+        local active = {}
+        if Config.Z_Enabled then table.insert(active, "Z") end
+        if Config.X_Enabled then table.insert(active, "X") end
+        if Config.C_Enabled then table.insert(active, "C") end
+        
+        if #active > 0 then
+            StatusLabel.Text = "状态：自动中 → " .. table.concat(active, " / ")
+            StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
+        else
+            StatusLabel.Text = "状态：总开关已开，但未选择技能"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 60)
+        end
+    else
+        StatusLabel.Text = "状态：未开启自动"
+        StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 180)
+    end
+end
+
+local function UpdateMasterButton()
+    if Config.MasterEnabled then
+        MasterBtn.Text = "总开关：开启"
+        MasterBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 70)
+    else
+        MasterBtn.Text = "总开关：关闭"
+        MasterBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    end
+    UpdateStatus()
 end
 
 local function ToggleSkill(key)
     if key == "Z" then
         Config.Z_Enabled = not Config.Z_Enabled
         ZRow.Toggle.Text = Config.Z_Enabled and "开" or "关"
-        ZRow.Toggle.BackgroundColor3 = Config.Z_Enabled and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(60, 60, 80)
+        ZRow.Toggle.BackgroundColor3 = Config.Z_Enabled and Color3.fromRGB(45, 170, 75) or Color3.fromRGB(55, 55, 75)
     elseif key == "X" then
         Config.X_Enabled = not Config.X_Enabled
         XRow.Toggle.Text = Config.X_Enabled and "开" or "关"
-        XRow.Toggle.BackgroundColor3 = Config.X_Enabled and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(60, 60, 80)
+        XRow.Toggle.BackgroundColor3 = Config.X_Enabled and Color3.fromRGB(45, 170, 75) or Color3.fromRGB(55, 55, 75)
     elseif key == "C" then
         Config.C_Enabled = not Config.C_Enabled
         CRow.Toggle.Text = Config.C_Enabled and "开" or "关"
-        CRow.Toggle.BackgroundColor3 = Config.C_Enabled and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(60, 60, 80)
+        CRow.Toggle.BackgroundColor3 = Config.C_Enabled and Color3.fromRGB(45, 170, 75) or Color3.fromRGB(55, 55, 75)
     end
+    UpdateStatus()
 end
 
 local function ChangeDelay(key, amount)
     if key == "Z" then
         Config.Z_Delay = math.clamp(Config.Z_Delay + amount, Config.MinDelay, Config.MaxDelay)
-        UpdateDelayLabel(ZRow, Config.Z_Delay)
+        ZRow.DelayLabel.Text = string.format("间隔: %.2fs", Config.Z_Delay)
     elseif key == "X" then
         Config.X_Delay = math.clamp(Config.X_Delay + amount, Config.MinDelay, Config.MaxDelay)
-        UpdateDelayLabel(XRow, Config.X_Delay)
+        XRow.DelayLabel.Text = string.format("间隔: %.2fs", Config.X_Delay)
     elseif key == "C" then
         Config.C_Delay = math.clamp(Config.C_Delay + amount, Config.MinDelay, Config.MaxDelay)
-        UpdateDelayLabel(CRow, Config.C_Delay)
+        CRow.DelayLabel.Text = string.format("间隔: %.2fs", Config.C_Delay)
     end
 end
 
--- 绑定按钮
+-- 绑定事件
+MasterBtn.MouseButton1Click:Connect(function()
+    Config.MasterEnabled = not Config.MasterEnabled
+    UpdateMasterButton()
+end)
+
 ZRow.Toggle.MouseButton1Click:Connect(function() ToggleSkill("Z") end)
 XRow.Toggle.MouseButton1Click:Connect(function() ToggleSkill("X") end)
 CRow.Toggle.MouseButton1Click:Connect(function() ToggleSkill("C") end)
 
 ZRow.MinusBtn.MouseButton1Click:Connect(function() ChangeDelay("Z", -0.1) end)
 ZRow.PlusBtn.MouseButton1Click:Connect(function() ChangeDelay("Z", 0.1) end)
-
 XRow.MinusBtn.MouseButton1Click:Connect(function() ChangeDelay("X", -0.1) end)
 XRow.PlusBtn.MouseButton1Click:Connect(function() ChangeDelay("X", 0.1) end)
-
 CRow.MinusBtn.MouseButton1Click:Connect(function() ChangeDelay("C", -0.1) end)
 CRow.PlusBtn.MouseButton1Click:Connect(function() ChangeDelay("C", 0.1) end)
 
--- ==================== 自动释放循环 ====================
-local function PressKey(key)
-    -- 模拟按键（手机端执行器通常支持）
-    VirtualUser:CaptureController()
-    VirtualUser:SetKeyDown(key)
-    task.wait(0.05)
-    VirtualUser:SetKeyUp(key)
+CloseBtn.MouseButton1Click:Connect(function()
+    Config.MasterEnabled = false
+    Config.Z_Enabled = false
+    Config.X_Enabled = false
+    Config.C_Enabled = false
+    ScreenGui:Destroy()
+end)
+
+-- ==================== 自动放技能核心 ====================
+local function PressKey(keyCode)
+    -- 更稳定的手机端按键模拟
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+        task.wait(0.03)
+        VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+    end)
 end
 
--- Z 循环
+local function GetActualDelay(baseDelay)
+    if Config.UseRandomDelay then
+        local offset = (math.random() * 2 - 1) * Config.RandomRange
+        return math.max(Config.MinDelay, baseDelay + offset)
+    end
+    return baseDelay
+end
+
+-- Z 自动循环
 task.spawn(function()
     while true do
-        if Config.Z_Enabled then
-            pcall(function()
-                PressKey("Z")
-            end)
-            task.wait(Config.Z_Delay)
+        if Config.MasterEnabled and Config.Z_Enabled then
+            PressKey(Enum.KeyCode.Z)
+            task.wait(GetActualDelay(Config.Z_Delay))
         else
-            task.wait(0.2)
+            task.wait(0.15)
         end
     end
 end)
 
--- X 循环
+-- X 自动循环
 task.spawn(function()
     while true do
-        if Config.X_Enabled then
-            pcall(function()
-                PressKey("X")
-            end)
-            task.wait(Config.X_Delay)
+        if Config.MasterEnabled and Config.X_Enabled then
+            PressKey(Enum.KeyCode.X)
+            task.wait(GetActualDelay(Config.X_Delay))
         else
-            task.wait(0.2)
+            task.wait(0.15)
         end
     end
 end)
 
--- C 循环
+-- C 自动循环
 task.spawn(function()
     while true do
-        if Config.C_Enabled then
-            pcall(function()
-                PressKey("C")
-            end)
-            task.wait(Config.C_Delay)
+        if Config.MasterEnabled and Config.C_Enabled then
+            PressKey(Enum.KeyCode.C)
+            task.wait(GetActualDelay(Config.C_Delay))
         else
-            task.wait(0.2)
+            task.wait(0.15)
         end
     end
 end)
 
-print("[Marco Skill UI] 已加载 - 手机端可用")
+print("[Marco Auto Skill] 已加载完成 - 手机端增强版")
