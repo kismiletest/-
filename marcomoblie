@@ -1,507 +1,137 @@
--- 手机端 Blox Fruits - Marco 自动放技能 + 瞬步自瞄触发X + F技能
--- 完整增强版（含 Z/X/C/F）
+-- 初始化全局开关状态
+getgenv().AutoSoruEnabled = false
 
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local RunService = game:GetService("RunService")
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-
-player.CharacterAdded:Connect(function(char)
-    character = char
-    humanoidRootPart = char:WaitForChild("HumanoidRootPart")
-end)
-
--- ==================== 配置 ====================
-local Config = {
-    MasterEnabled = false,
-    
-    Z_Enabled = false,
-    X_Enabled = false,
-    C_Enabled = false,
-    F_Enabled = false,               -- 新增 F
-    
-    Z_Delay = 0.85,
-    X_Delay = 1.25,
-    C_Delay = 1.55,
-    F_Delay = 2.0,                   -- 新增 F 默认间隔
-    
-    MinDelay = 0.18,
-    MaxDelay = 6.0,
-    
-    UseRandomDelay = true,
-    RandomRange = 0.08,
-    
-    -- 瞬步自瞄
-    FlashStepEnabled = false,
-    FlashStepRange = 120,
-    TriggerDistance = 8,
-    FlashStepCooldown = 0.35,
-    LastFlashStep = 0,
-    
-    CurrentTarget = nil,
-}
-
--- ==================== 创建 UI ====================
+-----------------------------------
+-- 1. 创建 GUI 开关
+-----------------------------------
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MarcoAutoSkillUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = playerGui
+-- 优先放置在 CoreGui 防止被游戏检测或删除，如果没有权限则降级到 PlayerGui
+ScreenGui.Parent = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 310, 0, 545)          -- 高度增加以容纳 F
-MainFrame.Position = UDim2.new(0.5, -155, 0.5, -272)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 160, 0, 50)
+Frame.Position = UDim2.new(0.5, -80, 0, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true -- 允许拖动
+Frame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 14)
-UICorner.Parent = MainFrame
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = Frame
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(70, 130, 255)
-UIStroke.Thickness = 1.8
-UIStroke.Parent = MainFrame
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(1, 0, 1, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 65, 65)
+ToggleButton.Text = "自动瞄准 & X键: 关"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.TextSize = 14
+ToggleButton.Parent = Frame
 
--- 标题
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -50, 0, 36)
-Title.Position = UDim2.new(0, 12, 0, 2)
-Title.BackgroundTransparency = 1
-Title.Text = "Marco 自动 + 瞬步自瞄"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 17
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = MainFrame
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 8)
+BtnCorner.Parent = ToggleButton
 
--- 关闭按钮
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -36, 0, 4)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.Text = "×"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 18
-CloseBtn.Parent = MainFrame
-
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 7)
-CloseCorner.Parent = CloseBtn
-
--- 状态文字
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -20, 0, 18)
-StatusLabel.Position = UDim2.new(0, 10, 0, 36)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "状态：未开启"
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextSize = 12
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.Parent = MainFrame
-
--- 目标信息
-local TargetLabel = Instance.new("TextLabel")
-TargetLabel.Size = UDim2.new(1, -20, 0, 16)
-TargetLabel.Position = UDim2.new(0, 10, 0, 54)
-TargetLabel.BackgroundTransparency = 1
-TargetLabel.Text = "目标：无"
-TargetLabel.TextColor3 = Color3.fromRGB(120, 180, 255)
-TargetLabel.Font = Enum.Font.Gotham
-TargetLabel.TextSize = 12
-TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
-TargetLabel.Parent = MainFrame
-
--- ==================== 总开关 ====================
-local MasterBtn = Instance.new("TextButton")
-MasterBtn.Size = UDim2.new(1, -20, 0, 34)
-MasterBtn.Position = UDim2.new(0, 10, 0, 76)
-MasterBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-MasterBtn.Text = "总开关：关闭"
-MasterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MasterBtn.Font = Enum.Font.GothamBold
-MasterBtn.TextSize = 15
-MasterBtn.Parent = MainFrame
-
-local MasterCorner = Instance.new("UICorner")
-MasterCorner.CornerRadius = UDim.new(0, 8)
-MasterCorner.Parent = MasterBtn
-
--- ==================== 瞬步自瞄开关 ====================
-local FlashBtn = Instance.new("TextButton")
-FlashBtn.Size = UDim2.new(1, -20, 0, 34)
-FlashBtn.Position = UDim2.new(0, 10, 0, 116)
-FlashBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-FlashBtn.Text = "瞬步自瞄 + 触发X：关闭"
-FlashBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlashBtn.Font = Enum.Font.GothamBold
-FlashBtn.TextSize = 14
-FlashBtn.Parent = MainFrame
-
-local FlashCorner = Instance.new("UICorner")
-FlashCorner.CornerRadius = UDim.new(0, 8)
-FlashCorner.Parent = FlashBtn
-
--- ==================== 技能行创建函数 ====================
-local function CreateSkillRow(name, yPos, defaultDelay)
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -20, 0, 58)
-    Frame.Position = UDim2.new(0, 10, 0, yPos)
-    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    Frame.BorderSizePixel = 0
-    Frame.Parent = MainFrame
-    
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = Frame
-    
-    local Toggle = Instance.new("TextButton")
-    Toggle.Size = UDim2.new(0, 46, 0, 24)
-    Toggle.Position = UDim2.new(0, 8, 0, 6)
-    Toggle.BackgroundColor3 = Color3.fromRGB(55, 55, 75)
-    Toggle.Text = "关"
-    Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Toggle.Font = Enum.Font.GothamBold
-    Toggle.TextSize = 13
-    Toggle.Parent = Frame
-    
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(0, 6)
-    ToggleCorner.Parent = Toggle
-    
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0, 80, 0, 24)
-    Label.Position = UDim2.new(0, 60, 0, 6)
-    Label.BackgroundTransparency = 1
-    Label.Text = name .. " 技能"
-    Label.TextColor3 = Color3.fromRGB(210, 210, 255)
-    Label.Font = Enum.Font.Gotham
-    Label.TextSize = 14
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = Frame
-    
-    local DelayLabel = Instance.new("TextLabel")
-    DelayLabel.Size = UDim2.new(0, 100, 0, 18)
-    DelayLabel.Position = UDim2.new(0, 8, 0, 34)
-    DelayLabel.BackgroundTransparency = 1
-    DelayLabel.Text = string.format("间隔: %.2fs", defaultDelay)
-    DelayLabel.TextColor3 = Color3.fromRGB(160, 160, 190)
-    DelayLabel.Font = Enum.Font.Gotham
-    DelayLabel.TextSize = 12
-    DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DelayLabel.Parent = Frame
-    
-    local MinusBtn = Instance.new("TextButton")
-    MinusBtn.Size = UDim2.new(0, 32, 0, 22)
-    MinusBtn.Position = UDim2.new(1, -78, 0, 30)
-    MinusBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 85)
-    MinusBtn.Text = "−"
-    MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MinusBtn.Font = Enum.Font.GothamBold
-    MinusBtn.TextSize = 16
-    MinusBtn.Parent = Frame
-    
-    local MinusCorner = Instance.new("UICorner")
-    MinusCorner.CornerRadius = UDim.new(0, 5)
-    MinusCorner.Parent = MinusBtn
-    
-    local PlusBtn = Instance.new("TextButton")
-    PlusBtn.Size = UDim2.new(0, 32, 0, 22)
-    PlusBtn.Position = UDim2.new(1, -40, 0, 30)
-    PlusBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 85)
-    PlusBtn.Text = "+"
-    PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    PlusBtn.Font = Enum.Font.GothamBold
-    PlusBtn.TextSize = 15
-    PlusBtn.Parent = Frame
-    
-    local PlusCorner = Instance.new("UICorner")
-    PlusCorner.CornerRadius = UDim.new(0, 5)
-    PlusCorner.Parent = PlusBtn
-    
-    return {Toggle = Toggle, DelayLabel = DelayLabel, MinusBtn = MinusBtn, PlusBtn = PlusBtn}
-end
-
-local ZRow = CreateSkillRow("Z", 160, Config.Z_Delay)
-local XRow = CreateSkillRow("X", 226, Config.X_Delay)
-local CRow = CreateSkillRow("C", 292, Config.C_Delay)
-local FRow = CreateSkillRow("F", 358, Config.F_Delay)   -- 新增 F 行
-
--- 底部提示
-local TipLabel = Instance.new("TextLabel")
-TipLabel.Size = UDim2.new(1, -20, 0, 40)
-TipLabel.Position = UDim2.new(0, 10, 1, -48)
-TipLabel.BackgroundTransparency = 1
-TipLabel.Text = "提示：瞬步自瞄开启后靠近敌人会自动放X\nF技能已加入，建议根据实际冷却调整间隔"
-TipLabel.TextColor3 = Color3.fromRGB(130, 130, 150)
-TipLabel.Font = Enum.Font.Gotham
-TipLabel.TextSize = 11
-TipLabel.TextWrapped = true
-TipLabel.Parent = MainFrame
-
--- ==================== 逻辑函数 ====================
-local function UpdateStatus()
-    if Config.MasterEnabled then
-        local list = {}
-        if Config.Z_Enabled then table.insert(list, "Z") end
-        if Config.X_Enabled then table.insert(list, "X") end
-        if Config.C_Enabled then table.insert(list, "C") end
-        if Config.F_Enabled then table.insert(list, "F") end
-        if Config.FlashStepEnabled then table.insert(list, "瞬步") end
-        
-        if #list > 0 then
-            StatusLabel.Text = "状态：运行中 → " .. table.concat(list, " / ")
-            StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
-        else
-            StatusLabel.Text = "状态：总开关已开，请选择功能"
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 60)
-        end
+ToggleButton.MouseButton1Click:Connect(function()
+    getgenv().AutoSoruEnabled = not getgenv().AutoSoruEnabled
+    if getgenv().AutoSoruEnabled then
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(65, 255, 65)
+        ToggleButton.Text = "自动瞄准 & X键: 开"
     else
-        StatusLabel.Text = "状态：未开启"
-        StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 65, 65)
+        ToggleButton.Text = "自动瞄准 & X键: 关"
     end
-end
-
-local function UpdateMasterButton()
-    MasterBtn.Text = Config.MasterEnabled and "总开关：开启" or "总开关：关闭"
-    MasterBtn.BackgroundColor3 = Config.MasterEnabled and Color3.fromRGB(35, 150, 65) or Color3.fromRGB(45, 45, 65)
-    UpdateStatus()
-end
-
-local function UpdateFlashButton()
-    FlashBtn.Text = Config.FlashStepEnabled and "瞬步自瞄 + 触发X：开启" or "瞬步自瞄 + 触发X：关闭"
-    FlashBtn.BackgroundColor3 = Config.FlashStepEnabled and Color3.fromRGB(40, 100, 200) or Color3.fromRGB(45, 45, 65)
-    UpdateStatus()
-end
-
-local function ToggleSkill(key)
-    if key == "Z" then
-        Config.Z_Enabled = not Config.Z_Enabled
-        ZRow.Toggle.Text = Config.Z_Enabled and "开" or "关"
-        ZRow.Toggle.BackgroundColor3 = Config.Z_Enabled and Color3.fromRGB(40, 160, 70) or Color3.fromRGB(55, 55, 75)
-    elseif key == "X" then
-        Config.X_Enabled = not Config.X_Enabled
-        XRow.Toggle.Text = Config.X_Enabled and "开" or "关"
-        XRow.Toggle.BackgroundColor3 = Config.X_Enabled and Color3.fromRGB(40, 160, 70) or Color3.fromRGB(55, 55, 75)
-    elseif key == "C" then
-        Config.C_Enabled = not Config.C_Enabled
-        CRow.Toggle.Text = Config.C_Enabled and "开" or "关"
-        CRow.Toggle.BackgroundColor3 = Config.C_Enabled and Color3.fromRGB(40, 160, 70) or Color3.fromRGB(55, 55, 75)
-    elseif key == "F" then
-        Config.F_Enabled = not Config.F_Enabled
-        FRow.Toggle.Text = Config.F_Enabled and "开" or "关"
-        FRow.Toggle.BackgroundColor3 = Config.F_Enabled and Color3.fromRGB(40, 160, 70) or Color3.fromRGB(55, 55, 75)
-    end
-    UpdateStatus()
-end
-
-local function ChangeDelay(key, amount)
-    if key == "Z" then
-        Config.Z_Delay = math.clamp(Config.Z_Delay + amount, Config.MinDelay, Config.MaxDelay)
-        ZRow.DelayLabel.Text = string.format("间隔: %.2fs", Config.Z_Delay)
-    elseif key == "X" then
-        Config.X_Delay = math.clamp(Config.X_Delay + amount, Config.MinDelay, Config.MaxDelay)
-        XRow.DelayLabel.Text = string.format("间隔: %.2fs", Config.X_Delay)
-    elseif key == "C" then
-        Config.C_Delay = math.clamp(Config.C_Delay + amount, Config.MinDelay, Config.MaxDelay)
-        CRow.DelayLabel.Text = string.format("间隔: %.2fs", Config.C_Delay)
-    elseif key == "F" then
-        Config.F_Delay = math.clamp(Config.F_Delay + amount, Config.MinDelay, Config.MaxDelay)
-        FRow.DelayLabel.Text = string.format("间隔: %.2fs", Config.F_Delay)
-    end
-end
-
--- 绑定事件
-MasterBtn.MouseButton1Click:Connect(function()
-    Config.MasterEnabled = not Config.MasterEnabled
-    UpdateMasterButton()
 end)
 
-FlashBtn.MouseButton1Click:Connect(function()
-    Config.FlashStepEnabled = not Config.FlashStepEnabled
-    UpdateFlashButton()
-end)
+-----------------------------------
+-- 2. 获取最近的玩家
+-----------------------------------
+local function getNearestPlayer()
+    local nearestPlayer = nil
+    local shortestDistance = math.huge
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
-ZRow.Toggle.MouseButton1Click:Connect(function() ToggleSkill("Z") end)
-XRow.Toggle.MouseButton1Click:Connect(function() ToggleSkill("X") end)
-CRow.Toggle.MouseButton1Click:Connect(function() ToggleSkill("C") end)
-FRow.Toggle.MouseButton1Click:Connect(function() ToggleSkill("F") end)
+    if not myRoot then return nil end
 
-ZRow.MinusBtn.MouseButton1Click:Connect(function() ChangeDelay("Z", -0.1) end)
-ZRow.PlusBtn.MouseButton1Click:Connect(function() ChangeDelay("Z", 0.1) end)
-XRow.MinusBtn.MouseButton1Click:Connect(function() ChangeDelay("X", -0.1) end)
-XRow.PlusBtn.MouseButton1Click:Connect(function() ChangeDelay("X", 0.1) end)
-CRow.MinusBtn.MouseButton1Click:Connect(function() ChangeDelay("C", -0.1) end)
-CRow.PlusBtn.MouseButton1Click:Connect(function() ChangeDelay("C", 0.1) end)
-FRow.MinusBtn.MouseButton1Click:Connect(function() ChangeDelay("F", -0.1) end)
-FRow.PlusBtn.MouseButton1Click:Connect(function() ChangeDelay("F", 0.1) end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    Config.MasterEnabled = false
-    Config.FlashStepEnabled = false
-    Config.Z_Enabled = false
-    Config.X_Enabled = false
-    Config.C_Enabled = false
-    Config.F_Enabled = false
-    ScreenGui:Destroy()
-end)
-
--- ==================== 按键模拟 ====================
-local function PressKey(keyCode)
-    pcall(function()
-        VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
-        task.wait(0.03)
-        VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
-    end)
-end
-
-local function GetActualDelay(base)
-    if Config.UseRandomDelay then
-        return math.max(Config.MinDelay, base + (math.random() * 2 - 1) * Config.RandomRange)
-    end
-    return base
-end
-
--- ==================== 瞬步自瞄核心 ====================
-local function GetNearestEnemy()
-    local nearest = nil
-    local shortest = Config.FlashStepRange
-    local myPos = humanoidRootPart.Position
-    
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
-                if dist < shortest then
-                    shortest = dist
-                    nearest = plr.Character
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local distance = (myRoot.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    nearestPlayer = player
                 end
             end
         end
     end
-    
-    local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace:FindFirstChild("NPCs")
-    if enemiesFolder then
-        for _, enemy in pairs(enemiesFolder:GetChildren()) do
-            if enemy:FindFirstChild("HumanoidRootPart") then
-                local hum = enemy:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 then
-                    local dist = (enemy.HumanoidRootPart.Position - myPos).Magnitude
-                    if dist < shortest then
-                        shortest = dist
-                        nearest = enemy
-                    end
+    return nearestPlayer
+end
+
+-----------------------------------
+-- 3. 拦截 Mouse.Hit (Aimbot)
+-----------------------------------
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", function(self, key)
+    if getgenv().AutoSoruEnabled and self == Mouse then
+        if key == "Hit" or key == "Target" then
+            local nearest = getNearestPlayer()
+            if nearest and nearest.Character and nearest.Character:FindFirstChild("HumanoidRootPart") then
+                if key == "Hit" then
+                    -- 拦截 Hit 返回最近玩家的 CFrame
+                    return nearest.Character.HumanoidRootPart.CFrame
+                elseif key == "Target" then
+                    -- 拦截 Target 返回最近玩家的 BasePart
+                    return nearest.Character.HumanoidRootPart
                 end
             end
         end
     end
-    
-    return nearest, shortest
-end
-
-local function FaceTarget(targetRoot)
-    if not targetRoot or not humanoidRootPart then return end
-    local direction = (targetRoot.Position - humanoidRootPart.Position) * Vector3.new(1, 0, 1)
-    if direction.Magnitude > 0.1 then
-        humanoidRootPart.CFrame = CFrame.lookAt(humanoidRootPart.Position, humanoidRootPart.Position + direction)
-    end
-end
-
-local function FlashToTarget(targetRoot)
-    if not targetRoot or not humanoidRootPart then return end
-    local now = tick()
-    if now - Config.LastFlashStep < Config.FlashStepCooldown then return end
-    
-    local offset = targetRoot.CFrame.LookVector * -3 + Vector3.new(0, 1.5, 0)
-    humanoidRootPart.CFrame = targetRoot.CFrame + offset
-    Config.LastFlashStep = now
-end
-
-RunService.Heartbeat:Connect(function()
-    if not Config.MasterEnabled or not Config.FlashStepEnabled then
-        TargetLabel.Text = "目标：无"
-        Config.CurrentTarget = nil
-        return
-    end
-    
-    if not humanoidRootPart or not humanoidRootPart.Parent then return end
-    
-    local target, dist = GetNearestEnemy()
-    
-    if target and target:FindFirstChild("HumanoidRootPart") then
-        Config.CurrentTarget = target
-        local root = target.HumanoidRootPart
-        TargetLabel.Text = string.format("目标：%s  |  距离：%.1f", target.Name, dist)
-        
-        FaceTarget(root)
-        
-        if dist > Config.TriggerDistance + 2 then
-            FlashToTarget(root)
-        end
-        
-        if dist <= Config.TriggerDistance then
-            PressKey(Enum.KeyCode.X)
-        end
-    else
-        TargetLabel.Text = "目标：无（范围内无敌人）"
-        Config.CurrentTarget = nil
-    end
+    return oldIndex(self, key)
 end)
 
--- ==================== 自动技能循环（含F） ====================
+-----------------------------------
+-- 4. 循环检测 UI 冷却并触发 X 键
+-----------------------------------
 task.spawn(function()
-    while true do
-        if Config.MasterEnabled and Config.Z_Enabled then
-            PressKey(Enum.KeyCode.Z)
-            task.wait(GetActualDelay(Config.Z_Delay))
-        else
-            task.wait(0.12)
+    while task.wait() do
+        if getgenv().AutoSoruEnabled then
+            -- 使用 pcall 防止因为玩家未加载 UI 或路径不存在导致的脚本报错中断
+            pcall(function()
+                local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui")
+                if not PlayerGui then return end
+                
+                -- 根据您提供的路径寻找目标 UI
+                local CooldownUI = PlayerGui.MobileContextButtons.ContextButtonFrame.BoundActionSoru.Button.Cooldown
+                
+                -- 兼容不同游戏的属性类型 (可能是直接属性、NumberValue 或者是 Attribute)
+                local percentageVal = 0
+                if CooldownUI:FindFirstChild("Percentage") and CooldownUI.Percentage:IsA("NumberValue") then
+                    percentageVal = CooldownUI.Percentage.Value
+                elseif CooldownUI:GetAttribute("Percentage") then
+                    percentageVal = CooldownUI:GetAttribute("Percentage")
+                else
+                    percentageVal = CooldownUI.Percentage
+                end
+
+                -- 当 Percentage 大于等于 0.98 时触发
+                if type(percentageVal) == "number" and percentageVal >= 0.98 then
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.X, false, game)
+                    task.wait() 
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.X, false, game)
+                    
+                    -- 添加一个短暂的防抖延迟，防止同一瞬间触发几十次
+                    task.wait(0.1) 
+                end
+            end)
         end
     end
 end)
-
-task.spawn(function()
-    while true do
-        if Config.MasterEnabled and Config.X_Enabled then
-            PressKey(Enum.KeyCode.X)
-            task.wait(GetActualDelay(Config.X_Delay))
-        else
-            task.wait(0.12)
-        end
-    end
-end)
-
-task.spawn(function()
-    while true do
-        if Config.MasterEnabled and Config.C_Enabled then
-            PressKey(Enum.KeyCode.C)
-            task.wait(GetActualDelay(Config.C_Delay))
-        else
-            task.wait(0.12)
-        end
-    end
-end)
-
-task.spawn(function()
-    while true do
-        if Config.MasterEnabled and Config.F_Enabled then
-            PressKey(Enum.KeyCode.F)
-            task.wait(GetActualDelay(Config.F_Delay))
-        else
-            task.wait(0.12)
-        end
-    end
-end)
-
-print("[Marco Auto + FlashStep + F] 已加载完成")
