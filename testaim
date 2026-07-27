@@ -33,6 +33,9 @@ _G.G_RemoveLava = _G.G_RemoveLava or false
 _G.G_WalkOnWater = _G.G_WalkOnWater or false
 _G.G_AutoFpsLock = _G.G_AutoFpsLock or false
 
+-- 自动瞬步 X 键变量
+_G.G_AutoSoruX = _G.G_AutoSoruX or false
+
 -- 自动技能变量
 _G.G_AutoHaki = _G.G_AutoHaki or false
 _G.G_AutoV3 = _G.G_AutoV3 or false
@@ -1046,6 +1049,66 @@ end
 
 if _G.G_WalkOnWater then StartWalkOnWater() end
 
+-- ================= 自动瞬步 X 键 =================
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+task.spawn(function()
+    while task.wait() do
+        if not _G.G_AutoSoruX then continue end
+        if not _G.G_SilentAimM1R then
+            -- 自瞄未开启时, 自动拦截 Mouse.Hit 到最近玩家用于瞬步瞄准
+            local mouse = LocalPlayer:GetMouse()
+            local nearest = nil
+            local shortest = math.huge
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myRoot then
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character then
+                        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                        local hum = player.Character:FindFirstChild("Humanoid")
+                        if hrp and hum and hum.Health > 0 then
+                            local d = (hrp.Position - myRoot.Position).Magnitude
+                            if d < shortest then
+                                shortest = d
+                                nearest = player
+                            end
+                        end
+                    end
+                end
+                if nearest then
+                    -- 强制瞄准最近玩家
+                    mouse.Target = nearest.Character:FindFirstChild("HumanoidRootPart")
+                end
+            end
+        end
+
+        -- 检测 Soru 冷却并自动按 X
+        pcall(function()
+            local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui")
+            if not PlayerGui then return end
+            local CooldownUI = PlayerGui:FindFirstChild("MobileContextButtons") and PlayerGui.MobileContextButtons:FindFirstChild("ContextButtonFrame") and PlayerGui.MobileContextButtons.ContextButtonFrame:FindFirstChild("BoundActionSoru") and PlayerGui.MobileContextButtons.ContextButtonFrame.BoundActionSoru:FindFirstChild("Button") and PlayerGui.MobileContextButtons.ContextButtonFrame.BoundActionSoru.Button:FindFirstChild("Cooldown")
+            if not CooldownUI then return end
+
+            local percentageVal = 0
+            local percentageObj = CooldownUI:FindFirstChild("Percentage")
+            if percentageObj and percentageObj:IsA("NumberValue") then
+                percentageVal = percentageObj.Value
+            elseif CooldownUI:GetAttribute("Percentage") then
+                percentageVal = CooldownUI:GetAttribute("Percentage")
+            elseif CooldownUI.Percentage then
+                percentageVal = CooldownUI.Percentage
+            end
+
+            if type(percentageVal) == "number" and percentageVal >= 0.98 then
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.X, false, game)
+                task.wait()
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.X, false, game)
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
 -- ================= 自动血拳卡帧 (FPS Lock) =================
 local fpsLocked = false
 local fpsUnlockTask = nil
@@ -1691,6 +1754,13 @@ FOVTab:Toggle({
 })
 
 if _G.G_AutoSoru then StartAutoSoru() end
+
+FOVTab:Toggle({
+    Title = "自动瞬步 X 键",
+    Desc = "Soru冷却时瞄准最近玩家并自动按X",
+    Value = _G.G_AutoSoruX,
+    Callback = function(v) _G.G_AutoSoruX = v end
+})
 
 -- ================= ESP 界面 =================
 ESPTab:Toggle({
