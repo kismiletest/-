@@ -25,10 +25,23 @@ _G.G_TeleportOffsetX = _G.G_TeleportOffsetX or 0
 _G.G_TeleportOffsetY = _G.G_TeleportOffsetY or 0
 _G.G_TeleportOffsetZ = _G.G_TeleportOffsetZ or 0
 
--- 初始化 Wind UI
-local WindUI = loadstring(request({
-    Url = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
-}).Body)()
+-- 初始化 Wind UI (增加了兼容性处理)
+local WindUI
+local success, result = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+end)
+
+if not success then
+    -- 如果 HttpGet 失败，尝试使用 request
+    local req = request or http_request or (syn and syn.request)
+    if req then
+        WindUI = loadstring(req({Url = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"}).Body)()
+    else
+        error("你的执行器不支持 HTTP 请求，无法加载 WindUI！")
+    end
+else
+    WindUI = result
+end
 
 local Window = WindUI:CreateWindow({
     Title = "FOV & Aimbot 中心",
@@ -65,18 +78,26 @@ local function GetPlayerList()
 end
 
 -- ================= 绘制 FOV 与射线 =================
-local c = Drawing.new("Circle")
-c.Visible = _G.G_SilentAimShowFOV
-c.Color = Color3.fromRGB(255, 0, 0)
-c.Radius = _G.G_SilentAimFOV
-c.Thickness = 2
-c.Filled = false
+local c, Line
+if Drawing then
+    c = Drawing.new("Circle")
+    c.Visible = _G.G_SilentAimShowFOV
+    c.Color = Color3.fromRGB(255, 0, 0)
+    c.Radius = _G.G_SilentAimFOV
+    c.Thickness = 2
+    c.Filled = false
 
-local Line = Drawing.new("Line")
-Line.Thickness = 2
-Line.Color = Color3.fromRGB(255, 0, 0)
-Line.Transparency = 1
-Line.Visible = false
+    Line = Drawing.new("Line")
+    Line.Thickness = 2
+    Line.Color = Color3.fromRGB(255, 0, 0)
+    Line.Transparency = 1
+    Line.Visible = false
+else
+    -- 如果执行器不支持 Drawing API，防止脚本崩溃
+    c = {Visible = false, Radius = 150, Position = Vector2.new(), Color = Color3.new()}
+    Line = {Visible = false, From = Vector2.new(), To = Vector2.new()}
+    warn("你的执行器不支持 Drawing API, 无法显示 FOV 圆圈和射线！")
+end
 
 local currentSilentAimTarget = nil
 
