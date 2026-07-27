@@ -1055,34 +1055,36 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 task.spawn(function()
     while task.wait() do
         if not _G.G_AutoSoruX then continue end
-        if not _G.G_SilentAimM1R then
-            -- 自瞄未开启时, 自动拦截 Mouse.Hit 到最近玩家用于瞬步瞄准
-            local mouse = LocalPlayer:GetMouse()
-            local nearest = nil
-            local shortest = math.huge
-            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if myRoot then
-                for _, player in pairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character then
-                        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                        local hum = player.Character:FindFirstChild("Humanoid")
-                        if hrp and hum and hum.Health > 0 then
-                            local d = (hrp.Position - myRoot.Position).Magnitude
-                            if d < shortest then
-                                shortest = d
-                                nearest = player
-                            end
+
+        local nearestPlayer = nil
+        local nearestDist = math.huge
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    local hum = player.Character:FindFirstChild("Humanoid")
+                    if hrp and hum and hum.Health > 0 then
+                        local d = (hrp.Position - myRoot.Position).Magnitude
+                        if d < nearestDist then
+                            nearestDist = d
+                            nearestPlayer = player
                         end
                     end
-                end
-                if nearest then
-                    -- 强制瞄准最近玩家
-                    mouse.Target = nearest.Character:FindFirstChild("HumanoidRootPart")
                 end
             end
         end
 
-        -- 检测 Soru 冷却并自动按 X
+        -- 瞄准最近玩家 (配合自瞄未开启时)
+        if nearestPlayer and not _G.G_SilentAimM1R then
+            local mouse = LocalPlayer:GetMouse()
+            local targetHrp = nearestPlayer.Character and nearestPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if targetHrp then
+                mouse.Target = targetHrp
+            end
+        end
+
+        -- 检测 Soru 冷却, 仅在距离敌人足够近时自动按 X
         pcall(function()
             local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui")
             if not PlayerGui then return end
@@ -1099,7 +1101,8 @@ task.spawn(function()
                 percentageVal = CooldownUI.Percentage
             end
 
-            if type(percentageVal) == "number" and percentageVal >= 0.98 then
+            -- 瞬步冷却就绪 且 附近有敌人 (< 500 距离)
+            if type(percentageVal) == "number" and percentageVal >= 0.98 and nearestPlayer and nearestDist < 500 then
                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.X, false, game)
                 task.wait()
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.X, false, game)
