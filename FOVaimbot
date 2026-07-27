@@ -1518,6 +1518,47 @@ FOVTab:Toggle({
     end
 })
 
+-- ==================== ESP 界面 ====================
+ESPTab:Toggle({
+    Title = "ESP 开关",
+    Value = _G.G_ESPEnabled,
+    Callback = function(state)
+        _G.G_ESPEnabled = state
+        if state then EnableESP() else DisableESP() end
+    end
+})
+
+ESPTab:Toggle({ Title = "显示玩家名字", Value = _G.G_ESP_Name, Callback = function(v) _G.G_ESP_Name = v end })
+ESPTab:Toggle({ Title = "显示玩家等级", Value = _G.G_ESP_Level, Callback = function(v) _G.G_ESP_Level = v end })
+ESPTab:Toggle({ Title = "显示玩家赏金", Value = _G.G_ESP_Bounty, Callback = function(v) _G.G_ESP_Bounty = v end })
+ESPTab:Toggle({ Title = "显示恶魔果实", Value = _G.G_ESP_Fruit, Callback = function(v) _G.G_ESP_Fruit = v end })
+ESPTab:Toggle({ Title = "显示距离", Value = _G.G_ESP_Distance, Callback = function(v) _G.G_ESP_Distance = v end })
+ESPTab:Toggle({ Title = "显示血量", Value = _G.G_ESP_HP, Callback = function(v) _G.G_ESP_HP = v end })
+
+ESPTab:Toggle({
+    Title = "高亮显示玩家",
+    Value = _G.G_ESP_Highlight,
+    Callback = function(v) _G.G_ESP_Highlight = v end
+})
+
+ESPTab:Colorpicker({
+    Title = "高亮颜色",
+    Default = hexToColor3(_G.G_ESP_HighlightColor),
+    Transparency = 0,
+    Callback = function(color)
+        _G.G_ESP_HighlightColor = string.format("%02X%02X%02X",
+            math.floor(color.R * 255 + 0.5),
+            math.floor(color.G * 255 + 0.5),
+            math.floor(color.B * 255 + 0.5))
+    end
+})
+
+ESPTab:Slider({
+    Title = "ESP 字体大小",
+    Value = { Min = 8, Max = 32, Default = _G.G_ESP_TextSize },
+    Callback = function(v) _G.G_ESP_TextSize = v end
+})
+
 -- ==================== 杂项 界面 ====================
 MiscTab:Toggle({
     Title = "自动 V3",
