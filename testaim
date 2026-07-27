@@ -31,6 +31,7 @@ _G.G_TeleportOffsetZ = _G.G_TeleportOffsetZ or 0
 _G.G_RemoveAnim = _G.G_RemoveAnim or false
 _G.G_RemoveLava = _G.G_RemoveLava or false
 _G.G_WalkOnWater = _G.G_WalkOnWater or false
+_G.G_AutoFpsLock = _G.G_AutoFpsLock or false
 
 -- 自动技能变量
 _G.G_AutoHaki = _G.G_AutoHaki or false
@@ -1045,6 +1046,86 @@ end
 
 if _G.G_WalkOnWater then StartWalkOnWater() end
 
+-- ================= 自动血拳卡帧 (FPS Lock) =================
+local fpsLocked = false
+local fpsUnlockTask = nil
+
+local function fpsLock()
+    if not _G.G_AutoFpsLock then return end
+    if not fpsLocked and setfpscap then
+        fpsLocked = true
+        setfpscap(12)
+    end
+end
+
+local function fpsUnlockWithDelay()
+    if fpsLocked and not fpsUnlockTask then
+        fpsUnlockTask = task.spawn(function()
+            task.wait(0.3)
+            if setfpscap then
+                setfpscap(0)
+            end
+            fpsLocked = false
+            fpsUnlockTask = nil
+        end)
+    end
+end
+
+local function fpsForceUnlock()
+    if fpsUnlockTask then
+        task.cancel(fpsUnlockTask)
+        fpsUnlockTask = nil
+    end
+    if fpsLocked and setfpscap then
+        setfpscap(0)
+        fpsLocked = false
+    end
+end
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if not _G.G_AutoFpsLock then continue end
+        pcall(function()
+            local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+            if not playerGui then return end
+            local main = playerGui:FindFirstChild("Main")
+            if not main then return end
+            local skills = main:FindFirstChild("Skills")
+            if not skills then return end
+            local sanguine = skills:FindFirstChild("Sanguine Art")
+            if not sanguine then return end
+            local zSkill = sanguine:FindFirstChild("Z")
+            if not zSkill then return end
+            local cooldown = zSkill:FindFirstChild("Cooldown")
+            if not cooldown then return end
+
+            local fullCdSize = UDim2.new(1, 0, 1, -1)
+            if not cooldown:GetAttribute("AutoFpsBound") then
+                cooldown:SetAttribute("AutoFpsBound", true)
+
+                if cooldown.Size == fullCdSize then
+                    fpsLock()
+                else
+                    fpsUnlockWithDelay()
+                end
+
+                cooldown:GetPropertyChangedSignal("Size"):Connect(function()
+                    if not _G.G_AutoFpsLock then return end
+                    if cooldown.Size == fullCdSize then
+                        if fpsUnlockTask then
+                            task.cancel(fpsUnlockTask)
+                            fpsUnlockTask = nil
+                        end
+                        fpsLock()
+                    else
+                        fpsUnlockWithDelay()
+                    end
+                end)
+            end
+        end)
+    end
+end)
+
 -- ================= 自动武装色 =================
 local function startAutoHakiLoop()
     task.spawn(function()
@@ -1724,6 +1805,15 @@ MiscTab:Toggle({
     Callback = function(v)
         _G.G_WalkOnWater = v
         if v then StartWalkOnWater() else StopWalkOnWater() end
+    end
+})
+
+MiscTab:Toggle({
+    Title = "自动血拳卡帧",
+    Value = _G.G_AutoFpsLock,
+    Callback = function(v)
+        _G.G_AutoFpsLock = v
+        if not v then fpsForceUnlock() end
     end
 })
 
