@@ -1893,7 +1893,7 @@ MiscTab:Toggle({
 MiscTab:Toggle({
     Title = "自动武装色",
     Value = _G.G_AutoHaki,
-    Callback = function(v) _G.G_AutoHaki = v end
+    Callback = function(v) _G.G_AutoHaki =  end
 })
 
 MiscTab:Toggle({
