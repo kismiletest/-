@@ -1,15 +1,13 @@
 -- ==================== Auto FPS Lock for Sanguine Art Z ====================
--- Fixed: 兼容平板/移动端, 12 FPS + 备用降帧方案
+-- Fixed: 强制降帧, 平板/移动端兼容
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local isEnabled = false
 local isLocked = false
-local currentTask = nil
-local frameBlocker = nil  -- 移动端备用降帧连接
+local blockerTask = nil
 
 -- ==================== FPS 控制 ====================
 local function lockFps()
@@ -17,89 +15,74 @@ local function lockFps()
 	if isLocked then return end
 	isLocked = true
 
-	-- 方案1: setfpscap (PC执行器)
+	-- 方案1: setfpscap
 	if setfpscap then
 		pcall(function() setfpscap(12) end)
 	end
 
-	-- 方案2: 移动端用 RenderStepped 空循环占满帧
-	frameBlocker = RunService.RenderStepped:Connect(function()
-		if not isLocked then return end
-		-- 每帧空转大量运算, 强制降帧
-		local x = 0
-		for _ = 1, 500 do
-			x = (x * 2 + 1) % 999999
+	-- 方案2: task.spawn 死循环占满帧 (移动端核心方案)
+	-- 疯狂创建/销毁 task 来挤占帧时间
+	blockerTask = task.spawn(function()
+		while isLocked do
+			-- 每 0.001 秒阻塞一次, 主线程被无限 task 切换占满
+			-- 结果: 帧率暴跌
+			for _ = 1, 2000 do
+				local a = math.random()
+				math.sqrt(a * 9999)
+			end
+			task.wait()
 		end
 	end)
 end
 
 local function unlockFps()
-	if currentTask then
-		task.cancel(currentTask)
-		currentTask = nil
+	isLocked = false
+	if blockerTask then
+		task.cancel(blockerTask)
+		blockerTask = nil
 	end
-	if frameBlocker then
-		frameBlocker:Disconnect()
-		frameBlocker = nil
-	end
-	if isLocked then
-		if setfpscap then
-			pcall(function() setfpscap(0) end)
-		end
-		isLocked = false
+	if setfpscap then
+		pcall(function() setfpscap(0) end)
 	end
 end
 
 local function unlockFpsWithDelay()
-	if isLocked and not currentTask then
-		currentTask = task.spawn(function()
-			task.wait(0.2)       -- 锁帧 0.2 秒后恢复 (原 0.3)
-			unlockFps()
-		end)
-	end
+	task.spawn(function()
+		task.wait(0.15)
+		unlockFps()
+	end)
 end
 
 -- ==================== UI ====================
-local ScreenGui = Instance.new("ScreenGui")
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local ScreenGui = Instance.new("ScreenGui", PlayerGui)
 ScreenGui.Name = "AutoFpsLockUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = PlayerGui
 
-local Frame = Instance.new("Frame")
-Frame.Name = "MainFrame"
+local Frame = Instance.new("Frame", ScreenGui)
 Frame.Size = UDim2.new(0, 200, 0, 90)
 Frame.Position = UDim2.new(0, 20, 0.5, -45)
 Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Frame.BorderSizePixel = 0
-Frame.Parent = ScreenGui
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = Frame
-
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(80, 80, 90)
-UIStroke.Thickness = 1.5
-UIStroke.Parent = Frame
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
+local s = Instance.new("UIStroke", Frame); s.Color = Color3.fromRGB(80,80,90); s.Thickness = 1.5
 
 local Title = Instance.new("TextLabel", Frame)
 Title.Size = UDim2.new(1, -20, 0, 28); Title.Position = UDim2.new(0, 10, 0, 6)
 Title.BackgroundTransparency = 1; Title.Text = "Sanguine Z FPS Lock"
 Title.TextColor3 = Color3.fromRGB(220, 220, 230); Title.TextSize = 14
-Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = 0
 
 local ToggleBtn = Instance.new("TextButton", Frame)
 ToggleBtn.Size = UDim2.new(0, 80, 0, 30); ToggleBtn.Position = UDim2.new(1, -90, 0, 36)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70); ToggleBtn.Text = "OFF"
 ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200); ToggleBtn.TextSize = 13
 ToggleBtn.Font = Enum.Font.GothamBold; ToggleBtn.AutoButtonColor = false
-
-local ToggleCorner = Instance.new("UICorner", ToggleBtn)
-ToggleCorner.CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
 local StatusLabel = Instance.new("TextLabel", Frame)
-StatusLabel.Size = UDim2.new(0, 100, 0, 26); StatusLabel.Position = UDim2.new(0, 10, 0, 38)
+StatusLabel.Size = UDim2.new(0, 110, 0, 26); StatusLabel.Position = UDim2.new(0, 10, 0, 38)
 StatusLabel.BackgroundTransparency = 1; StatusLabel.Text = "已关闭"
 StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 170); StatusLabel.TextSize = 13
 StatusLabel.Font = Enum.Font.Gotham; StatusLabel.TextXAlignment = 0
@@ -107,28 +90,28 @@ StatusLabel.Font = Enum.Font.Gotham; StatusLabel.TextXAlignment = 0
 local PlatformLabel = Instance.new("TextLabel", Frame)
 PlatformLabel.Size = UDim2.new(1, -20, 0, 16); PlatformLabel.Position = UDim2.new(0, 10, 0, 68)
 PlatformLabel.BackgroundTransparency = 1
-PlatformLabel.Text = "FPS: " .. tostring(setfpscap ~= nil and "setfpscap" or "RenderStepped(移动端兼容)")
+PlatformLabel.Text = "setfpscap=" .. tostring(setfpscap ~= nil) .. " | 双重降帧"
 PlatformLabel.TextColor3 = Color3.fromRGB(120, 120, 130); PlatformLabel.TextSize = 10
 PlatformLabel.Font = Enum.Font.Gotham; PlatformLabel.TextXAlignment = 0
 
--- ==================== 拖动 ====================
-local dragging, dragStart, startPos = false
-Frame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true; dragStart = input.Position; startPos = Frame.Position
+-- 拖动
+Frame.Active = true
+local dragInfo = { on = false }
+Frame.InputBegan:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragInfo.on = true; dragInfo.start = i.Position; dragInfo.pos = Frame.Position
 	end
 end)
-Frame.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+Frame.InputEnded:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 then dragInfo.on = false end
 end)
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+game:GetService("UserInputService").InputChanged:Connect(function(i)
+	if dragInfo.on and i.UserInputType == Enum.UserInputType.MouseMovement then
+		local d = i.Position - dragInfo.start
+		Frame.Position = UDim2.new(dragInfo.pos.X.Scale, dragInfo.pos.X.Offset + d.X, dragInfo.pos.Y.Scale, dragInfo.pos.Y.Offset + d.Y)
 	end
 end)
 
--- ==================== UI 更新 ====================
 local function updateUI()
 	if isEnabled then
 		ToggleBtn.Text = "ON"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
@@ -148,43 +131,55 @@ ToggleBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==================== 核心: 检测 Sanguine Z 冷却 ====================
+local function findCooldown()
+	local pg = LocalPlayer:FindFirstChild("PlayerGui")
+	if not pg then return nil end
+
+	-- 路径1: Main > Skills > Sanguine Art > Z > Cooldown
+	local main = pg:FindFirstChild("Main")
+	if main then
+		local skills = main:FindFirstChild("Skills")
+		if skills then
+			local sa = skills:FindFirstChild("Sanguine Art")
+			if sa then
+				local z = sa:FindFirstChild("Z")
+				if z then
+					local cd = z:FindFirstChild("Cooldown")
+					if cd then return cd end
+				end
+			end
+		end
+	end
+
+	-- 路径2: 遍历所有 Cooldown 对象 (兜底)
+	for _, obj in ipairs(pg:GetDescendants()) do
+		if obj.Name == "Cooldown" and obj.ClassName == "Frame" and obj.Parent and obj.Parent.Name == "Z" then
+			return obj
+		end
+	end
+	return nil
+end
+
 task.spawn(function()
 	while task.wait(0.3) do
 		if not isEnabled then continue end
 		pcall(function()
-			local pg = LocalPlayer:FindFirstChild("PlayerGui")
-			if not pg then return end
-			local main = pg:FindFirstChild("Main")
-			if not main then return end
-			local skills = main:FindFirstChild("Skills")
-			if not skills then return end
-			local sanguine = skills:FindFirstChild("Sanguine Art")
-			if not sanguine then return end
-			local zSkill = sanguine:FindFirstChild("Z")
-			if not zSkill then return end
-			local cooldown = zSkill:FindFirstChild("Cooldown")
+			local cooldown = findCooldown()
 			if not cooldown then return end
 
 			local fullCdSize = UDim2.new(1, 0, 1, -1)
-
 			if not cooldown:GetAttribute("AutoFpsBound") then
 				cooldown:SetAttribute("AutoFpsBound", true)
 
-				-- 初始状态判断
 				if cooldown.Size == fullCdSize then
 					lockFps()
 				else
 					unlockFpsWithDelay()
 				end
 
-				-- 监听冷却变化
 				cooldown:GetPropertyChangedSignal("Size"):Connect(function()
 					if not isEnabled then return end
 					if cooldown.Size == fullCdSize then
-						if currentTask then
-							task.cancel(currentTask)
-							currentTask = nil
-						end
 						lockFps()
 					else
 						unlockFpsWithDelay()
@@ -195,6 +190,4 @@ task.spawn(function()
 	end
 end)
 
-print("[Auto FPS Lock] 已加载 | Lock=12FPS | 平板兼容版")
-print("  降帧方法: " .. (setfpscap ~= nil and "setfpscap(12)" or "RenderStepped 空循环"))
-print("  关闭开关自动解锁 FPS")
+print("[Auto FPS Lock] 已加载 | 双重降帧: setfpscap + task死循环")
