@@ -174,7 +174,7 @@ end)
 local Window = WindUI:CreateWindow({
     Title = "kiyo hub",
     Icon = "",
-    Author = "kiyo",
+    Author = "by kiyo",
     Folder = "WindUI",
     Size = UDim2.fromOffset(580, 460),
     Transparent = true,
