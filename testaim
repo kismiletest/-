@@ -1,5 +1,5 @@
 -- ==================== Auto FPS Lock for Sanguine Art Z ====================
--- Fixed: 强制降帧, 平板/移动端兼容
+-- Fixed: 强制降帧到 5 FPS, 平板/移动端兼容
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local isEnabled = false
 local isLocked = false
 local blockerTask = nil
+local TARGET_FPS = 5   -- 目标帧率
 
 -- ==================== FPS 控制 ====================
 local function lockFps()
@@ -15,20 +16,17 @@ local function lockFps()
 	if isLocked then return end
 	isLocked = true
 
-	-- 方案1: setfpscap
 	if setfpscap then
-		pcall(function() setfpscap(12) end)
+		pcall(function() setfpscap(TARGET_FPS) end)
 	end
 
-	-- 方案2: task.spawn 死循环占满帧 (移动端核心方案)
-	-- 疯狂创建/销毁 task 来挤占帧时间
+	-- 移动端死循环占帧
 	blockerTask = task.spawn(function()
 		while isLocked do
-			-- 每 0.001 秒阻塞一次, 主线程被无限 task 切换占满
-			-- 结果: 帧率暴跌
-			for _ = 1, 2000 do
+			for _ = 1, 5000 do
 				local a = math.random()
-				math.sqrt(a * 9999)
+				math.sqrt(a * 99999)
+				math.sin(a)
 			end
 			task.wait()
 		end
@@ -48,7 +46,7 @@ end
 
 local function unlockFpsWithDelay()
 	task.spawn(function()
-		task.wait(0.15)
+		task.wait(0.25)
 		unlockFps()
 	end)
 end
@@ -116,7 +114,7 @@ local function updateUI()
 	if isEnabled then
 		ToggleBtn.Text = "ON"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
 		ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-		StatusLabel.Text = "已开启 (12FPS)"; StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
+		StatusLabel.Text = "已开启 (5FPS)"; StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
 	else
 		ToggleBtn.Text = "OFF"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
 		ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -190,4 +188,4 @@ task.spawn(function()
 	end
 end)
 
-print("[Auto FPS Lock] 已加载 | 双重降帧: setfpscap + task死循环")
+print("[Auto FPS Lock] 已加载 | 目标: 5 FPS | 双重降帧")
