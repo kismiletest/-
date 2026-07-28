@@ -1,202 +1,200 @@
--- ==================== Roblox 飞行脚本 ====================
+-- ==================== Auto FPS Lock for Sanguine Art Z ====================
+-- Fixed: 兼容平板/移动端, 12 FPS + 备用降帧方案
 local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
 
--- ==================== 状态 ====================
-_G.Fly = _G.Fly or false
-_G.FlySpeed = _G.FlySpeed or 50
-local flying = false
-local keys = { W = false, A = false, S = false, D = false, Space = false, LeftShift = false }
-local heartbeatConn = nil
+local isEnabled = false
+local isLocked = false
+local currentTask = nil
+local frameBlocker = nil  -- 移动端备用降帧连接
 
--- ==================== GUI ====================
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FlyGUI"
-screenGui.Parent = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+-- ==================== FPS 控制 ====================
+local function lockFps()
+	if not isEnabled then return end
+	if isLocked then return end
+	isLocked = true
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 150)
-frame.Position = UDim2.new(0, 20, 0, 60)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
+	-- 方案1: setfpscap (PC执行器)
+	if setfpscap then
+		pcall(function() setfpscap(12) end)
+	end
 
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-local stroke = Instance.new("UIStroke", frame)
-stroke.Color = Color3.fromRGB(80, 80, 90); stroke.Thickness = 1.5
+	-- 方案2: 移动端用 RenderStepped 空循环占满帧
+	frameBlocker = RunService.RenderStepped:Connect(function()
+		if not isLocked then return end
+		-- 每帧空转大量运算, 强制降帧
+		local x = 0
+		for _ = 1, 500 do
+			x = (x * 2 + 1) % 999999
+		end
+	end)
+end
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, -20, 0, 28); title.Position = UDim2.new(0, 10, 0, 6)
-title.BackgroundTransparency = 1; title.Text = "飞行控制"; title.TextColor3 = Color3.fromRGB(255,255,255)
-title.TextSize = 16; title.Font = Enum.Font.GothamBold; title.TextXAlignment = Enum.TextXAlignment.Left
+local function unlockFps()
+	if currentTask then
+		task.cancel(currentTask)
+		currentTask = nil
+	end
+	if frameBlocker then
+		frameBlocker:Disconnect()
+		frameBlocker = nil
+	end
+	if isLocked then
+		if setfpscap then
+			pcall(function() setfpscap(0) end)
+		end
+		isLocked = false
+	end
+end
 
-local toggleBtn = Instance.new("TextButton", frame)
-toggleBtn.Size = UDim2.new(0, 80, 0, 32); toggleBtn.Position = UDim2.new(0.5, -40, 0, 40)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60); toggleBtn.Text = "OFF"
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255); toggleBtn.TextSize = 14
-toggleBtn.Font = Enum.Font.GothamBold; toggleBtn.AutoButtonColor = false
-Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+local function unlockFpsWithDelay()
+	if isLocked and not currentTask then
+		currentTask = task.spawn(function()
+			task.wait(0.2)       -- 锁帧 0.2 秒后恢复 (原 0.3)
+			unlockFps()
+		end)
+	end
+end
 
-local speedLabel = Instance.new("TextLabel", frame)
-speedLabel.Size = UDim2.new(0, 100, 0, 20); speedLabel.Position = UDim2.new(0, 15, 0, 82)
-speedLabel.BackgroundTransparency = 1; speedLabel.Text = "速度: " .. _G.FlySpeed; speedLabel.TextColor3 = Color3.fromRGB(200,200,200)
-speedLabel.TextSize = 13; speedLabel.Font = Enum.Font.Gotham; speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+-- ==================== UI ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoFpsLockUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
 
-local fasterBtn = Instance.new("TextButton", frame)
-fasterBtn.Size = UDim2.new(0, 40, 0, 28); fasterBtn.Position = UDim2.new(1, -100, 0, 78)
-fasterBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70); fasterBtn.Text = "+"
-fasterBtn.TextColor3 = Color3.fromRGB(255,255,255); fasterBtn.TextSize = 18; fasterBtn.Font = Enum.Font.GothamBold; fasterBtn.AutoButtonColor = false
-Instance.new("UICorner", fasterBtn).CornerRadius = UDim.new(0, 6)
+local Frame = Instance.new("Frame")
+Frame.Name = "MainFrame"
+Frame.Size = UDim2.new(0, 200, 0, 90)
+Frame.Position = UDim2.new(0, 20, 0.5, -45)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
 
-local slowerBtn = Instance.new("TextButton", frame)
-slowerBtn.Size = UDim2.new(0, 40, 0, 28); slowerBtn.Position = UDim2.new(1, -50, 0, 78)
-slowerBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70); slowerBtn.Text = "-"
-slowerBtn.TextColor3 = Color3.fromRGB(255,255,255); slowerBtn.TextSize = 18; slowerBtn.Font = Enum.Font.GothamBold; slowerBtn.AutoButtonColor = false
-Instance.new("UICorner", slowerBtn).CornerRadius = UDim.new(0, 6)
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Frame
 
-local modeLabel = Instance.new("TextLabel", frame)
-modeLabel.Size = UDim2.new(1, -20, 0, 18); modeLabel.Position = UDim2.new(0, 10, 0, 115)
-modeLabel.BackgroundTransparency = 1; modeLabel.Text = "WASD 移动 | Space 上 | Shift 下"
-modeLabel.TextColor3 = Color3.fromRGB(140, 140, 150); modeLabel.TextSize = 11
-modeLabel.Font = Enum.Font.Gotham; modeLabel.TextXAlignment = Enum.TextXAlignment.Left
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(80, 80, 90)
+UIStroke.Thickness = 1.5
+UIStroke.Parent = Frame
 
--- ==================== 更新 UI ====================
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, -20, 0, 28); Title.Position = UDim2.new(0, 10, 0, 6)
+Title.BackgroundTransparency = 1; Title.Text = "Sanguine Z FPS Lock"
+Title.TextColor3 = Color3.fromRGB(220, 220, 230); Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold; Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local ToggleBtn = Instance.new("TextButton", Frame)
+ToggleBtn.Size = UDim2.new(0, 80, 0, 30); ToggleBtn.Position = UDim2.new(1, -90, 0, 36)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70); ToggleBtn.Text = "OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200); ToggleBtn.TextSize = 13
+ToggleBtn.Font = Enum.Font.GothamBold; ToggleBtn.AutoButtonColor = false
+
+local ToggleCorner = Instance.new("UICorner", ToggleBtn)
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+
+local StatusLabel = Instance.new("TextLabel", Frame)
+StatusLabel.Size = UDim2.new(0, 100, 0, 26); StatusLabel.Position = UDim2.new(0, 10, 0, 38)
+StatusLabel.BackgroundTransparency = 1; StatusLabel.Text = "已关闭"
+StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 170); StatusLabel.TextSize = 13
+StatusLabel.Font = Enum.Font.Gotham; StatusLabel.TextXAlignment = 0
+
+local PlatformLabel = Instance.new("TextLabel", Frame)
+PlatformLabel.Size = UDim2.new(1, -20, 0, 16); PlatformLabel.Position = UDim2.new(0, 10, 0, 68)
+PlatformLabel.BackgroundTransparency = 1
+PlatformLabel.Text = "FPS: " .. tostring(setfpscap ~= nil and "setfpscap" or "RenderStepped(移动端兼容)")
+PlatformLabel.TextColor3 = Color3.fromRGB(120, 120, 130); PlatformLabel.TextSize = 10
+PlatformLabel.Font = Enum.Font.Gotham; PlatformLabel.TextXAlignment = 0
+
+-- ==================== 拖动 ====================
+local dragging, dragStart, startPos = false
+Frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true; dragStart = input.Position; startPos = Frame.Position
+	end
+end)
+Frame.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- ==================== UI 更新 ====================
 local function updateUI()
-    if flying then
-        toggleBtn.Text = "ON"; toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
-    else
-        toggleBtn.Text = "OFF"; toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-    end
-    speedLabel.Text = "速度: " .. _G.FlySpeed
+	if isEnabled then
+		ToggleBtn.Text = "ON"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
+		ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		StatusLabel.Text = "已开启 (12FPS)"; StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
+	else
+		ToggleBtn.Text = "OFF"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+		ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+		StatusLabel.Text = "已关闭"; StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 170)
+		unlockFps()
+	end
 end
 
--- ==================== 飞行逻辑 (CFrame 移动) ====================
-local function flyLoop()
-    local char = LocalPlayer.Character
-    local root = char and char:WaitForChild("HumanoidRootPart", 5)
-    local hum = char and char:WaitForChild("Humanoid", 5)
-    if not root or not hum then return end
-
-    -- 起步: 先升空
-    root.CFrame = root.CFrame + Vector3.new(0, 5, 0)
-
-    heartbeatConn = RunService.Heartbeat:Connect(function()
-        if not flying then
-            if heartbeatConn then heartbeatConn:Disconnect(); heartbeatConn = nil end
-            return
-        end
-
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChild("Humanoid")
-        if not root or not hum then stopFly(); return end
-
-        local speed = _G.FlySpeed
-        local moveDir = Vector3.new()
-        local camCF = Camera.CFrame
-
-        if keys.W then moveDir += camCF.LookVector end
-        if keys.S then moveDir -= camCF.LookVector end
-        if keys.D then moveDir += camCF.RightVector end
-        if keys.A then moveDir -= camCF.RightVector end
-        if keys.Space then moveDir += Vector3.new(0, 1, 0) end
-        if keys.LeftShift then moveDir -= Vector3.new(0, 1, 0) end
-
-        if moveDir.Magnitude > 0 then
-            local dt = 1 / 60 -- ~60fps 每帧位移
-            root.CFrame = root.CFrame + (moveDir.Unit * speed * dt)
-            root.AssemblyLinearVelocity = Vector3.new()     -- 重置速度防止被弹飞
-            root.AssemblyAngularVelocity = Vector3.new()
-        else
-            root.AssemblyLinearVelocity = Vector3.new()
-            root.AssemblyAngularVelocity = Vector3.new()
-        end
-
-        -- Humanoid 状态: 切换到 Physics 避开地面检测
-        if hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Running then
-            hum:ChangeState(Enum.HumanoidStateType.Physics)
-        end
-    end)
-end
-
-function stopFly()
-    flying = false
-    if heartbeatConn then heartbeatConn:Disconnect(); heartbeatConn = nil end
-    updateUI()
-end
-
-function startFly()
-    if flying then return end
-    flying = true
-    updateUI()
-    flyLoop()
-end
-
--- ==================== 输入监听 ====================
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if not flying then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        local keyName = input.KeyCode.Name
-        if keys[keyName] ~= nil then keys[keyName] = true end
-    end
+ToggleBtn.MouseButton1Click:Connect(function()
+	isEnabled = not isEnabled
+	updateUI()
 end)
 
-UIS.InputEnded:Connect(function(input)
-    if not flying then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        local keyName = input.KeyCode.Name
-        if keys[keyName] ~= nil then keys[keyName] = false end
-    end
+-- ==================== 核心: 检测 Sanguine Z 冷却 ====================
+task.spawn(function()
+	while task.wait(0.3) do
+		if not isEnabled then continue end
+		pcall(function()
+			local pg = LocalPlayer:FindFirstChild("PlayerGui")
+			if not pg then return end
+			local main = pg:FindFirstChild("Main")
+			if not main then return end
+			local skills = main:FindFirstChild("Skills")
+			if not skills then return end
+			local sanguine = skills:FindFirstChild("Sanguine Art")
+			if not sanguine then return end
+			local zSkill = sanguine:FindFirstChild("Z")
+			if not zSkill then return end
+			local cooldown = zSkill:FindFirstChild("Cooldown")
+			if not cooldown then return end
+
+			local fullCdSize = UDim2.new(1, 0, 1, -1)
+
+			if not cooldown:GetAttribute("AutoFpsBound") then
+				cooldown:SetAttribute("AutoFpsBound", true)
+
+				-- 初始状态判断
+				if cooldown.Size == fullCdSize then
+					lockFps()
+				else
+					unlockFpsWithDelay()
+				end
+
+				-- 监听冷却变化
+				cooldown:GetPropertyChangedSignal("Size"):Connect(function()
+					if not isEnabled then return end
+					if cooldown.Size == fullCdSize then
+						if currentTask then
+							task.cancel(currentTask)
+							currentTask = nil
+						end
+						lockFps()
+					else
+						unlockFpsWithDelay()
+					end
+				end)
+			end
+		end)
+	end
 end)
 
--- ==================== 按钮事件 ====================
-toggleBtn.MouseButton1Click:Connect(function()
-    if flying then stopFly() else startFly() end
-end)
-
-fasterBtn.MouseButton1Click:Connect(function()
-    _G.FlySpeed = math.min(_G.FlySpeed + 10, 300); updateUI()
-end)
-
-slowerBtn.MouseButton1Click:Connect(function()
-    _G.FlySpeed = math.max(_G.FlySpeed - 10, 10); updateUI()
-end)
-
--- 键盘 F 开关飞行
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.F then
-        if flying then stopFly() else startFly() end
-    end
-end)
-
--- 角色重生时恢复飞行
-LocalPlayer.CharacterAdded:Connect(function(char)
-    if flying then
-        stopFly()
-        task.wait(0.8)
-        startFly()
-    end
-end)
-
--- ==================== 初始化 ====================
-updateUI()
-if _G.Fly then
-    task.spawn(function()
-        task.wait(1)
-        startFly()
-    end)
-end
-
-print("========== 飞行脚本已加载 ==========")
-print("  按 F 或点击 ON/OFF 开关飞行")
-print("  WASD = 移动 | Space = 上升 | Shift = 下降")
-print("  速度: " .. _G.FlySpeed)
-print("======================================")
+print("[Auto FPS Lock] 已加载 | Lock=12FPS | 平板兼容版")
+print("  降帧方法: " .. (setfpscap ~= nil and "setfpscap(12)" or "RenderStepped 空循环"))
+print("  关闭开关自动解锁 FPS")
