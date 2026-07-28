@@ -328,27 +328,119 @@ local function teleportTo(obj)
     end
 end
 
--- ==================== 自动通关: 检测下一关传送 ====================
--- 监听新生成物体 (某些游戏通关后才生成出口)
-local newSpawnedExits = {}
-Workspace.ChildAdded:Connect(function(child)
-    task.wait(0.3)
-    if matchKW(child.Name, nextLevelKw) then
-        table.insert(newSpawnedExits, child)
+-- ==================== 自动通关: 检测下一关传送 (The Mimic 优化) ====================
+-- The Mimic 关卡结构: Jealousy/Control/Revenge/Vengeful/Witch/Samurai 等章节
+-- 每章完成后在 Workspace 某处生成出口 Portal/Part/Region
+local nextLevelKw = {
+    "nextlevel","下一关","nextroom","next","elevator","电梯","exitdoor","出口",
+    "portal","传送门","loadzone","gateway","entrancedoor",
+    "finish","finishline","过关","clear","通关","complete","enddoor","winzone",
+    "escape","逃脱","leave","离开","endportal","finishportal",
+    "checkpoint","spawnpoint","lobby","return","back","returnlobby",
+    "chapter","chapter2","chapter3","book2","book3",
+    "jealousy","control","revenge","vengeful","witch","samurai","wrath","abandon",
+    "part2","phase2","stage2","levelend"
+}
+
+-- The Mimic 常用物件名
+local mimicExitNames = { "Exit", "Portal", "Teleport", "Finish", "End", "Leave", "Win", "Complete", "Next", "Lobby", "Return" }
+
+local function isExitObj(obj)
+    local name = obj.Name:lower()
+    local parent = obj.Parent
+    local parentName = parent and parent.Name:lower() or ""
+
+    -- 精确匹配 The Mimic 出口名
+    for _, en in ipairs(mimicExitNames) do
+        if name == en:lower() or parentName == en:lower() then return true end
     end
-    -- 也检查子物体
-    for _, obj in ipairs(child:GetDescendants()) do
-        if matchKW(obj.Name, nextLevelKw) then
-            table.insert(newSpawnedExits, obj)
+
+    -- 关键词匹配
+    if matchKW(obj.Name, nextLevelKw) then return true end
+    if matchKW(parentName, nextLevelKw) then return true end
+
+    -- 是 Part 且含碰撞触发器 (TouchInterest)
+    if obj:IsA("BasePart") then
+        if obj:FindFirstChildOfClass("TouchTransmitter") then return true end
+        -- 完全透明或非常高透明度 + 名字含出口含义
+        if obj.Transparency > 0.7 and (name:find("exit") or name:find("portal") or name:find("end") or name:find("finish") or parentName:find("exit") or parentName:find("portal")) then
+            return true
         end
+    end
+
+    -- ProximityPrompt 交互文本含出口含义
+    local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
+    if pp and pp.Enabled ~= false then
+        local txt = ((pp.ActionText or "") .. " " .. (pp.ObjectText or "")):lower()
+        if txt:find("enter") or txt:find("exit") or txt:find("next") or txt:find("leave")
+           or txt:find("进入") or txt:find("离开") or txt:find("下一") or txt:find("过关")
+           or txt:find("return") or txt:find("lobby") then
+            return true
+        end
+    end
+
+    -- 检查父级是否是出口模型
+    if parent then
+        local grandparent = parent.Parent
+        local gpName = grandparent and grandparent.Name:lower() or ""
+        if matchKW(parentName, nextLevelKw) or matchKW(gpName, nextLevelKw) then return true end
+    end
+
+    return false
+end
+
+-- 从所有可能的位置扫描出口 (不限 Workspace)
+local function scanAllExits()
+    local exits = {}
+    local seen = {}
+
+    local function scanRecursive(folder)
+        if not folder then return end
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("Model") or child:IsA("Folder") then
+                scanRecursive(child)
+            end
+            if not seen[child] and isExitObj(child) then
+                seen[child] = true
+                table.insert(exits, child)
+            end
+        end
+    end
+
+    -- 扫描 Workspace 所有子级 (包括 Map, Game, Level 等文件夹)
+    scanRecursive(Workspace)
+    -- 也扫描 ReplicatedStorage (部分游戏出口预制件在这里)
+    scanRecursive(ReplicatedStorage)
+
+    -- 按离玩家距离排序
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        table.sort(exits, function(a, b)
+            local pa = a:IsA("BasePart") and a or a:FindFirstChildWhichIsA("BasePart")
+            local pb = b:IsA("BasePart") and b or b:FindFirstChildWhichIsA("BasePart")
+            local da = pa and (pa.Position - root.Position).Magnitude or 99999
+            local db = pb and (pb.Position - root.Position).Magnitude or 99999
+            return da < db
+        end)
+    end
+
+    return exits
+end
+
+-- 监听新生成物体
+local newSpawnedExits = {}
+Workspace.DescendantAdded:Connect(function(child)
+    task.wait(0.2)
+    if isExitObj(child) then
+        table.insert(newSpawnedExits, child)
     end
 end)
 
 task.spawn(function()
-    while task.wait(0.3) do
+    while task.wait(0.5) do
         if not _G.Auto_NextLevel then continue end
 
-        -- 优先收集当前关卡物品
+        -- 优先收集物品
         if _G.Auto_Collect then
             local item = findNearest(function(o, pp, cd)
                 local p = o.Parent; if p and p:FindFirstChild("Humanoid") then return false end
@@ -360,79 +452,53 @@ task.spawn(function()
             end
         end
 
+        -- 自动开门
         if _G.Auto_OpenDoors then
-            local door = findNearest(function(o, pp, cd) return matchKW(o.Name, doorKw) end)
+            local door = findNearest(function(o) return matchKW(o.Name, doorKw) end)
             if door then
                 if _G.TargetObjective then teleportTo(door) end
                 interact(door)
             end
         end
 
-        -- 核心: 检测下一关入口 (多策略)
+        -- 核心: 找下一关出口
         local nextLevelObj = nil
 
-        -- 优先查新生成的物体
-        for _, obj in ipairs(newSpawnedExits) do
-            if obj and obj.Parent then nextLevelObj = obj; break end
-        end
-
-        if not nextLevelObj then
-            for _, obj in ipairs(getCachedDescendants()) do
-                local name = obj.Name:lower()
-                local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-
-                -- 匹配下一关关键词
-                if matchKW(obj.Name, nextLevelKw) then
-                    nextLevelObj = obj; break
-                end
-                -- 也匹配父级名
-                if matchKW(parentName, nextLevelKw) then
-                    nextLevelObj = obj; break
-                end
-
-                -- 门类 + 下一关提示
-                if matchKW(obj.Name, doorKw) then
-                    local surface = obj:FindFirstChildOfClass("SurfaceGui") or obj:FindFirstChildWhichIsA("BillboardGui")
-                    if surface then
-                        local tl = surface:FindFirstChildOfClass("TextLabel")
-                        if tl and matchKW(tl.Text, nextLevelKw) then nextLevelObj = obj; break end
-                    end
-                end
-
-                -- 透明或半透明 Part (可能是传送门)
-                if (name:find("teleport") or name:find("tp") or parentName:find("teleport") or parentName:find("tp") or name:find("portal") or name:find("传送")) then
-                    local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-                    if part then nextLevelObj = obj; break end
-                end
-
-                -- 带 ProximityPrompt 且 ActionText 含通过关键词
-                local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-                if pp and pp.Enabled ~= false then
-                    local txt = (pp.ActionText or ""):lower()
-                    local objTxt = (pp.ObjectText or ""):lower()
-                    if txt:find("enter") or txt:find("open") or txt:find("next") or txt:find("进入") or txt:find("下一")
-                       or objTxt:find("exit") or objTxt:find("leave") or objTxt:find("escape") then
-                        nextLevelObj = obj; break
-                    end
-                end
-
-                -- 检测 Region3/Trigger 类型物体 (碰撞触发传送)
-                if (name:find("trigger") or name:find("region") or name:find("finish") or name:find("end") or name:find("clear")) then
-                    if obj:IsA("BasePart") and obj.Transparency > 0.5 then
-                        nextLevelObj = obj; break
-                    end
-                end
+        -- 优先查新生成物体
+        for i, obj in ipairs(newSpawnedExits) do
+            if obj and obj.Parent then
+                nextLevelObj = obj
+                table.remove(newSpawnedExits, i)
+                break
             end
         end
 
+        -- 全量扫描出口
+        if not nextLevelObj then
+            local exits = scanAllExits()
+            if #exits > 0 then nextLevelObj = exits[1] end
+        end
+
         if nextLevelObj then
-            -- 传送到下一关入口并交互
-            teleportTo(nextLevelObj)
+            print("[通关] 找到下一关入口: " .. nextLevelObj:GetFullName() .. " | 传送中...")
+            -- 多点传送 (对出口区域上下左右都试试)
+            local part = nextLevelObj:IsA("BasePart") and nextLevelObj or nextLevelObj:FindFirstChildWhichIsA("BasePart")
+            if part and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                -- 尝试多个位置
+                local positions = {
+                    part.CFrame + Vector3.new(0, 3, 0),
+                    part.CFrame + Vector3.new(0, 5, -3),
+                    part.CFrame + Vector3.new(0, 3, 3),
+                    part.Position + Vector3.new(0, 5, 0),
+                }
+                for _, cf in ipairs(positions) do
+                    hrp.CFrame = cf
+                    interact(nextLevelObj)
+                    task.wait(0.15)
+                end
+            end
             interact(nextLevelObj)
-            task.wait(0.5)
-            interact(nextLevelObj)
-            -- 清理已用的出口记录
-            newSpawnedExits = {}
         end
     end
 end)
