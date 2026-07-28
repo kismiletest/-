@@ -10,10 +10,7 @@ local Camera = Workspace.CurrentCamera
 
 -- 全局变量
 _G.ESP_Players = _G.ESP_Players ~= false
-_G.ESP_Items = _G.ESP_Items ~= false
-_G.ESP_Doors = _G.ESP_Doors ~= false
 _G.ESP_Monsters = _G.ESP_Monsters ~= false
-_G.ESP_Keys = _G.ESP_Keys ~= false
 _G.Auto_Collect = _G.Auto_Collect or false
 _G.Auto_OpenDoors = _G.Auto_OpenDoors or false
 _G.Auto_Interact = _G.Auto_Interact or false
@@ -51,13 +48,9 @@ if WindUI then
     ESPTab:Toggle({ Title = "玩家透视", Value = _G.ESP_Players, Callback = function(v) _G.ESP_Players = v end })
     ESPTab:Toggle({ Title = "显示名字", Value = true, Callback = function(v) _G.ShowPlayerNames = v end })
     ESPTab:Toggle({ Title = "显示距离", Value = true, Callback = function(v) _G.ShowDistance = v end })
-    ESPTab:Toggle({ Title = "显示血量", Value = true, Callback = function(v) _G.ShowHealth = v end })
-    ESPTab:Slider({ Title = "ESp最大距离", Value = { Min = 50, Max = 2000, Default = _G.ESP_MaxDistance }, Callback = function(v) _G.ESP_MaxDistance = v end })
+    ESPTab:Slider({ Title = "ESP最大距离", Value = { Min = 50, Max = 2000, Default = _G.ESP_MaxDistance }, Callback = function(v) _G.ESP_MaxDistance = v end })
 
-    ESPTab:Section({ Title = "物体透视" })
-    ESPTab:Toggle({ Title = "物品透视", Value = _G.ESP_Items, Callback = function(v) _G.ESP_Items = v end })
-    ESPTab:Toggle({ Title = "钥匙透视", Value = _G.ESP_Keys, Callback = function(v) _G.ESP_Keys = v end })
-    ESPTab:Toggle({ Title = "门透视", Value = _G.ESP_Doors, Callback = function(v) _G.ESP_Doors = v end })
+    ESPTab:Section({ Title = "怪物透视" })
     ESPTab:Toggle({ Title = "怪物透视", Value = _G.ESP_Monsters, Callback = function(v) _G.ESP_Monsters = v end })
     ESPTab:Toggle({ Title = "追踪线", Value = _G.ShowTracers, Callback = function(v) _G.ShowTracers = v end })
 
@@ -99,14 +92,80 @@ task.spawn(function() while task.wait(0.15) do
     end
 end end)
 
-LocalPlayer.CharacterAdded:Connect(function() task.wait(0.5); updateSpeed() end)
+-- ==================== 持续加速 (Heartbeat 强制覆写) ====================
+task.spawn(function()
+    RunService.Heartbeat:Connect(function()
+        if _G.SpeedEnabled and LocalPlayer.Character then
+            local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+            if hum and hum.WalkSpeed ~= _G.SpeedHack then
+                hum.WalkSpeed = _G.SpeedHack
+            end
+        end
+    end)
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    if _G.SpeedEnabled then updateSpeed() end
+    if _G.Fullbright then updateFullbright() end
+end)
 
 -- ==================== 关键词匹配 ====================
 local itemKw = { "key", "钥匙","gatekey","lockpick","card","rustykey","goldenkey","silverkey","masterkey","keycard" }
 local doorKw = { "door","门","gate","exit","entrance","portal","next","下一","level","关卡","room","房间" }
-local monsterKw = { "monster","怪物","enemy","killer","ghost","鬼","spider","zombie","slend","granny","neighbor","piggy","huggy","bendy","chase" }
-local itemNames = { "battery","电池","fuel","燃料","fuse","保险丝","plank","木板","gear","齿轮","wrench","screw","tool","cog","lever","拉杆","handle","valve","阀门","note","纸条","tape","磁带","flashlight","手电","med","pill","bandage","hammer","spawn" }
-local nextLevelKw = { "nextlevel","下一关","nextroom","elevator","电梯","exitdoor","出口","portal","传送门","loadzone","nextleveldoor","level2","level3","gateway","entrancedoor" }
+-- ==================== 怪物检测 (遍历所有非玩家 Humanoid) ====================
+local monsterKw = { "monster","怪物","enemy","killer","ghost","鬼","spider","zombie","huggy","bendy","chase",
+    "mimic","模仿","jealous","revenge","vengeful"," wrath","witch","samurai","control",
+    "slend","granny","piggy","mother","father","grandpa","grandma","teacher",
+    "abandon","creature","demon","devil","shadow","siren","banshee","phantom","entity",
+    "figure","seek","rush","ambush","halt","eyes","screech","dupe","giggle","timothy",
+    "hide","snare","a-60","a-90","a-120","blitz","john","doe","狼","蛇","虫","蜘蛛","鲨",
+    "scary","horror","mutant","infection","infected","pursuer","hunter","stalker" }
+local nextLevelKw = { "nextlevel","下一关","nextroom","elevator","电梯","exitdoor","出口","portal",
+    "传送门","loadzone","nextleveldoor","level2","level3","gateway","entrancedoor",
+    "finish","过关","clear","通关","complete","enddoor","winzone","escape","逃脱" }
+
+-- 获取所有怪物模型 (带 Humanoid 的非玩家 Character)
+local function getMonsterModels()
+    local monsters = {}
+    local seen = {}
+    -- 优先查 Enemy/Monster/NPC 文件夹
+    local function scanFolder(folder)
+        if not folder then return end
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("Model") and not seen[child] then
+                seen[child] = true
+                local hum = child:FindFirstChildOfClass("Humanoid") or child:FindFirstChild("Humanoid")
+                local root = child:FindFirstChild("HumanoidRootPart")
+                if hum and hum.Health > 0 and root then
+                    local isPlayer = Players:GetPlayerFromCharacter(child)
+                    if not isPlayer then
+                        table.insert(monsters, {model = child, hum = hum, root = root})
+                    end
+                end
+            end
+        end
+    end
+    scanFolder(Workspace:FindFirstChild("Enemies"))
+    scanFolder(Workspace:FindFirstChild("Enemy"))
+    scanFolder(Workspace:FindFirstChild("NPCs"))
+    scanFolder(Workspace:FindFirstChild("Monsters"))
+    scanFolder(Workspace:FindFirstChild("Monster"))
+    scanFolder(Workspace:FindFirstChild("Spawned"))
+    scanFolder(Workspace:FindFirstChild("Mobs"))
+    scanFolder(Workspace:FindFirstChild("Live"))
+    scanFolder(Workspace:FindFirstChild("Characters")) -- 有些游戏把怪物放这里
+    scanFolder(Workspace) -- 兜底扫描 Workspace 顶层
+    return monsters
+end
+
+-- 是否是模仿者特定怪物
+local function isMimicType(name)
+    name = name:lower()
+    return name:find("mimic") or name:find("模仿") or name:find("jealous") or name:find("revenge")
+        or name:find("vengeful") or name:find("control") or name:find("witch")
+        or name:find("samurai") or name:find("wrath") or name:find("abandon")
+end
 local function matchKW(name, kwList)
     name = name:lower()
     for _, kw in ipairs(kwList) do if name:find(kw) then return true end end
@@ -186,7 +245,6 @@ task.spawn(function()
                 local parts = {}
                 if _G.ShowPlayerNames then parts[#parts+1] = player.Name end
                 if _G.ShowDistance and myPos then parts[#parts+1] = " " .. math.floor((root.Position - myPos).Magnitude) .. "m" end
-                if _G.ShowHealth then parts[#parts+1] = " " .. math.floor(hum.Health/hum.MaxHealth*100) .. "%" end
 
                 local txt = getESPText(); if not txt then break end
                 txt.Text = table.concat(parts); txt.Color = Color3.fromRGB(255,255,0)
@@ -199,38 +257,33 @@ task.spawn(function()
             end
         end
 
-        -- 物体 ESP
-        local typeCfgs = {
-            {"items", _G.ESP_Items, function(o) return matchKW(o.Name, itemNames) or o:FindFirstChildWhichIsA("ProximityPrompt") or o:FindFirstChildWhichIsA("ClickDetector") end, Color3.fromRGB(0,255,100)},
-            {"keys", _G.ESP_Keys, function(o) return matchKW(o.Name, itemKw) end, Color3.fromRGB(255,215,0)},
-            {"doors", _G.ESP_Doors, function(o) return matchKW(o.Name, doorKw) end, Color3.fromRGB(0,180,255)},
-            {"monsters", _G.ESP_Monsters, function(o) return matchKW(o.Name, monsterKw) end, Color3.fromRGB(255,60,60)},
-        }
-
-        local objects = getCachedDescendants()
-        for _, cfg in ipairs(typeCfgs) do
-            if not cfg[2] or espCount >= ESP_LIMIT then break end
-            for _, obj in ipairs(objects) do
+        -- 怪物 ESP (直接扫描 Humanoid 模型)
+        if _G.ESP_Monsters and espCount < ESP_LIMIT then
+            for _, m in ipairs(getMonsterModels()) do
                 if espCount >= ESP_LIMIT then break end
-                if not cfg[3](obj) then continue end
+                if myPos and (m.root.Position - myPos).Magnitude > maxDist then continue end
 
-                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-                if not part then continue end
-                if myPos and (part.Position - myPos).Magnitude > maxDist then continue end
-
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                local head = m.model:FindFirstChild("Head")
+                local pos, onScreen
+                if head then
+                    pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                else
+                    pos, onScreen = Camera:WorldToViewportPoint(m.root.Position + Vector3.new(0,3,0))
+                end
                 if not onScreen then continue end
 
-                local label = obj.Name
-                if cfg[1] == "keys" then label = "[钥匙] " .. label end
-                if obj:FindFirstChildWhichIsA("ProximityPrompt") then label = "[E] " .. label end
+                local healthPercent = math.floor(m.hum.Health / m.hum.MaxHealth * 100)
+                local tag = "[怪物] "
+                if isMimicType(m.model.Name) then tag = "[模仿者] " end
+                local label = tag .. m.model.Name .. " " .. healthPercent .. "%"
 
                 local txt = getESPText(); if not txt then break end
-                txt.Text = label; txt.Color = cfg[4]; txt.Position = Vector2.new(pos.X, pos.Y); txt.Visible = true
+                txt.Text = label; txt.Color = Color3.fromRGB(255,60,60)
+                txt.Position = Vector2.new(pos.X, pos.Y); txt.Visible = true
                 espCount = espCount + 1
 
                 if showTracers then
-                    local tr = getTracer(); tr.Color = cfg[4]
+                    local tr = getTracer(); tr.Color = Color3.fromRGB(255,60,60)
                     tr.From = screenCenter; tr.To = Vector2.new(pos.X, pos.Y); tr.Visible = true
                 end
             end
@@ -276,6 +329,21 @@ local function teleportTo(obj)
 end
 
 -- ==================== 自动通关: 检测下一关传送 ====================
+-- 监听新生成物体 (某些游戏通关后才生成出口)
+local newSpawnedExits = {}
+Workspace.ChildAdded:Connect(function(child)
+    task.wait(0.3)
+    if matchKW(child.Name, nextLevelKw) then
+        table.insert(newSpawnedExits, child)
+    end
+    -- 也检查子物体
+    for _, obj in ipairs(child:GetDescendants()) do
+        if matchKW(obj.Name, nextLevelKw) then
+            table.insert(newSpawnedExits, obj)
+        end
+    end
+end)
+
 task.spawn(function()
     while task.wait(0.3) do
         if not _G.Auto_NextLevel then continue end
@@ -300,34 +368,59 @@ task.spawn(function()
             end
         end
 
-        -- 核心: 检测下一关入口
+        -- 核心: 检测下一关入口 (多策略)
         local nextLevelObj = nil
-        for _, obj in ipairs(getCachedDescendants()) do
-            local name = obj.Name:lower()
-            -- 匹配下一关关键词
-            if matchKW(obj.Name, nextLevelKw) then
-                nextLevelObj = obj
-                break
-            end
-            -- 门类 + 下一关提示
-            if matchKW(obj.Name, doorKw) then
-                local surface = obj:FindFirstChildOfClass("SurfaceGui") or obj:FindFirstChildWhichIsA("BillboardGui")
-                if surface then
-                    local tl = surface:FindFirstChildOfClass("TextLabel")
-                    if tl and matchKW(tl.Text, nextLevelKw) then nextLevelObj = obj; break end
-                end
-            end
-            -- Portal / Teleporter 检测
-            if name:find("teleport") or name:find("tp") or name:find("portal") or name:find("传送") then
-                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-                if part and part.Transparency < 1 then nextLevelObj = obj; break end
-            end
-            -- 带 ProximityPrompt 的目标门
-            local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-            if pp and pp.Enabled ~= false then
-                local txt = pp.ActionText:lower() or ""
-                if txt:find("enter") or txt:find("open") or txt:find("next") or txt:find("进入") or txt:find("下一") then
+
+        -- 优先查新生成的物体
+        for _, obj in ipairs(newSpawnedExits) do
+            if obj and obj.Parent then nextLevelObj = obj; break end
+        end
+
+        if not nextLevelObj then
+            for _, obj in ipairs(getCachedDescendants()) do
+                local name = obj.Name:lower()
+                local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+
+                -- 匹配下一关关键词
+                if matchKW(obj.Name, nextLevelKw) then
                     nextLevelObj = obj; break
+                end
+                -- 也匹配父级名
+                if matchKW(parentName, nextLevelKw) then
+                    nextLevelObj = obj; break
+                end
+
+                -- 门类 + 下一关提示
+                if matchKW(obj.Name, doorKw) then
+                    local surface = obj:FindFirstChildOfClass("SurfaceGui") or obj:FindFirstChildWhichIsA("BillboardGui")
+                    if surface then
+                        local tl = surface:FindFirstChildOfClass("TextLabel")
+                        if tl and matchKW(tl.Text, nextLevelKw) then nextLevelObj = obj; break end
+                    end
+                end
+
+                -- 透明或半透明 Part (可能是传送门)
+                if (name:find("teleport") or name:find("tp") or parentName:find("teleport") or parentName:find("tp") or name:find("portal") or name:find("传送")) then
+                    local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
+                    if part then nextLevelObj = obj; break end
+                end
+
+                -- 带 ProximityPrompt 且 ActionText 含通过关键词
+                local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
+                if pp and pp.Enabled ~= false then
+                    local txt = (pp.ActionText or ""):lower()
+                    local objTxt = (pp.ObjectText or ""):lower()
+                    if txt:find("enter") or txt:find("open") or txt:find("next") or txt:find("进入") or txt:find("下一")
+                       or objTxt:find("exit") or objTxt:find("leave") or objTxt:find("escape") then
+                        nextLevelObj = obj; break
+                    end
+                end
+
+                -- 检测 Region3/Trigger 类型物体 (碰撞触发传送)
+                if (name:find("trigger") or name:find("region") or name:find("finish") or name:find("end") or name:find("clear")) then
+                    if obj:IsA("BasePart") and obj.Transparency > 0.5 then
+                        nextLevelObj = obj; break
+                    end
                 end
             end
         end
@@ -338,6 +431,8 @@ task.spawn(function()
             interact(nextLevelObj)
             task.wait(0.5)
             interact(nextLevelObj)
+            -- 清理已用的出口记录
+            newSpawnedExits = {}
         end
     end
 end)
