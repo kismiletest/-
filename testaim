@@ -1,290 +1,214 @@
--- ==================== Blox Fruits 自动攻击核心 ====================
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
+-- ==================== Anime Expeditions x100 运气 ====================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local Heartbeat = RunService.Heartbeat
 
--- ==================== 全局变量 ====================
-_G.FastAttack = _G.FastAttack ~= true
-_G.FastAttackDelay = _G.FastAttackDelay or 0.15
-_G.AttackMobs = _G.AttackMobs ~= true
-_G.AttackPlayers = _G.AttackPlayers ~= true
-_G.FruitM1 = _G.FruitM1 or false
-_G.GunM1 = _G.GunM1 or false
-_G.AutoBuso = _G.AutoBuso or false
-_G.KillAuraRange = _G.KillAuraRange or 350
-_G.AttackPart = _G.AttackPart or "HumanoidRootPart"
+-- ==================== 全局状态 ====================
+_G.X100Luck = _G.X100Luck or false
+_G.LuckMultiplier = _G.LuckMultiplier or 100
+_G.RemoteSpy = _G.RemoteSpy or false
+_G.AutoSummon = _G.AutoSummon or false
 
--- ==================== 工具函数 ====================
-local function isValidTarget(model)
-    if not model then return false end
-    if model == LocalPlayer.Character then return false end
-    local hum = model:FindFirstChildOfClass("Humanoid") or model:FindFirstChild("Humanoid")
-    local root = model:FindFirstChild("HumanoidRootPart")
-    return hum and root and hum.Health > 0
+-- ==================== WindUI ====================
+local WindUI
+pcall(function()
+    WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+end)
+if WindUI then
+    local Window = WindUI:CreateWindow({
+        Title = "Anime Expeditions",
+        Icon = "", Author = "kiyo", Folder = "WindUI",
+        Size = UDim2.fromOffset(460, 360), Transparent = true, Theme = "Dark",
+        Acrylic = false, HideSearchBar = false, SideBarWidth = 170, ToggleKey = Enum.KeyCode.G,
+    })
+    local MainTab = Window:Tab({ Title = "幸运 & 抽卡", Icon = "star" })
+    local InfoTab = Window:Tab({ Title = "Remote 日志", Icon = "list" })
+
+    MainTab:Section({ Title = "幸运倍率" })
+    MainTab:Toggle({ Title = "x100 幸运", Value = _G.X100Luck, Callback = function(v) _G.X100Luck = v end })
+    MainTab:Slider({ Title = "倍率", Value = { Min = 10, Max = 1000, Default = _G.LuckMultiplier }, Callback = function(v) _G.LuckMultiplier = v end })
+    MainTab:Toggle({ Title = "自动抽卡", Value = _G.AutoSummon, Callback = function(v) _G.AutoSummon = v end })
+
+    InfoTab:Section({ Title = "调试" })
+    InfoTab:Toggle({ Title = "Remote 监控 (控制台输出)", Value = _G.RemoteSpy, Callback = function(v) _G.RemoteSpy = v end })
+    InfoTab:Button({ Title = "手动打印所有 Remote", Callback = function() printAllRemotes() end })
 end
 
-local function isAlly(player)
-    if not player or not player.Team or not LocalPlayer.Team then return false end
-    return player.Team == LocalPlayer.Team
+-- ==================== Remote 扫描 ====================
+local summonRemotes = {}
+local function scanForSummonRemotes()
+    summonRemotes = {}
+    local summonKeywords = { "summon", "roll", "pull", "spin", "gacha", "luck", "banner", "wish", "召唤", "抽卡", "抽取", "许愿" }
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") or obj:IsA("BindableEvent") or obj:IsA("BindableFunction") then
+            local name = obj.Name:lower()
+            local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+            local fullPath = obj:GetFullName():lower()
+            for _, kw in ipairs(summonKeywords) do
+                if name:find(kw) or parentName:find(kw) or fullPath:find(kw) then
+                    table.insert(summonRemotes, { obj = obj, name = obj.Name, path = obj:GetFullName(), type = obj.ClassName })
+                    break
+                end
+            end
+        end
+    end
+    table.sort(summonRemotes, function(a, b) return a.path < b.path end)
 end
 
-local function getAttackPart(target)
-    return target:FindFirstChild(_G.AttackPart) or target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Head") or target:FindFirstChild("Torso")
+function printAllRemotes()
+    scanForSummonRemotes()
+    print("========== 抽卡相关 Remote ==========")
+    if #summonRemotes == 0 then
+        print("  未找到抽卡 Remote, 开启 Remote 监控后手动抽一次卡试试")
+        print("  提示: 检查 ReplicatedStorage 中 Remotes/Events/Functions 文件夹")
+        print("  常见名字: Summon, Roll, Pull, Spin, Gacha, Banner, Wish")
+    else
+        for i, r in ipairs(summonRemotes) do
+            print("  [" .. i .. "] " .. r.type .. " | " .. r.path)
+        end
+    end
+    print("======================================")
 end
 
-local function getNearbyTargets()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return {} end
+scanForSummonRemotes()
+task.spawn(function() task.wait(3); printAllRemotes() end)
 
-    local targets = {}
-    local myPos = root.Position
-    local range = _G.KillAuraRange
+-- ==================== __namecall 拦截 (x100 幸运核心) ====================
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
 
-    if _G.AttackMobs then
-        for _, folderName in ipairs({"Enemies", "Enemy", "NPCs", "Mobs"}) do
-            local folder = Workspace:FindFirstChild(folderName)
-            if folder then
-                for _, model in ipairs(folder:GetChildren()) do
-                    if isValidTarget(model) then
-                        local part = getAttackPart(model)
-                        if part and (part.Position - myPos).Magnitude <= range then
-                            table.insert(targets, {model, part})
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    -- Remote 监控 (可选)
+    if _G.RemoteSpy and (method == "FireServer" or method == "InvokeServer") then
+        local argPreview = {}
+        for i, v in ipairs(args) do
+            if i > 5 then argPreview[#argPreview + 1] = "..."; break end
+            if typeof(v) == "table" then
+                argPreview[#argPreview + 1] = "table[" .. #v .. "]"
+            elseif typeof(v) == "string" then
+                argPreview[#argPreview + 1] = '"' .. v .. '"'
+            elseif typeof(v) == "number" then
+                argPreview[#argPreview + 1] = tostring(v)
+            else
+                argPreview[#argPreview + 1] = typeof(v)
+            end
+        end
+        print("[Remote] " .. tostring(self) .. " > " .. method .. "(" .. table.concat(argPreview, ", ") .. ")")
+    end
+
+    -- x100 幸运逻辑: 修改召唤参数中的倍率
+    if _G.X100Luck and (method == "FireServer" or method == "InvokeServer") then
+        -- 检查是否是目标 Remote
+        local isSummon = false
+        for _, r in ipairs(summonRemotes) do
+            if self == r.obj then isSummon = true; break end
+        end
+
+        -- 如果精准匹配到了召唤 Remote
+        if isSummon then
+            local newArgs = {}
+            for i, v in ipairs(args) do
+                -- 找到倍率/luck 参数并乘上倍率
+                if typeof(v) == "number" and (v < 1000) then
+                    -- 小数值可能是 luck/bonus 参数
+                    newArgs[i] = v * _G.LuckMultiplier
+                elseif typeof(v) == "table" and v.luck then
+                    -- 如果参数是 table 且有 luck 字段
+                    local t = {}
+                    for k, val in pairs(v) do
+                        if k == "luck" or k == "multiplier" or k == "bonus" then
+                            t[k] = val * _G.LuckMultiplier
+                        else
+                            t[k] = val
                         end
                     end
+                    newArgs[i] = t
+                else
+                    newArgs[i] = v
                 end
             end
+
+            print("[x" .. _G.LuckMultiplier .. " 幸运] 修改发包: " .. tostring(self))
+            return oldNamecall(self, unpack(newArgs))
         end
     end
 
-    if _G.AttackPlayers then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                if not isAlly(player) and isValidTarget(player.Character) then
-                    local part = getAttackPart(player.Character)
-                    if part and (part.Position - myPos).Magnitude <= range then
-                        table.insert(targets, {player.Character, part})
+    -- 泛用拦截: 如果第一个参数是数字且疑似倍率(小数值)
+    if _G.X100Luck and not next(summonRemotes) and (method == "FireServer" or method == "InvokeServer") then
+        local selfName = tostring(self):lower()
+        if selfName:find("summon") or selfName:find("roll") or selfName:find("pull") or selfName:find("spin") or selfName:find("gacha") then
+            local newArgs = {}
+            for i, v in ipairs(args) do
+                if typeof(v) == "number" then
+                    newArgs[i] = v * _G.LuckMultiplier
+                else
+                    newArgs[i] = v
+                end
+            end
+            return oldNamecall(self, unpack(newArgs))
+        end
+    end
+
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+-- ==================== 自动抽卡 ====================
+task.spawn(function()
+    while task.wait(2) do
+        if not _G.AutoSummon then continue end
+
+        -- 找 ProximityPrompt 中的抽卡按钮
+        local found = false
+        pcall(function()
+            local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+            if not playerGui then return end
+            for _, obj in ipairs(playerGui:GetDescendants()) do
+                if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                    local name = obj.Name:lower()
+                    local text = (obj:IsA("TextButton") and obj.Text or ""):lower()
+                    if name:find("summon") or name:find("roll") or name:find("pull") or name:find("spin")
+                       or text:find("summon") or text:find("roll") or text:find("pull") or text:find("召唤") then
+                        -- 模拟点击
+                        local guiService = game:GetService("GuiService")
+                        guiService.SelectedObject = obj
+                        pcall(function()
+                            local clicks = {
+                                Enum.UserInputType.MouseButton1,
+                                Enum.UserInputType.Touch,
+                            }
+                            for _, inputType in ipairs(clicks) do
+                                game:GetService("VirtualInputManager"):SendMouseButtonEvent(
+                                    obj.AbsolutePosition.X + obj.AbsoluteSize.X / 2,
+                                    obj.AbsolutePosition.Y + obj.AbsoluteSize.Y / 2,
+                                    0, true, game, inputType
+                                )
+                                task.wait(0.05)
+                                game:GetService("VirtualInputManager"):SendMouseButtonEvent(
+                                    obj.AbsolutePosition.X + obj.AbsoluteSize.X / 2,
+                                    obj.AbsolutePosition.Y + obj.AbsoluteSize.Y / 2,
+                                    0, false, game, inputType
+                                )
+                            end
+                        end)
+                        found = true
+                        break
                     end
                 end
             end
-        end
-    end
-
-    return targets
-end
-
--- ==================== 远程引用缓存 ====================
-local Net, RegisterAttack, RegisterHit, CommF, CommE
-
-local function initRemotes()
-    if Net then return true end
-    local modules = ReplicatedStorage:FindFirstChild("Modules")
-    Net = modules and modules:FindFirstChild("Net")
-    if Net then
-        RegisterAttack = Net:FindFirstChild("RE/RegisterAttack") or Net:FindFirstChild("RegisterAttack")
-        RegisterHit = Net:FindFirstChild("RE/RegisterHit") or Net:FindFirstChild("RegisterHit")
-    end
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if remotes then
-        CommF = remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF")
-        CommE = remotes:FindFirstChild("CommE") or remotes:FindFirstChild("CommE")
-    end
-    return Net and RegisterAttack and RegisterHit
-end
-
--- ==================== 快速攻击 (M1 近战) ====================
-local lastM1Attack = 0
-task.spawn(function()
-    while task.wait() do
-        if not _G.FastAttack then continue end
-        if not _G.AttackMobs and not _G.AttackPlayers then continue end
-
-        local char = LocalPlayer.Character
-        if not char or not isValidTarget(char) then continue end
-
-        -- 枪模式跳过 M1
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool and tool.ToolTip == "Gun" then continue end
-
-        local targets = getNearbyTargets()
-        if #targets == 0 then continue end
-
-        -- 节流
-        local elapsed = tick() - lastM1Attack
-        local minDelay = _G.FastAttackDelay
-        if elapsed < minDelay then
-            task.wait(minDelay - elapsed)
-        end
-
-        if not initRemotes() then continue end
-
-        local mainTarget = targets[1]
-        local hitList = {}
-        for _, t in ipairs(targets) do
-            table.insert(hitList, {t[1], t[2]})
-        end
-
-        pcall(function()
-            RegisterAttack:FireServer(0.3)
-            RegisterHit:FireServer(mainTarget[2], hitList)
         end)
 
-        lastM1Attack = tick()
-    end
-end)
-
--- ==================== 果实 M1 ====================
-task.spawn(function()
-    local function getFruitTool()
-        local char = LocalPlayer.Character
-        if char then
-            for _, tool in ipairs(char:GetChildren()) do
-                if tool:IsA("Tool") and tool.ToolTip == "Blox Fruit" then return tool end
-            end
-        end
-        local bp = LocalPlayer:FindFirstChild("Backpack")
-        if bp then
-            for _, tool in ipairs(bp:GetChildren()) do
-                if tool:IsA("Tool") and tool.ToolTip == "Blox Fruit" then return tool end
-            end
-        end
-    end
-
-    while task.wait(0.12) do
-        if not _G.FruitM1 then continue end
-        if not _G.AttackMobs and not _G.AttackPlayers then continue end
-
-        pcall(function()
-            local fruit = getFruitTool()
-            if not fruit then return end
-            local remote = fruit:FindFirstChild("LeftClickRemote")
-            if not remote then return end
-
-            local char = LocalPlayer.Character
-            local myHRP = char and char:FindFirstChild("HumanoidRootPart")
-            if not myHRP then return end
-
-            local targets = getNearbyTargets()
-            for _, t in ipairs(targets) do
-                local dir = (t[2].Position - myHRP.Position).Unit
-                remote:FireServer(Vector3.new(dir.X, dir.Y, dir.Z), 1, true)
-            end
-        end)
-    end
-end)
-
--- ==================== 枪械 M1 ====================
-task.spawn(function()
-    local ShootGunEvent, Validator2
-
-    local function initGunRemotes()
-        if ShootGunEvent then return true end
-        local modules = ReplicatedStorage:FindFirstChild("Modules")
-        local dragonNet = modules and modules:WaitForChild("Net")
-        if dragonNet then
-            ShootGunEvent = dragonNet:FindFirstChild("RE/ShootGunEvent")
-        end
-        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-        if remotes then
-            Validator2 = remotes:FindFirstChild("Validator2")
-        end
-        return ShootGunEvent and Validator2
-    end
-
-    -- 过验证器
-    local ShootFunction
-    local function getValidator()
-        if not ShootFunction then
-            local ok, controller = pcall(require, ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("CombatController"))
-            if ok and controller and controller.Attack then
-                ShootFunction = debug.getupvalue(controller.Attack, 9)
-            end
-        end
-        if not ShootFunction then return 0, 0 end
-        local upvals = debug.getupvalues(ShootFunction)
-        if not upvals then return 0, 0 end
-        -- 标准 upvalue 索引 (可能因更新变动)
-        local idx = {21, 22, 23, 24, 25, 26, 27}
-        for i = 1, 10 do
-            if upvals[i] == 727595 then
-                local o = i - 15
-                idx = {12+o, 13+o, 16+o, 17+o, 14+o, 12+o, 18+o}
-                break
-            end
-        end
-        local v1, v2, v3, v4, v5, v6, v7 = upvals[15], upvals[13], upvals[16], upvals[17], upvals[14], upvals[12], upvals[18]
-        if not v1 then return 0, 0 end
-        local v8 = v6 * v2
-        local v9 = (v5 * v2 + v6 * v1) % v3
-        v9 = (v9 * v3 + v8) % v4
-        v5 = math.floor(v9 / v3); v6 = v9 - v5 * v3; v7 = v7 + 1
-        debug.setupvalue(ShootFunction, 14, v5); debug.setupvalue(ShootFunction, 12, v6); debug.setupvalue(ShootFunction, 18, v7)
-        return math.floor(v9 / v4 * 16777215), v7
-    end
-
-    while task.wait(0.085) do
-        if not _G.GunM1 then continue end
-        if not initGunRemotes() then continue end
-
-        pcall(function()
-            local char = LocalPlayer.Character
-            local tool = char and char:FindFirstChildOfClass("Tool")
-            if not tool or tool.ToolTip ~= "Gun" then return end
-
-            local targets = getNearbyTargets()
-            if #targets == 0 then return end
-
-            local valCode, valCount = getValidator()
-            if valCode ~= 0 then Validator2:FireServer(valCode, valCount) end
-
-            tool:SetAttribute("LocalOverheat", 0)
-            tool:SetAttribute("LocalTotalShots", (tool:GetAttribute("LocalTotalShots") or 0) + 1)
-
-            local targetPos = targets[1][2].Position
-            ShootGunEvent:FireServer(targetPos, { targets[1][2] })
-        end)
-    end
-end)
-
--- ==================== 自动武装色 ====================
-task.spawn(function()
-    while task.wait(2) do
-        if not _G.AutoBuso then continue end
-        if not CommF then initRemotes() end
-        if not CommF then continue end
-        local char = LocalPlayer.Character
-        if char and not char:FindFirstChild("HasBuso") then
-            pcall(function() CommF:InvokeServer("Buso") end)
-        end
-    end
-end)
-
--- ==================== 锁定目标 (瞄准最近) ====================
-RunService.RenderStepped:Connect(function()
-    if not (_G.FastAttack or _G.FruitM1 or _G.GunM1) then return end
-    local targets = getNearbyTargets()
-    if #targets > 0 then
-        LocalPlayer:GetMouse().Target = targets[1][2]
-        LocalPlayer:GetMouse().TargetFilter = targets[1][1]
-    end
-end)
-
--- ==================== 物品/奖励收集 ====================
-task.spawn(function()
-    while task.wait(0.5) do
-        if not _G.AutoCollect or not _G.AttackMobs then continue end
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then continue end
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj.Name == "Item" or obj.Name == "Chest" then
-                local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-                if pp and pp.Enabled ~= false and part and (part.Position - root.Position).Magnitude < 50 then
-                    fireproximityprompt(pp)
+        if not found then
+            -- 如果没有找到 UI 按钮，尝试遍历所有召唤 Remote 发包
+            for _, r in ipairs(summonRemotes) do
+                if r.obj:IsA("RemoteEvent") then
+                    pcall(function() r.obj:FireServer() end)
+                elseif r.obj:IsA("RemoteFunction") then
+                    pcall(function() r.obj:InvokeServer() end)
                 end
             end
         end
@@ -293,11 +217,16 @@ end)
 
 -- ==================== 通知 ====================
 task.spawn(function()
-    task.wait(1)
-    print("=" .. string.rep("=", 40))
-    print("  Blox Fruits 攻击核心 已加载")
-    print("  _G.FastAttack = " .. tostring(_G.FastAttack))
-    print("  _G.FruitM1 = " .. tostring(_G.FruitM1))
-    print("  _G.GunM1 = " .. tostring(_G.GunM1))
-    print("=" .. string.rep("=", 40))
+    task.wait(2)
+    print("=" .. string.rep("=", 45))
+    print("  Anime Expeditions x100 运气 已加载")
+    print("  _G.X100Luck = " .. tostring(_G.X100Luck))
+    print("  _G.LuckMultiplier = x" .. _G.LuckMultiplier)
+    print("  找到 " .. #summonRemotes .. " 个抽卡 Remote")
+    if WindUI then
+        print("  按 G 打开 GUI 面板")
+    else
+        print("  控制台控制: _G.X100Luck / _G.RemoteSpy")
+    end
+    print("=" .. string.rep("=", 45))
 end)
