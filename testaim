@@ -1,539 +1,303 @@
--- ==================== 恐怖游戏透视自动通关 (优化版) ====================
+-- ==================== Blox Fruits 自动攻击核心 ====================
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local UIS = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local Heartbeat = RunService.Heartbeat
 
--- 全局变量
-_G.ESP_Players = _G.ESP_Players ~= false
-_G.ESP_Monsters = _G.ESP_Monsters ~= false
-_G.Auto_Collect = _G.Auto_Collect or false
-_G.Auto_OpenDoors = _G.Auto_OpenDoors or false
-_G.Auto_Interact = _G.Auto_Interact or false
-_G.Auto_NextLevel = _G.Auto_NextLevel or false
-_G.SpeedHack = _G.SpeedHack or 16
-_G.SpeedEnabled = _G.SpeedEnabled or false
-_G.Noclip = _G.Noclip or false
-_G.Fullbright = _G.Fullbright or false
-_G.CollectRange = _G.CollectRange or 50
-_G.ShowTracers = _G.ShowTracers or false
-_G.TargetObjective = _G.TargetObjective or false
-_G.ESP_MaxDistance = _G.ESP_MaxDistance or 500
+-- ==================== 全局变量 ====================
+_G.FastAttack = _G.FastAttack ~= true
+_G.FastAttackDelay = _G.FastAttackDelay or 0.15
+_G.AttackMobs = _G.AttackMobs ~= true
+_G.AttackPlayers = _G.AttackPlayers ~= true
+_G.FruitM1 = _G.FruitM1 or false
+_G.GunM1 = _G.GunM1 or false
+_G.AutoBuso = _G.AutoBuso or false
+_G.KillAuraRange = _G.KillAuraRange or 350
+_G.AttackPart = _G.AttackPart or "HumanoidRootPart"
 
--- WindUI
-local WindUI
-local ok, res = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-end)
-if ok then WindUI = res else
-    local req = request or http_request or (syn and syn.request)
-    if req then WindUI = loadstring(req({Url = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"}).Body)() end
+-- ==================== 工具函数 ====================
+local function isValidTarget(model)
+    if not model then return false end
+    if model == LocalPlayer.Character then return false end
+    local hum = model:FindFirstChildOfClass("Humanoid") or model:FindFirstChild("Humanoid")
+    local root = model:FindFirstChild("HumanoidRootPart")
+    return hum and root and hum.Health > 0
 end
 
-if WindUI then
-    local Window = WindUI:CreateWindow({
-        Title = "Horror Game Hub", Icon = "", Author = "kiyo", Folder = "WindUI",
-        Size = UDim2.fromOffset(560, 480), Transparent = true, Theme = "Dark",
-        Acrylic = false, HideSearchBar = false, SideBarWidth = 180, ToggleKey = Enum.KeyCode.G,
-    })
-    local ESPTab = Window:Tab({ Title = "透视 ESP", Icon = "eye" })
-    local AutoTab = Window:Tab({ Title = "自动功能", Icon = "zap" })
-    local MiscTab = Window:Tab({ Title = "玩家功能", Icon = "user" })
-
-    ESPTab:Section({ Title = "玩家透视" })
-    ESPTab:Toggle({ Title = "玩家透视", Value = _G.ESP_Players, Callback = function(v) _G.ESP_Players = v end })
-    ESPTab:Toggle({ Title = "显示名字", Value = true, Callback = function(v) _G.ShowPlayerNames = v end })
-    ESPTab:Toggle({ Title = "显示距离", Value = true, Callback = function(v) _G.ShowDistance = v end })
-    ESPTab:Slider({ Title = "ESP最大距离", Value = { Min = 50, Max = 2000, Default = _G.ESP_MaxDistance }, Callback = function(v) _G.ESP_MaxDistance = v end })
-
-    ESPTab:Section({ Title = "怪物透视" })
-    ESPTab:Toggle({ Title = "怪物透视", Value = _G.ESP_Monsters, Callback = function(v) _G.ESP_Monsters = v end })
-    ESPTab:Toggle({ Title = "追踪线", Value = _G.ShowTracers, Callback = function(v) _G.ShowTracers = v end })
-
-    AutoTab:Section({ Title = "自动通关" })
-    AutoTab:Toggle({ Title = "自动下一关 (传送)", Value = _G.Auto_NextLevel, Callback = function(v) _G.Auto_NextLevel = v end })
-    AutoTab:Toggle({ Title = "自动收集物品", Value = _G.Auto_Collect, Callback = function(v) _G.Auto_Collect = v end })
-    AutoTab:Slider({ Title = "收集范围", Value = { Min = 5, Max = 200, Default = _G.CollectRange }, Callback = function(v) _G.CollectRange = v end })
-    AutoTab:Toggle({ Title = "自动开门", Value = _G.Auto_OpenDoors, Callback = function(v) _G.Auto_OpenDoors = v end })
-    AutoTab:Toggle({ Title = "自动贴物体(传送)", Value = _G.TargetObjective, Callback = function(v) _G.TargetObjective = v end })
-
-    MiscTab:Section({ Title = "移动" })
-    MiscTab:Toggle({ Title = "加速", Value = _G.SpeedEnabled, Callback = function(v) _G.SpeedEnabled = v; updateSpeed() end })
-    MiscTab:Slider({ Title = "移动速度", Value = { Min = 16, Max = 200, Default = _G.SpeedHack }, Callback = function(v) _G.SpeedHack = v; updateSpeed() end })
-    MiscTab:Toggle({ Title = "穿墙", Value = _G.Noclip, Callback = function(v) _G.Noclip = v end })
-    MiscTab:Toggle({ Title = "全局照明", Value = _G.Fullbright, Callback = function(v) _G.Fullbright = v; updateFullbright() end })
+local function isAlly(player)
+    if not player or not player.Team or not LocalPlayer.Team then return false end
+    return player.Team == LocalPlayer.Team
 end
 
--- ==================== 工具 ====================
-function updateSpeed()
-    local c = LocalPlayer.Character; if c and c:FindFirstChild("Humanoid") then
-        c.Humanoid.WalkSpeed = _G.SpeedEnabled and _G.SpeedHack or 16 end
+local function getAttackPart(target)
+    return target:FindFirstChild(_G.AttackPart) or target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Head") or target:FindFirstChild("Torso")
 end
-function updateFullbright()
-    if _G.Fullbright then
-        Lighting.Brightness = 3; Lighting.ClockTime = 14; Lighting.FogEnd = 1e9
-        Lighting.GlobalShadows = false; Lighting.OutdoorAmbient = Color3.fromRGB(128,128,128)
-    else
-        Lighting.Brightness = 1; Lighting.ClockTime = 14; Lighting.FogEnd = 10000
-        Lighting.GlobalShadows = true; Lighting.OutdoorAmbient = Color3.new(78,78,78)
-    end
-end
-if _G.Fullbright then updateFullbright() end
 
-task.spawn(function() while task.wait(0.15) do
-    if _G.Noclip and LocalPlayer.Character then
-        for _, p in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end
-        end
-    end
-end end)
+local function getNearbyTargets()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return {} end
 
--- ==================== 持续加速 (Heartbeat 强制覆写) ====================
-task.spawn(function()
-    RunService.Heartbeat:Connect(function()
-        if _G.SpeedEnabled and LocalPlayer.Character then
-            local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-            if hum and hum.WalkSpeed ~= _G.SpeedHack then
-                hum.WalkSpeed = _G.SpeedHack
-            end
-        end
-    end)
-end)
+    local targets = {}
+    local myPos = root.Position
+    local range = _G.KillAuraRange
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    if _G.SpeedEnabled then updateSpeed() end
-    if _G.Fullbright then updateFullbright() end
-end)
-
--- ==================== 关键词匹配 ====================
-local itemKw = { "key", "钥匙","gatekey","lockpick","card","rustykey","goldenkey","silverkey","masterkey","keycard" }
-local doorKw = { "door","门","gate","exit","entrance","portal","next","下一","level","关卡","room","房间" }
--- ==================== 怪物检测 (遍历所有非玩家 Humanoid) ====================
-local monsterKw = { "monster","怪物","enemy","killer","ghost","鬼","spider","zombie","huggy","bendy","chase",
-    "mimic","模仿","jealous","revenge","vengeful"," wrath","witch","samurai","control",
-    "slend","granny","piggy","mother","father","grandpa","grandma","teacher",
-    "abandon","creature","demon","devil","shadow","siren","banshee","phantom","entity",
-    "figure","seek","rush","ambush","halt","eyes","screech","dupe","giggle","timothy",
-    "hide","snare","a-60","a-90","a-120","blitz","john","doe","狼","蛇","虫","蜘蛛","鲨",
-    "scary","horror","mutant","infection","infected","pursuer","hunter","stalker" }
-local nextLevelKw = { "nextlevel","下一关","nextroom","elevator","电梯","exitdoor","出口","portal",
-    "传送门","loadzone","nextleveldoor","level2","level3","gateway","entrancedoor",
-    "finish","过关","clear","通关","complete","enddoor","winzone","escape","逃脱" }
-
--- 获取所有怪物模型 (带 Humanoid 的非玩家 Character)
-local function getMonsterModels()
-    local monsters = {}
-    local seen = {}
-    -- 优先查 Enemy/Monster/NPC 文件夹
-    local function scanFolder(folder)
-        if not folder then return end
-        for _, child in ipairs(folder:GetChildren()) do
-            if child:IsA("Model") and not seen[child] then
-                seen[child] = true
-                local hum = child:FindFirstChildOfClass("Humanoid") or child:FindFirstChild("Humanoid")
-                local root = child:FindFirstChild("HumanoidRootPart")
-                if hum and hum.Health > 0 and root then
-                    local isPlayer = Players:GetPlayerFromCharacter(child)
-                    if not isPlayer then
-                        table.insert(monsters, {model = child, hum = hum, root = root})
+    if _G.AttackMobs then
+        for _, folderName in ipairs({"Enemies", "Enemy", "NPCs", "Mobs"}) do
+            local folder = Workspace:FindFirstChild(folderName)
+            if folder then
+                for _, model in ipairs(folder:GetChildren()) do
+                    if isValidTarget(model) then
+                        local part = getAttackPart(model)
+                        if part and (part.Position - myPos).Magnitude <= range then
+                            table.insert(targets, {model, part})
+                        end
                     end
                 end
             end
         end
     end
-    scanFolder(Workspace:FindFirstChild("Enemies"))
-    scanFolder(Workspace:FindFirstChild("Enemy"))
-    scanFolder(Workspace:FindFirstChild("NPCs"))
-    scanFolder(Workspace:FindFirstChild("Monsters"))
-    scanFolder(Workspace:FindFirstChild("Monster"))
-    scanFolder(Workspace:FindFirstChild("Spawned"))
-    scanFolder(Workspace:FindFirstChild("Mobs"))
-    scanFolder(Workspace:FindFirstChild("Live"))
-    scanFolder(Workspace:FindFirstChild("Characters")) -- 有些游戏把怪物放这里
-    scanFolder(Workspace) -- 兜底扫描 Workspace 顶层
-    return monsters
-end
 
--- 是否是模仿者特定怪物
-local function isMimicType(name)
-    name = name:lower()
-    return name:find("mimic") or name:find("模仿") or name:find("jealous") or name:find("revenge")
-        or name:find("vengeful") or name:find("control") or name:find("witch")
-        or name:find("samurai") or name:find("wrath") or name:find("abandon")
-end
-local function matchKW(name, kwList)
-    name = name:lower()
-    for _, kw in ipairs(kwList) do if name:find(kw) then return true end end
-    return false
-end
-
--- ==================== 优化版 ESP (缓存 + 距离过滤 + 节流) ====================
-local espPool = {} -- 对象池复用 Drawing 对象
-local function getESPText()
-    if not Drawing then return nil end
-    for _, t in ipairs(espPool) do
-        if not t.Visible then return t end
+    if _G.AttackPlayers then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                if not isAlly(player) and isValidTarget(player.Character) then
+                    local part = getAttackPart(player.Character)
+                    if part and (part.Position - myPos).Magnitude <= range then
+                        table.insert(targets, {player.Character, part})
+                    end
+                end
+            end
+        end
     end
-    local d = Drawing.new("Text")
-    d.Size = 13; d.Center = true; d.Outline = true; d.OutlineColor = Color3.new(); d.Font = 2
-    table.insert(espPool, d)
-    return d
+
+    return targets
 end
 
-local tracerPool = {}
-local function getTracer()
-    if not Drawing then return nil end
-    for _, t in ipairs(tracerPool) do
-        if not t.Visible then return t end
+-- ==================== 远程引用缓存 ====================
+local Net, RegisterAttack, RegisterHit, CommF, CommE
+
+local function initRemotes()
+    if Net then return true end
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    Net = modules and modules:FindFirstChild("Net")
+    if Net then
+        RegisterAttack = Net:FindFirstChild("RE/RegisterAttack") or Net:FindFirstChild("RegisterAttack")
+        RegisterHit = Net:FindFirstChild("RE/RegisterHit") or Net:FindFirstChild("RegisterHit")
     end
-    local l = Drawing.new("Line"); l.Thickness = 1; l.Transparency = 0.5
-    table.insert(tracerPool, l)
-    return l
-end
-
--- 缓存扫描结果, 降低 GetDescendants 调用频率
-local cachedDescendants = {}
-local lastCacheTime = 0
-local function getCachedDescendants()
-    if tick() - lastCacheTime > 0.5 then
-        cachedDescendants = Workspace:GetDescendants()
-        lastCacheTime = tick()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if remotes then
+        CommF = remotes:FindFirstChild("CommF_") or remotes:FindFirstChild("CommF")
+        CommE = remotes:FindFirstChild("CommE") or remotes:FindFirstChild("CommE")
     end
-    return cachedDescendants
+    return Net and RegisterAttack and RegisterHit
 end
 
-local lastESPUpdate = 0
-local ESP_LIMIT = 60 -- 最多显示 60 个 ESP 标签
+-- ==================== 快速攻击 (M1 近战) ====================
+local lastM1Attack = 0
 task.spawn(function()
     while task.wait() do
-        if not Drawing then continue end
-        local now = tick()
-        if now - lastESPUpdate < 0.15 then continue end
-        lastESPUpdate = now
+        if not _G.FastAttack then continue end
+        if not _G.AttackMobs and not _G.AttackPlayers then continue end
 
-        -- 隐藏所有
-        for _, t in ipairs(espPool) do t.Visible = false end
-        for _, l in ipairs(tracerPool) do l.Visible = false end
-        local espCount = 0
+        local char = LocalPlayer.Character
+        if not char or not isValidTarget(char) then continue end
 
-        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local myPos = myRoot and myRoot.Position
-        local vpSize = Camera.ViewportSize
-        local screenCenter = Vector2.new(vpSize.X / 2, vpSize.Y)
-        local maxDist = _G.ESP_MaxDistance or 500
-        local showTracers = _G.ShowTracers
+        -- 枪模式跳过 M1
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool and tool.ToolTip == "Gun" then continue end
 
-        -- 玩家 ESP
-        if _G.ESP_Players and espCount < ESP_LIMIT then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player == LocalPlayer then continue end
-                local char = player.Character
-                local head = char and char:FindFirstChild("Head")
-                local hum = char and char:FindFirstChild("Humanoid")
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                if not head or not hum or not root then continue end
-                if myPos and (root.Position - myPos).Magnitude > maxDist then continue end
+        local targets = getNearbyTargets()
+        if #targets == 0 then continue end
 
-                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if not onScreen then continue end
-
-                local parts = {}
-                if _G.ShowPlayerNames then parts[#parts+1] = player.Name end
-                if _G.ShowDistance and myPos then parts[#parts+1] = " " .. math.floor((root.Position - myPos).Magnitude) .. "m" end
-
-                local txt = getESPText(); if not txt then break end
-                txt.Text = table.concat(parts); txt.Color = Color3.fromRGB(255,255,0)
-                txt.Position = Vector2.new(pos.X, pos.Y); txt.Visible = true; espCount = espCount + 1
-
-                if showTracers then
-                    local tr = getTracer(); tr.Color = Color3.fromRGB(255,255,0)
-                    tr.From = screenCenter; tr.To = Vector2.new(pos.X, pos.Y); tr.Visible = true
-                end
-            end
+        -- 节流
+        local elapsed = tick() - lastM1Attack
+        local minDelay = _G.FastAttackDelay
+        if elapsed < minDelay then
+            task.wait(minDelay - elapsed)
         end
 
-        -- 怪物 ESP (直接扫描 Humanoid 模型)
-        if _G.ESP_Monsters and espCount < ESP_LIMIT then
-            for _, m in ipairs(getMonsterModels()) do
-                if espCount >= ESP_LIMIT then break end
-                if myPos and (m.root.Position - myPos).Magnitude > maxDist then continue end
+        if not initRemotes() then continue end
 
-                local head = m.model:FindFirstChild("Head")
-                local pos, onScreen
-                if head then
-                    pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                else
-                    pos, onScreen = Camera:WorldToViewportPoint(m.root.Position + Vector3.new(0,3,0))
-                end
-                if not onScreen then continue end
-
-                local healthPercent = math.floor(m.hum.Health / m.hum.MaxHealth * 100)
-                local tag = "[怪物] "
-                if isMimicType(m.model.Name) then tag = "[模仿者] " end
-                local label = tag .. m.model.Name .. " " .. healthPercent .. "%"
-
-                local txt = getESPText(); if not txt then break end
-                txt.Text = label; txt.Color = Color3.fromRGB(255,60,60)
-                txt.Position = Vector2.new(pos.X, pos.Y); txt.Visible = true
-                espCount = espCount + 1
-
-                if showTracers then
-                    local tr = getTracer(); tr.Color = Color3.fromRGB(255,60,60)
-                    tr.From = screenCenter; tr.To = Vector2.new(pos.X, pos.Y); tr.Visible = true
-                end
-            end
+        local mainTarget = targets[1]
+        local hitList = {}
+        for _, t in ipairs(targets) do
+            table.insert(hitList, {t[1], t[2]})
         end
+
+        pcall(function()
+            RegisterAttack:FireServer(0.3)
+            RegisterHit:FireServer(mainTarget[2], hitList)
+        end)
+
+        lastM1Attack = tick()
     end
 end)
 
--- ==================== 自动找物体 (优化: 用缓存) ====================
-local function findNearest(filterFn)
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
-    local myPos, nearest, nd = root.Position, nil, _G.CollectRange
-    for _, obj in ipairs(getCachedDescendants()) do
-        local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-        if pp and pp.Enabled == false then continue end
-        local cd = obj:FindFirstChildWhichIsA("ClickDetector")
-        if not pp and not cd then continue end
-        if filterFn and not filterFn(obj, pp, cd) then continue end
-        local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-        if not part then continue end
-        local d = (part.Position - myPos).Magnitude
-        if d < nd then nd = d; nearest = obj end
-    end
-    return nearest
-end
-
-local function interact(obj)
-    if not obj then return end
-    local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-    if pp and pp.Enabled ~= false then fireproximityprompt(pp); return end
-    local cd = obj:FindFirstChildWhichIsA("ClickDetector")
-    if cd then fireclickdetector(cd); return end
-    for _, c in ipairs(obj:GetChildren()) do
-        if c:IsA("TouchTransmitter") then pcall(function() c:TouchInterest(obj) end) end
-    end
-end
-
-local function teleportTo(obj)
-    local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-    if part and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = part.CFrame + Vector3.new(0, 3, 0)
-    end
-end
-
--- ==================== 自动通关: 检测下一关传送 (The Mimic 优化) ====================
--- The Mimic 关卡结构: Jealousy/Control/Revenge/Vengeful/Witch/Samurai 等章节
--- 每章完成后在 Workspace 某处生成出口 Portal/Part/Region
-local nextLevelKw = {
-    "nextlevel","下一关","nextroom","next","elevator","电梯","exitdoor","出口",
-    "portal","传送门","loadzone","gateway","entrancedoor",
-    "finish","finishline","过关","clear","通关","complete","enddoor","winzone",
-    "escape","逃脱","leave","离开","endportal","finishportal",
-    "checkpoint","spawnpoint","lobby","return","back","returnlobby",
-    "chapter","chapter2","chapter3","book2","book3",
-    "jealousy","control","revenge","vengeful","witch","samurai","wrath","abandon",
-    "part2","phase2","stage2","levelend"
-}
-
--- The Mimic 常用物件名
-local mimicExitNames = { "Exit", "Portal", "Teleport", "Finish", "End", "Leave", "Win", "Complete", "Next", "Lobby", "Return" }
-
-local function isExitObj(obj)
-    local name = obj.Name:lower()
-    local parent = obj.Parent
-    local parentName = parent and parent.Name:lower() or ""
-
-    -- 精确匹配 The Mimic 出口名
-    for _, en in ipairs(mimicExitNames) do
-        if name == en:lower() or parentName == en:lower() then return true end
-    end
-
-    -- 关键词匹配
-    if matchKW(obj.Name, nextLevelKw) then return true end
-    if matchKW(parentName, nextLevelKw) then return true end
-
-    -- 是 Part 且含碰撞触发器 (TouchInterest)
-    if obj:IsA("BasePart") then
-        if obj:FindFirstChildOfClass("TouchTransmitter") then return true end
-        -- 完全透明或非常高透明度 + 名字含出口含义
-        if obj.Transparency > 0.7 and (name:find("exit") or name:find("portal") or name:find("end") or name:find("finish") or parentName:find("exit") or parentName:find("portal")) then
-            return true
-        end
-    end
-
-    -- ProximityPrompt 交互文本含出口含义
-    local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-    if pp and pp.Enabled ~= false then
-        local txt = ((pp.ActionText or "") .. " " .. (pp.ObjectText or "")):lower()
-        if txt:find("enter") or txt:find("exit") or txt:find("next") or txt:find("leave")
-           or txt:find("进入") or txt:find("离开") or txt:find("下一") or txt:find("过关")
-           or txt:find("return") or txt:find("lobby") then
-            return true
-        end
-    end
-
-    -- 检查父级是否是出口模型
-    if parent then
-        local grandparent = parent.Parent
-        local gpName = grandparent and grandparent.Name:lower() or ""
-        if matchKW(parentName, nextLevelKw) or matchKW(gpName, nextLevelKw) then return true end
-    end
-
-    return false
-end
-
--- 从所有可能的位置扫描出口 (不限 Workspace)
-local function scanAllExits()
-    local exits = {}
-    local seen = {}
-
-    local function scanRecursive(folder)
-        if not folder then return end
-        for _, child in ipairs(folder:GetChildren()) do
-            if child:IsA("Model") or child:IsA("Folder") then
-                scanRecursive(child)
+-- ==================== 果实 M1 ====================
+task.spawn(function()
+    local function getFruitTool()
+        local char = LocalPlayer.Character
+        if char then
+            for _, tool in ipairs(char:GetChildren()) do
+                if tool:IsA("Tool") and tool.ToolTip == "Blox Fruit" then return tool end
             end
-            if not seen[child] and isExitObj(child) then
-                seen[child] = true
-                table.insert(exits, child)
+        end
+        local bp = LocalPlayer:FindFirstChild("Backpack")
+        if bp then
+            for _, tool in ipairs(bp:GetChildren()) do
+                if tool:IsA("Tool") and tool.ToolTip == "Blox Fruit" then return tool end
             end
         end
     end
 
-    -- 扫描 Workspace 所有子级 (包括 Map, Game, Level 等文件夹)
-    scanRecursive(Workspace)
-    -- 也扫描 ReplicatedStorage (部分游戏出口预制件在这里)
-    scanRecursive(ReplicatedStorage)
+    while task.wait(0.12) do
+        if not _G.FruitM1 then continue end
+        if not _G.AttackMobs and not _G.AttackPlayers then continue end
 
-    -- 按离玩家距离排序
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        table.sort(exits, function(a, b)
-            local pa = a:IsA("BasePart") and a or a:FindFirstChildWhichIsA("BasePart")
-            local pb = b:IsA("BasePart") and b or b:FindFirstChildWhichIsA("BasePart")
-            local da = pa and (pa.Position - root.Position).Magnitude or 99999
-            local db = pb and (pb.Position - root.Position).Magnitude or 99999
-            return da < db
+        pcall(function()
+            local fruit = getFruitTool()
+            if not fruit then return end
+            local remote = fruit:FindFirstChild("LeftClickRemote")
+            if not remote then return end
+
+            local char = LocalPlayer.Character
+            local myHRP = char and char:FindFirstChild("HumanoidRootPart")
+            if not myHRP then return end
+
+            local targets = getNearbyTargets()
+            for _, t in ipairs(targets) do
+                local dir = (t[2].Position - myHRP.Position).Unit
+                remote:FireServer(Vector3.new(dir.X, dir.Y, dir.Z), 1, true)
+            end
         end)
     end
-
-    return exits
-end
-
--- 监听新生成物体
-local newSpawnedExits = {}
-Workspace.DescendantAdded:Connect(function(child)
-    task.wait(0.2)
-    if isExitObj(child) then
-        table.insert(newSpawnedExits, child)
-    end
 end)
 
+-- ==================== 枪械 M1 ====================
 task.spawn(function()
-    while task.wait(0.5) do
-        if not _G.Auto_NextLevel then continue end
+    local ShootGunEvent, Validator2
 
-        -- 优先收集物品
-        if _G.Auto_Collect then
-            local item = findNearest(function(o, pp, cd)
-                local p = o.Parent; if p and p:FindFirstChild("Humanoid") then return false end
-                return matchKW(o.Name, itemNames) or matchKW(o.Name, itemKw)
-            end)
-            if item then
-                if _G.TargetObjective then teleportTo(item) end
-                interact(item)
+    local function initGunRemotes()
+        if ShootGunEvent then return true end
+        local modules = ReplicatedStorage:FindFirstChild("Modules")
+        local dragonNet = modules and modules:WaitForChild("Net")
+        if dragonNet then
+            ShootGunEvent = dragonNet:FindFirstChild("RE/ShootGunEvent")
+        end
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            Validator2 = remotes:FindFirstChild("Validator2")
+        end
+        return ShootGunEvent and Validator2
+    end
+
+    -- 过验证器
+    local ShootFunction
+    local function getValidator()
+        if not ShootFunction then
+            local ok, controller = pcall(require, ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("CombatController"))
+            if ok and controller and controller.Attack then
+                ShootFunction = debug.getupvalue(controller.Attack, 9)
             end
         end
-
-        -- 自动开门
-        if _G.Auto_OpenDoors then
-            local door = findNearest(function(o) return matchKW(o.Name, doorKw) end)
-            if door then
-                if _G.TargetObjective then teleportTo(door) end
-                interact(door)
-            end
-        end
-
-        -- 核心: 找下一关出口
-        local nextLevelObj = nil
-
-        -- 优先查新生成物体
-        for i, obj in ipairs(newSpawnedExits) do
-            if obj and obj.Parent then
-                nextLevelObj = obj
-                table.remove(newSpawnedExits, i)
+        if not ShootFunction then return 0, 0 end
+        local upvals = debug.getupvalues(ShootFunction)
+        if not upvals then return 0, 0 end
+        -- 标准 upvalue 索引 (可能因更新变动)
+        local idx = {21, 22, 23, 24, 25, 26, 27}
+        for i = 1, 10 do
+            if upvals[i] == 727595 then
+                local o = i - 15
+                idx = {12+o, 13+o, 16+o, 17+o, 14+o, 12+o, 18+o}
                 break
             end
         end
+        local v1, v2, v3, v4, v5, v6, v7 = upvals[15], upvals[13], upvals[16], upvals[17], upvals[14], upvals[12], upvals[18]
+        if not v1 then return 0, 0 end
+        local v8 = v6 * v2
+        local v9 = (v5 * v2 + v6 * v1) % v3
+        v9 = (v9 * v3 + v8) % v4
+        v5 = math.floor(v9 / v3); v6 = v9 - v5 * v3; v7 = v7 + 1
+        debug.setupvalue(ShootFunction, 14, v5); debug.setupvalue(ShootFunction, 12, v6); debug.setupvalue(ShootFunction, 18, v7)
+        return math.floor(v9 / v4 * 16777215), v7
+    end
 
-        -- 全量扫描出口
-        if not nextLevelObj then
-            local exits = scanAllExits()
-            if #exits > 0 then nextLevelObj = exits[1] end
-        end
+    while task.wait(0.085) do
+        if not _G.GunM1 then continue end
+        if not initGunRemotes() then continue end
 
-        if nextLevelObj then
-            print("[通关] 找到下一关入口: " .. nextLevelObj:GetFullName() .. " | 传送中...")
-            -- 多点传送 (对出口区域上下左右都试试)
-            local part = nextLevelObj:IsA("BasePart") and nextLevelObj or nextLevelObj:FindFirstChildWhichIsA("BasePart")
-            if part and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local hrp = LocalPlayer.Character.HumanoidRootPart
-                -- 尝试多个位置
-                local positions = {
-                    part.CFrame + Vector3.new(0, 3, 0),
-                    part.CFrame + Vector3.new(0, 5, -3),
-                    part.CFrame + Vector3.new(0, 3, 3),
-                    part.Position + Vector3.new(0, 5, 0),
-                }
-                for _, cf in ipairs(positions) do
-                    hrp.CFrame = cf
-                    interact(nextLevelObj)
-                    task.wait(0.15)
-                end
-            end
-            interact(nextLevelObj)
-        end
+        pcall(function()
+            local char = LocalPlayer.Character
+            local tool = char and char:FindFirstChildOfClass("Tool")
+            if not tool or tool.ToolTip ~= "Gun" then return end
+
+            local targets = getNearbyTargets()
+            if #targets == 0 then return end
+
+            local valCode, valCount = getValidator()
+            if valCode ~= 0 then Validator2:FireServer(valCode, valCount) end
+
+            tool:SetAttribute("LocalOverheat", 0)
+            tool:SetAttribute("LocalTotalShots", (tool:GetAttribute("LocalTotalShots") or 0) + 1)
+
+            local targetPos = targets[1][2].Position
+            ShootGunEvent:FireServer(targetPos, { targets[1][2] })
+        end)
     end
 end)
 
--- ==================== 通用自动交互 ====================
+-- ==================== 自动武装色 ====================
 task.spawn(function()
-    while task.wait(0.3) do
-        if _G.Auto_Interact then
-            local obj = findNearest(function(o, pp, cd)
-                return not (matchKW(o.Name, monsterKw) or matchKW(o.Name, doorKw) or matchKW(o.Name, nextLevelKw))
-            end)
-            if obj then
-                if _G.TargetObjective then teleportTo(obj) end
-                interact(obj)
-            end
+    while task.wait(2) do
+        if not _G.AutoBuso then continue end
+        if not CommF then initRemotes() end
+        if not CommF then continue end
+        local char = LocalPlayer.Character
+        if char and not char:FindFirstChild("HasBuso") then
+            pcall(function() CommF:InvokeServer("Buso") end)
         end
     end
 end)
 
--- ==================== 防死 ====================
+-- ==================== 锁定目标 (瞄准最近) ====================
+RunService.RenderStepped:Connect(function()
+    if not (_G.FastAttack or _G.FruitM1 or _G.GunM1) then return end
+    local targets = getNearbyTargets()
+    if #targets > 0 then
+        LocalPlayer:GetMouse().Target = targets[1][2]
+        LocalPlayer:GetMouse().TargetFilter = targets[1][1]
+    end
+end)
+
+-- ==================== 物品/奖励收集 ====================
 task.spawn(function()
     while task.wait(0.5) do
-        pcall(function()
-            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
-            if hum and hum.Health < hum.MaxHealth * 0.3 then hum.Health = hum.MaxHealth end
-        end)
+        if not _G.AutoCollect or not _G.AttackMobs then continue end
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then continue end
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj.Name == "Item" or obj.Name == "Chest" then
+                local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
+                local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
+                if pp and pp.Enabled ~= false and part and (part.Position - root.Position).Magnitude < 50 then
+                    fireproximityprompt(pp)
+                end
+            end
+        end
     end
 end)
 
 -- ==================== 通知 ====================
 task.spawn(function()
     task.wait(1)
-    local ok = WindUI and "OK" or "FAIL"
-    print(string.rep("=", 50))
-    print("  Horror Pass v2 | GUI: " .. ok .. " | 按 G")
-    print("  自动下一关: " .. tostring(_G.Auto_NextLevel))
-    print(string.rep("=", 50))
+    print("=" .. string.rep("=", 40))
+    print("  Blox Fruits 攻击核心 已加载")
+    print("  _G.FastAttack = " .. tostring(_G.FastAttack))
+    print("  _G.FruitM1 = " .. tostring(_G.FruitM1))
+    print("  _G.GunM1 = " .. tostring(_G.GunM1))
+    print("=" .. string.rep("=", 40))
 end)
