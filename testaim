@@ -9,11 +9,9 @@ local Camera = Workspace.CurrentCamera
 -- ==================== 状态 ====================
 _G.Fly = _G.Fly or false
 _G.FlySpeed = _G.FlySpeed or 50
-_G.FlyMode = _G.FlyMode or "BodyVelocity"
-
 local flying = false
-local flyBodyGyro, flyBodyVel
 local keys = { W = false, A = false, S = false, D = false, Space = false, LeftShift = false }
+local heartbeatConn = nil
 
 -- ==================== GUI ====================
 local screenGui = Instance.new("ScreenGui")
@@ -29,9 +27,7 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0, 10)
-
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 local stroke = Instance.new("UIStroke", frame)
 stroke.Color = Color3.fromRGB(80, 80, 90); stroke.Thickness = 1.5
 
@@ -45,11 +41,11 @@ toggleBtn.Size = UDim2.new(0, 80, 0, 32); toggleBtn.Position = UDim2.new(0.5, -4
 toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60); toggleBtn.Text = "OFF"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255); toggleBtn.TextSize = 14
 toggleBtn.Font = Enum.Font.GothamBold; toggleBtn.AutoButtonColor = false
-local btnCorner = Instance.new("UICorner", toggleBtn); btnCorner.CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 
 local speedLabel = Instance.new("TextLabel", frame)
 speedLabel.Size = UDim2.new(0, 100, 0, 20); speedLabel.Position = UDim2.new(0, 15, 0, 82)
-speedLabel.BackgroundTransparency = 1; speedLabel.Text = "速度: 50"; speedLabel.TextColor3 = Color3.fromRGB(200,200,200)
+speedLabel.BackgroundTransparency = 1; speedLabel.Text = "速度: " .. _G.FlySpeed; speedLabel.TextColor3 = Color3.fromRGB(200,200,200)
 speedLabel.TextSize = 13; speedLabel.Font = Enum.Font.Gotham; speedLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local fasterBtn = Instance.new("TextButton", frame)
@@ -66,11 +62,11 @@ Instance.new("UICorner", slowerBtn).CornerRadius = UDim.new(0, 6)
 
 local modeLabel = Instance.new("TextLabel", frame)
 modeLabel.Size = UDim2.new(1, -20, 0, 18); modeLabel.Position = UDim2.new(0, 10, 0, 115)
-modeLabel.BackgroundTransparency = 1; modeLabel.Text = "WASD 移动 | Space 上升 | Shift 下降"
+modeLabel.BackgroundTransparency = 1; modeLabel.Text = "WASD 移动 | Space 上 | Shift 下"
 modeLabel.TextColor3 = Color3.fromRGB(140, 140, 150); modeLabel.TextSize = 11
 modeLabel.Font = Enum.Font.Gotham; modeLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- ==================== 飞行逻辑 ====================
+-- ==================== 更新 UI ====================
 local function updateUI()
     if flying then
         toggleBtn.Text = "ON"; toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
@@ -80,42 +76,26 @@ local function updateUI()
     speedLabel.Text = "速度: " .. _G.FlySpeed
 end
 
-local function setupCharacter(char)
-    local hum = char:FindFirstChildOfClass("Humanoid") or char:FindFirstChild("Humanoid")
-    if not hum then return end
-    hum.PlatformStand = true
-end
+-- ==================== 飞行逻辑 (CFrame 移动) ====================
+local function flyLoop()
+    local char = LocalPlayer.Character
+    local root = char and char:WaitForChild("HumanoidRootPart", 5)
+    local hum = char and char:WaitForChild("Humanoid", 5)
+    if not root or not hum then return end
 
-local function cleanupCharacter(char)
-    if flyBodyGyro and flyBodyGyro.Parent then flyBodyGyro:Destroy(); flyBodyGyro = nil end
-    if flyBodyVel and flyBodyVel.Parent then flyBodyVel:Destroy(); flyBodyVel = nil end
-    local hum = char:FindFirstChildOfClass("Humanoid") or char:FindFirstChild("Humanoid")
-    if hum then hum.PlatformStand = false end
-end
+    -- 起步: 先升空
+    root.CFrame = root.CFrame + Vector3.new(0, 5, 0)
 
-local function startBodyVelocityMode()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
-    local root = char:WaitForChild("HumanoidRootPart", 5)
-    if not hum or not root then return end
-
-    hum.PlatformStand = true
-
-    flyBodyGyro = Instance.new("BodyGyro", root)
-    flyBodyGyro.MaxTorque = Vector3.new(1, 1, 1) * 40000
-    flyBodyGyro.CFrame = Camera.CFrame
-    flyBodyGyro.P = 30000
-
-    flyBodyVel = Instance.new("BodyVelocity", root)
-    flyBodyVel.MaxForce = Vector3.new(1, 1, 1) * 40000
-    flyBodyVel.Velocity = Vector3.new()
-
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
-        if not flying or not hum or not hum.Parent then
-            if conn then conn:Disconnect() end
+    heartbeatConn = RunService.Heartbeat:Connect(function()
+        if not flying then
+            if heartbeatConn then heartbeatConn:Disconnect(); heartbeatConn = nil end
             return
         end
+
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChild("Humanoid")
+        if not root or not hum then stopFly(); return end
 
         local speed = _G.FlySpeed
         local moveDir = Vector3.new()
@@ -128,41 +108,40 @@ local function startBodyVelocityMode()
         if keys.Space then moveDir += Vector3.new(0, 1, 0) end
         if keys.LeftShift then moveDir -= Vector3.new(0, 1, 0) end
 
-        if flyBodyVel and flyBodyVel.Parent then
-            flyBodyVel.Velocity = moveDir.Unit * speed * (moveDir.Magnitude > 0 and 1 or 0)
-        end
-        if flyBodyGyro and flyBodyGyro.Parent then
-            flyBodyGyro.CFrame = camCF
+        if moveDir.Magnitude > 0 then
+            local dt = 1 / 60 -- ~60fps 每帧位移
+            root.CFrame = root.CFrame + (moveDir.Unit * speed * dt)
+            root.AssemblyLinearVelocity = Vector3.new()     -- 重置速度防止被弹飞
+            root.AssemblyAngularVelocity = Vector3.new()
+        else
+            root.AssemblyLinearVelocity = Vector3.new()
+            root.AssemblyAngularVelocity = Vector3.new()
         end
 
-        -- 防止被打落
-        hum.PlatformStand = true
-        -- Noclip
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+        -- Humanoid 状态: 切换到 Physics 避开地面检测
+        if hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Running then
+            hum:ChangeState(Enum.HumanoidStateType.Physics)
         end
     end)
 end
 
-local function stopFly()
+function stopFly()
     flying = false
-    pcall(function() cleanupCharacter(LocalPlayer.Character) end)
+    if heartbeatConn then heartbeatConn:Disconnect(); heartbeatConn = nil end
     updateUI()
 end
 
-local function startFly()
+function startFly()
     if flying then return end
     flying = true
     updateUI()
-    pcall(function() setupCharacter(LocalPlayer.Character) end)
-    startBodyVelocityMode()
+    flyLoop()
 end
 
 -- ==================== 输入监听 ====================
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if not flying then return end
-
     if input.UserInputType == Enum.UserInputType.Keyboard then
         local keyName = input.KeyCode.Name
         if keys[keyName] ~= nil then keys[keyName] = true end
@@ -183,16 +162,14 @@ toggleBtn.MouseButton1Click:Connect(function()
 end)
 
 fasterBtn.MouseButton1Click:Connect(function()
-    _G.FlySpeed = math.min(_G.FlySpeed + 10, 300)
-    updateUI()
+    _G.FlySpeed = math.min(_G.FlySpeed + 10, 300); updateUI()
 end)
 
 slowerBtn.MouseButton1Click:Connect(function()
-    _G.FlySpeed = math.max(_G.FlySpeed - 10, 10)
-    updateUI()
+    _G.FlySpeed = math.max(_G.FlySpeed - 10, 10); updateUI()
 end)
 
--- 键盘快捷键 F 开关飞行
+-- 键盘 F 开关飞行
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.F then
@@ -200,33 +177,26 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- 角色重生时清理
+-- 角色重生时恢复飞行
 LocalPlayer.CharacterAdded:Connect(function(char)
     if flying then
-        flying = false
-        task.wait(0.5)
+        stopFly()
+        task.wait(0.8)
         startFly()
-    end
-end)
-
--- 禁止角色被踢飞 (Anti-fling)
-LocalPlayer.CharacterAdded:Connect(function(char)
-    local root = char:WaitForChild("HumanoidRootPart", 10)
-    if root then
-        root:GetPropertyChangedSignal("CFrame"):Connect(function()
-            if flying and root.AssemblyLinearVelocity.Magnitude > 200 then
-                root.AssemblyLinearVelocity = Vector3.new()
-            end
-        end)
     end
 end)
 
 -- ==================== 初始化 ====================
 updateUI()
-if _G.Fly then startFly() end
+if _G.Fly then
+    task.spawn(function()
+        task.wait(1)
+        startFly()
+    end)
+end
 
 print("========== 飞行脚本已加载 ==========")
 print("  按 F 或点击 ON/OFF 开关飞行")
-print("  WASD 移动 | Space 上升 | Shift 下降")
-print("  当前速度: " .. _G.FlySpeed)
+print("  WASD = 移动 | Space = 上升 | Shift = 下降")
+print("  速度: " .. _G.FlySpeed)
 print("======================================")
