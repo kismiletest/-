@@ -1,6 +1,5 @@
 -- ==================== 自动连点脚本 ====================
 local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
@@ -11,65 +10,126 @@ local clicking = false
 local clickTask = nil
 
 -- ==================== GUI ====================
-local gui = Instance.new("ScreenGui", pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer.PlayerGui)
+local parent = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer.PlayerGui
+local gui = Instance.new("ScreenGui", parent)
 gui.Name = "AutoClickerUI"
 
 local f = Instance.new("Frame", gui)
-f.Size = UDim2.new(0, 180, 0, 80)
+f.Size = UDim2.new(0, 180, 0, 90)
 f.Position = UDim2.new(1, -200, 0, 20)
 f.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 f.BorderSizePixel = 0
-f.Active = true; f.Draggable = true
 Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
 
-local t = Instance.new("TextLabel", f)
-t.Size = UDim2.new(1, -20, 0, 22); t.Position = UDim2.new(0, 10, 0, 5)
-t.BackgroundTransparency = 1; t.TextColor3 = Color3.new(1,1,1)
-t.Text = "自动连点 (" .. _G.ClicksPerSec .. "cps)"
-t.TextSize = 14; t.Font = Enum.Font.GothamBold; t.TextXAlignment = 0
+-- 拖动手柄 (只有顶部条可拖, 不影响按钮)
+local dragBar = Instance.new("TextButton", f)
+dragBar.Size = UDim2.new(1, 0, 0, 28)
+dragBar.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+dragBar.Text = "自动连点 (" .. _G.ClicksPerSec .. "cps)"
+dragBar.TextColor3 = Color3.new(1, 1, 1)
+dragBar.TextSize = 14
+dragBar.Font = Enum.Font.GothamBold
+dragBar.TextXAlignment = Enum.TextXAlignment.Left
+dragBar.AutoButtonColor = false
+Instance.new("UICorner", dragBar).CornerRadius = UDim.new(0, 8)
+local dragCorner = dragBar:FindFirstChildWhichIsA("UICorner")
 
+-- 拖动逻辑
+local dragging, dragStart, startPos
+dragBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true; dragStart = input.Position; startPos = f.Position
+		input.UserInputState = Enum.UserInputState.Cancel
+	end
+end)
+UIS.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		f.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+-- 开关按钮
 local btn = Instance.new("TextButton", f)
-btn.Size = UDim2.new(0, 70, 0, 26); btn.Position = UDim2.new(0, 15, 0, 32)
-btn.BackgroundColor3 = Color3.fromRGB(255,55,55); btn.Text = "OFF"
-btn.TextColor3 = Color3.new(1,1,1); btn.TextSize = 13
-btn.Font = Enum.Font.GothamBold; btn.AutoButtonColor = false
+btn.Size = UDim2.new(0, 80, 0, 30)
+btn.Position = UDim2.new(0, 15, 0, 36)
+btn.BackgroundColor3 = Color3.fromRGB(255, 55, 55)
+btn.Text = "OFF"
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.TextSize = 14
+btn.Font = Enum.Font.GothamBold
+btn.AutoButtonColor = false
 Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
+-- 加速按钮
 local faster = Instance.new("TextButton", f)
-faster.Size = UDim2.new(0, 32, 0, 26); faster.Position = UDim2.new(1, -90, 0, 32)
-faster.BackgroundColor3 = Color3.fromRGB(55,55,65); faster.Text = "+"
-faster.TextColor3 = Color3.new(1,1,1); faster.Font = Enum.Font.GothamBold; faster.AutoButtonColor = false
+faster.Size = UDim2.new(0, 34, 0, 30)
+faster.Position = UDim2.new(1, -90, 0, 36)
+faster.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+faster.Text = "+"
+faster.TextColor3 = Color3.new(1, 1, 1)
+faster.TextSize = 18
+faster.Font = Enum.Font.GothamBold
+faster.AutoButtonColor = false
 Instance.new("UICorner", faster).CornerRadius = UDim.new(0, 5)
 
+-- 减速按钮
 local slower = Instance.new("TextButton", f)
-slower.Size = UDim2.new(0, 32, 0, 26); slower.Position = UDim2.new(1, -52, 0, 32)
-slower.BackgroundColor3 = Color3.fromRGB(55,55,65); slower.Text = "-"
-slower.TextColor3 = Color3.new(1,1,1); slower.Font = Enum.Font.GothamBold; slower.AutoButtonColor = false
+slower.Size = UDim2.new(0, 34, 0, 30)
+slower.Position = UDim2.new(1, -48, 0, 36)
+slower.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+slower.Text = "-"
+slower.TextColor3 = Color3.new(1, 1, 1)
+slower.TextSize = 18
+slower.Font = Enum.Font.GothamBold
+slower.AutoButtonColor = false
 Instance.new("UICorner", slower).CornerRadius = UDim.new(0, 5)
 
+-- 提示
 local hint = Instance.new("TextLabel", f)
-hint.Size = UDim2.new(1, -20, 0, 14); hint.Position = UDim2.new(0, 10, 0, 60)
-hint.BackgroundTransparency = 1; hint.Text = "G 开关 | 左键触发 | 点击速度 +/-"
-hint.TextColor3 = Color3.new(0.45, 0.45, 0.45); hint.TextSize = 10
-hint.Font = Enum.Font.GothamBold; hint.TextXAlignment = 0
+hint.Size = UDim2.new(1, -20, 0, 16)
+hint.Position = UDim2.new(0, 10, 0, 70)
+hint.BackgroundTransparency = 1
+hint.Text = "G 开关 | +/- 调速"
+hint.TextColor3 = Color3.new(0.45, 0.45, 0.45)
+hint.TextSize = 10
+hint.Font = Enum.Font.GothamBold
+hint.TextXAlignment = 0
 
+-- ==================== UI 更新 ====================
 local function updateUI()
 	if clicking then
-		btn.Text = "ON"; btn.BackgroundColor3 = Color3.fromRGB(45, 170, 85)
+		btn.Text = "ON"
+		btn.BackgroundColor3 = Color3.fromRGB(45, 170, 85)
 	else
-		btn.Text = "OFF"; btn.BackgroundColor3 = Color3.fromRGB(255, 55, 55)
+		btn.Text = "OFF"
+		btn.BackgroundColor3 = Color3.fromRGB(255, 55, 55)
 	end
-	t.Text = "自动连点 (" .. _G.ClicksPerSec .. "cps)"
+	dragBar.Text = "自动连点 (" .. _G.ClicksPerSec .. "cps)"
 end
 
+-- ==================== 按钮事件 ====================
 btn.MouseButton1Click:Connect(function()
 	if clicking then stopClick() else startClick() end
 end)
 faster.MouseButton1Click:Connect(function()
-	_G.ClicksPerSec = math.min(_G.ClicksPerSec + 5, 100); updateUI()
+	_G.ClicksPerSec = math.min(_G.ClicksPerSec + 5, 100)
+	updateUI()
 end)
 slower.MouseButton1Click:Connect(function()
-	_G.ClicksPerSec = math.max(_G.ClicksPerSec - 5, 1); updateUI()
+	_G.ClicksPerSec = math.max(_G.ClicksPerSec - 5, 1)
+	updateUI()
+end)
+
+-- ==================== 快捷键 ====================
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.G then
+		if clicking then stopClick() else startClick() end
+	end
 end)
 
 -- ==================== 连点逻辑 ====================
@@ -87,42 +147,29 @@ function startClick()
 	clickTask = task.spawn(function()
 		while clicking do
 			local interval = 1 / _G.ClicksPerSec
-			local mousePos = UIS:GetMouseLocation()
 
-			-- 方法1: VirtualInputManager 模拟点击
 			pcall(function()
+				local mousePos = UIS:GetMouseLocation()
 				local vim = game:GetService("VirtualInputManager")
 				vim:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
+				task.wait(0.01)
 				vim:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
 			end)
 
-			-- 方法2: 触发 ProximityPrompt / ClickDetector (兼容各类点击游戏)
-			if interval > 0.02 then
-				pcall(function()
-					local target = LocalPlayer:GetMouse().Target
-					if target then
-						local cd = target:FindFirstChildWhichIsA("ClickDetector")
-						if cd then fireclickdetector(cd) end
-						local pp = target.Parent and target.Parent:FindFirstChildWhichIsA("ProximityPrompt")
-						if pp then fireproximityprompt(pp) end
-					end
-				end)
-			end
+			pcall(function()
+				local target = LocalPlayer:GetMouse().Target
+				if target then
+					local cd = target:FindFirstChildWhichIsA("ClickDetector")
+					if cd then fireclickdetector(cd) end
+					local pp = target.Parent and target.Parent:FindFirstChildWhichIsA("ProximityPrompt")
+					if pp then fireproximityprompt(pp) end
+				end
+			end)
 
 			task.wait(interval)
 		end
 	end)
 end
-
--- ==================== 快捷键 ====================
-UIS.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
-	if input.UserInputType == Enum.UserInputType.Keyboard then
-		if input.KeyCode == Enum.KeyCode.G then
-			if clicking then stopClick() else startClick() end
-		end
-	end
-end)
 
 updateUI()
 print("自动连点就绪 | G 开关 | " .. _G.ClicksPerSec .. " cps")
