@@ -3,11 +3,9 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- ==================== 全局变量 ====================
 _G.AutoLeviathan = _G.AutoLeviathan or false
 _G.AutoSpawnBoat = _G.AutoSpawnBoat or false
 _G.AutoCollectLevi = _G.AutoCollectLevi or false
@@ -16,20 +14,14 @@ _G.AutoRejoinCD = _G.AutoRejoinCD or false
 _G.AutoBuyTicket = _G.AutoBuyTicket or false
 _G.BoatSpeed = _G.BoatSpeed or 100
 
--- Leviathan 部位关键词
-local leviNames = {
-	"Leviathan", "Levi", "利维坦", "LeviSegment", "LeviHead",
-	"Heart", "心脏", "Leviathan Heart", "LeviathanHeart", "SeaBeast",
-	"FrozenWatcher", "Frozen", "LeviSpine", "LeviTail", "LeviBody",
-	"MainSegment", "Segment",
-}
+local leviNames = { "Leviathan","Levi","利维坦","LeviSegment","LeviHead",
+	"Heart","心脏","Leviathan Heart","LeviathanHeart","SeaBeast",
+	"FrozenWatcher","Frozen","LeviSpine","LeviTail","LeviBody",
+	"MainSegment","Segment" }
 
--- ==================== WindUI ====================
+-- WindUI
 local WindUI
-pcall(function()
-	WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-end)
-
+pcall(function() WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))() end)
 if WindUI then
 	local Window = WindUI:CreateWindow({
 		Title = "利维坦自动", Icon = "", Author = "kiyo", Folder = "WindUI",
@@ -37,7 +29,6 @@ if WindUI then
 		Acrylic = false, HideSearchBar = false, SideBarWidth = 180, ToggleKey = Enum.KeyCode.G,
 	})
 	local MainTab = Window:Tab({ Title = "利维坦", Icon = "sword" })
-
 	MainTab:Section({ Title = "自动刷取" })
 	MainTab:Toggle({ Title = "自动刷利维坦", Value = _G.AutoLeviathan, Callback = function(v) _G.AutoLeviathan = v end })
 	MainTab:Toggle({ Title = "自动召唤船", Value = _G.AutoSpawnBoat, Callback = function(v) _G.AutoSpawnBoat = v end })
@@ -45,145 +36,124 @@ if WindUI then
 	MainTab:Toggle({ Title = "自动重进 (冷却后)", Value = _G.AutoRejoinCD, Callback = function(v) _G.AutoRejoinCD = v end })
 	MainTab:Toggle({ Title = "自动买票", Value = _G.AutoBuyTicket, Callback = function(v) _G.AutoBuyTicket = v end })
 	MainTab:Slider({ Title = "船只速度", Value = { Min = 30, Max = 300, Default = _G.BoatSpeed }, Callback = function(v) _G.BoatSpeed = v end })
-
 	MainTab:Section({ Title = "透视" })
 	MainTab:Toggle({ Title = "利维坦 ESP", Value = _G.ESP_Leviathan, Callback = function(v) _G.ESP_Leviathan = v end })
 end
 
--- ==================== 工具函数 ====================
 local function isLeviPart(obj)
 	local name = obj.Name:lower()
-	local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-	local grandName = obj.Parent and obj.Parent.Parent and obj.Parent.Parent.Name:lower() or ""
+	local pn = obj.Parent and obj.Parent.Name:lower() or ""
+	local gn = obj.Parent and obj.Parent.Parent and obj.Parent.Parent.Name:lower() or ""
 	for _, kw in ipairs(leviNames) do
-		if name:find(kw:lower()) or parentName:find(kw:lower()) or grandName:find(kw:lower()) then
-			return true
-		end
+		local l = kw:lower()
+		if name:find(l) or pn:find(l) or gn:find(l) then return true end
 	end
 	return false
 end
 
 local function findLeviParts()
-	local parts = {}
-	local seen = {}
-
-	local function scan(folder)
-		if not folder then return end
-		for _, child in ipairs(folder:GetChildren()) do
-			if not seen[child] and isLeviPart(child) then
-				seen[child] = true
-				if child:IsA("BasePart") or child:IsA("Model") then
-					local hum = child:FindFirstChildOfClass("Humanoid") or child:FindFirstChild("Humanoid")
-					local root = child:IsA("BasePart") and child or child:FindFirstChildWhichIsA("BasePart")
+	local parts, seen = {}, {}
+	local function scan(f)
+		if not f then return end
+		for _, c in ipairs(f:GetChildren()) do
+			if not seen[c] and isLeviPart(c) then
+				seen[c] = true
+				if c:IsA("BasePart") or c:IsA("Model") then
+					local root = c:IsA("BasePart") and c or c:FindFirstChildWhichIsA("BasePart")
 					if root then
-						table.insert(parts, {
-							obj = child,
-							part = root,
-							hum = hum,
-							name = child.Name,
-						})
+						table.insert(parts, {obj=c, part=root, hum=c:FindFirstChildOfClass("Humanoid") or c:FindFirstChild("Humanoid"), name=c.Name})
 					end
 				end
 			end
-			if child:IsA("Model") or child:IsA("Folder") then
-				scan(child)
-			end
+			if c:IsA("Model") or c:IsA("Folder") then scan(c) end
 		end
 	end
-
 	scan(Workspace:FindFirstChild("SeaBeasts"))
 	scan(Workspace:FindFirstChild("SeaEvents"))
 	scan(Workspace:FindFirstChild("Bosses"))
-	scan(Workspace) -- 兜底
-
+	scan(Workspace)
 	return parts
 end
 
--- 初始化远程
 local function getRemotes()
-	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-	local mods = ReplicatedStorage:FindFirstChild("Modules")
-	local net = mods and mods:FindFirstChild("Net")
-	return remotes, mods, net
+	local m = ReplicatedStorage:FindFirstChild("Modules")
+	local n = m and m:FindFirstChild("Net")
+	return ReplicatedStorage:FindFirstChild("Remotes"), m, n
 end
 
--- ==================== 攻击逻辑 ====================
+local function findMyBoat()
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("Model") then
+			local seat = obj:FindFirstChildWhichIsA("VehicleSeat")
+			if seat and seat.Occupant == LocalPlayer.Character then return obj end
+		end
+	end
+end
+
+local function spawnBoat()
+	local _, _, net = getRemotes()
+	local commF = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+	if commF then pcall(function() commF:InvokeServer("Boat") end) end
+end
+
+-- 攻击逻辑
 task.spawn(function()
-	while task.wait(0.15) do
-		if not _G.AutoLeviathan then continue end
+	local lastAttack = 0
+	while task.wait() do
+		if not _G.AutoLeviathan then task.wait(0.5); continue end
+		local elapsed = tick() - lastAttack
+		if elapsed < 0.15 then task.wait(0.15 - elapsed) end
+		lastAttack = tick()
 
 		pcall(function()
 			local leviParts = findLeviParts()
 			if #leviParts == 0 then
-				-- 没有利维坦: 尝试召唤船出海
-				if _G.AutoSpawnBoat then
-					spawnBoat()
-				end
+				if _G.AutoSpawnBoat then spawnBoat() end
 				return
 			end
-
 			local char = LocalPlayer.Character
 			local root = char and char:FindFirstChild("HumanoidRootPart")
 			if not root then return end
-
-			local _, mods, net = getRemotes()
+			local _, _, net = getRemotes()
 			if not net then return end
-
 			local RA = net:FindFirstChild("RE/RegisterAttack") or net:FindFirstChild("RegisterAttack")
 			local RH = net:FindFirstChild("RE/RegisterHit") or net:FindFirstChild("RegisterHit")
 			if not RA or not RH then return end
 
-			-- 找到最近的利维坦部位
-			local nearestPart = nil
-			local nearestDist = math.huge
+			local nearest, nd = nil, math.huge
 			for _, lp in ipairs(leviParts) do
 				local d = (lp.part.Position - root.Position).Magnitude
-				if d < nearestDist then
-					nearestDist = d
-					nearestPart = lp
+				if d < nd then nd = d; nearest = lp end
+			end
+			if not nearest then return end
+
+			if nd > 100 then
+				local boat = findMyBoat()
+				local seat = boat and boat:FindFirstChildWhichIsA("VehicleSeat")
+				if seat then
+					seat.CFrame = CFrame.new(nearest.part.Position + Vector3.new(0,20,-30))
+				else
+					root.CFrame = CFrame.new(nearest.part.Position + Vector3.new(0,20,-30))
 				end
 			end
 
-			if nearestPart then
-				-- 传送到部位附近
-				if nearestDist > 100 then
-					local boat = findMyBoat()
-					if boat then
-						-- 控制船只靠近
-						local boatRoot = boat:FindFirstChild("VehicleSeat") or boat:FindFirstChildWhichIsA("BasePart")
-						if boatRoot then
-							boatRoot.CFrame = CFrame.new(nearestPart.part.Position + Vector3.new(0, 20, -30))
-						end
-					else
-						-- 直接传送角色
-						root.CFrame = CFrame.new(nearestPart.part.Position + Vector3.new(0, 20, -30))
-					end
-				end
+			local hitList = {}
+			for _, lp in ipairs(leviParts) do
+				local model = lp.obj:IsA("Model") and lp.obj or lp.obj.Parent
+				if model then table.insert(hitList, {model, lp.part}) end
+			end
+			if #hitList > 0 then
+				RA:FireServer(0.3)
+				RH:FireServer(nearest.part, hitList)
+			end
 
-				-- 构建攻击列表 (攻击所有利维坦部位)
-				local hitList = {}
-				for _, lp in ipairs(leviParts) do
-					local part = lp.part
+			for _, lp in ipairs(leviParts) do
+				local n = lp.name:lower()
+				if n:find("heart") or n:find("心脏") then
 					local model = lp.obj:IsA("Model") and lp.obj or lp.obj.Parent
 					if model then
-						table.insert(hitList, {model, part})
-					end
-				end
-
-				-- 发包攻击
-				if #hitList > 0 then
-					RA:FireServer(0.3)
-					RH:FireServer(nearestPart.part, hitList)
-				end
-
-				-- 心脏优先逻辑
-				for _, lp in ipairs(leviParts) do
-					if lp.name:lower():find("heart") or lp.name:lower():find("心脏") then
-						local hum = lp.obj:FindFirstChildOfClass("Humanoid") or lp.obj.Parent and lp.obj.Parent:FindFirstChildOfClass("Humanoid")
-						if hum and hum.Health > 0 then
-							RA:FireServer(0.3)
-							RH:FireServer(lp.part, {{lp.obj:IsA("Model") and lp.obj or lp.obj.Parent, lp.part}})
-						end
+						RA:FireServer(0.3)
+						RH:FireServer(lp.part, {{model, lp.part}})
 					end
 				end
 			end
@@ -191,61 +161,7 @@ task.spawn(function()
 	end
 end)
 
--- ==================== 获取我的船 ====================
-local function findMyBoat()
-	for _, obj in ipairs(Workspace:GetDescendants()) do
-		if obj:IsA("Model") and obj.Name:lower():find("boat") then
-			local seat = obj:FindFirstChild("VehicleSeat")
-			if seat and seat.Occupant == LocalPlayer.Character and LocalPlayer.Character then
-				return obj
-			end
-		end
-	end
-	-- 也搜索 BoatModel / PirateBoat 等
-	for _, obj in ipairs(Workspace:GetChildren()) do
-		if obj:IsA("Model") then
-			local seat = obj:FindFirstChildWhichIsA("VehicleSeat")
-			if seat and seat.Occupant and seat.Occupant:IsDescendantOf(LocalPlayer.Character or Instance.new("Model")) then
-				return obj
-			end
-		end
-	end
-	return nil
-end
-
-local function spawnBoat()
-	local _, _, net = getRemotes()
-	if not net then return end
-
-	-- 尝试各种召唤船的远程
-	local commF = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
-	if commF then
-		pcall(function() commF:InvokeServer("Boat") end)
-	end
-
-	-- 或者直接点屏幕上的船按钮
-	local pg = LocalPlayer:FindFirstChild("PlayerGui")
-	if pg then
-		for _, btn in ipairs(pg:GetDescendants()) do
-			if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-				local t = (btn:IsA("TextButton") and btn.Text or btn.Name):lower()
-				if t:find("boat") or t:find("船") or t:find("spawn") then
-					pcall(function()
-						local vim = game:GetService("VirtualInputManager")
-						local absPos = btn.AbsolutePosition
-						local absSize = btn.AbsoluteSize
-						vim:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, true, game, 0)
-						task.wait(0.05)
-						vim:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, false, game, 0)
-					end)
-					return
-				end
-			end
-		end
-	end
-end
-
--- ==================== 自动收集掉落 ====================
+-- 自动收集掉落
 task.spawn(function()
 	while task.wait(0.5) do
 		if not _G.AutoCollectLevi then continue end
@@ -253,14 +169,13 @@ task.spawn(function()
 			local char = LocalPlayer.Character
 			local root = char and char:FindFirstChild("HumanoidRootPart")
 			if not root then return end
-
 			for _, obj in ipairs(Workspace:GetDescendants()) do
-				local name = obj.Name:lower()
-				if name:find("item") or name:find("chest") or name:find("reward") or name:find("drop") or name:find("scale") or name:find("heart") or name:find("scale") then
+				local n = obj.Name:lower()
+				if n:find("item") or n:find("chest") or n:find("reward") or n:find("drop") or n:find("scale") or n:find("heart") then
 					local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
 					local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
 					if pp and pp.Enabled ~= false and part and (part.Position - root.Position).Magnitude < 100 then
-						root.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+						root.CFrame = part.CFrame + Vector3.new(0,3,0)
 						fireproximityprompt(pp)
 					end
 				end
@@ -269,120 +184,87 @@ task.spawn(function()
 	end
 end)
 
--- ==================== 利维坦 ESP ====================
+-- 利维坦 ESP
 if Drawing then
 	task.spawn(function()
 		while task.wait(0.3) do
 			if not _G.ESP_Leviathan then continue end
-
 			local leviParts = findLeviParts()
 			local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 			local myPos = myRoot and myRoot.Position
-
 			for _, lp in ipairs(leviParts) do
 				local pos, onScreen = Camera:WorldToViewportPoint(lp.part.Position)
 				if not onScreen then continue end
-
 				local dist = myPos and math.floor((lp.part.Position - myPos).Magnitude) or 0
 				local hpText = ""
 				if lp.hum then
 					local hp = lp.hum.MaxHealth > 0 and math.floor(lp.hum.Health/lp.hum.MaxHealth*100) or 0
 					hpText = " HP:" .. hp .. "%"
 				end
-
 				local d = Drawing.new("Text")
 				d.Text = lp.name .. " | " .. dist .. "m" .. hpText
-				d.Color = Color3.fromRGB(255, 80, 80)
-				d.Size = 14; d.Center = true; d.Outline = true; d.Visible = true
-				d.Position = Vector2.new(pos.X, pos.Y)
-				d.Font = 2
-
+				d.Color = Color3.fromRGB(255,80,80); d.Size = 14; d.Center = true; d.Outline = true; d.Visible = true
+				d.Position = Vector2.new(pos.X, pos.Y); d.Font = 2
 				task.delay(0.35, function() pcall(function() d:Remove() end) end)
 			end
 		end
 	end)
 end
 
--- ==================== 船只速度控制 ====================
+-- 船只速度
 task.spawn(function()
 	while task.wait(0.5) do
 		if not _G.AutoLeviathan then continue end
 		pcall(function()
 			local boat = findMyBoat()
 			if not boat then return end
-			local seat = boat:FindFirstChildWhichIsA("VehicleSeat")
-			if not seat then return end
-
-			-- 压制船只速度属性
 			for _, v in ipairs(boat:GetDescendants()) do
 				if v:IsA("BodyVelocity") or v:IsA("BodyMover") or v:IsA("RocketPropulsion") then
-					if v.MaxForce then v.MaxForce = Vector3.new(1,1,1) * 1e6 end
+					if v.MaxForce then v.MaxForce = Vector3.new(1,1,1)*1e6 end
 				end
-			end
-
-			-- 检测并修复 AngularVelocity
-			local rootPart = boat:FindFirstChildWhichIsA("BasePart")
-			if rootPart then
-				rootPart.AssemblyAngularVelocity = Vector3.zero
 			end
 		end)
 	end
 end)
 
--- ==================== 自动重进 (冷却后) ====================
+-- 自动重进 (冷却后)
 task.spawn(function()
 	while task.wait(5) do
 		if not _G.AutoRejoinCD then continue end
 		pcall(function()
 			local leviParts = findLeviParts()
-			if #leviParts > 0 then
-				-- 有利维坦: 记下并继续打
-				continue
-			end
-
-			-- 检查是否在新战斗中 (看是否有 SeaBeast/SeaEvent 存活)
+			-- 有利维坦就跳过
+			if #leviParts > 0 then return end
 			local seaBeasts = Workspace:FindFirstChild("SeaBeasts")
 			local seaEvents = Workspace:FindFirstChild("SeaEvents")
 			local hasEnemy = (seaBeasts and #seaBeasts:GetChildren() > 0) or (seaEvents and #seaEvents:GetChildren() > 0)
+			if hasEnemy then return end
 
-			if not hasEnemy then
-				-- 没有利维坦也没有其他海怪, 判定已打完
-				-- 等冷却: 检测 ReplicatedStorage 中的冷却计时
-				local hasCooldown = false
-				for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-					if obj.Name:lower():find("cooldown") or obj.Name:lower():find("levi") then
-						local val = tonumber(obj:GetAttribute("Value") or obj:GetAttribute("Cooldown") or obj.Value)
-						if val and val > 0 then hasCooldown = true; break end
-					end
+			local hasCooldown = false
+			for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+				local n = obj.Name:lower()
+				if n:find("cooldown") or n:find("levi") then
+					local val = tonumber(obj:GetAttribute("Value") or obj:GetAttribute("Cooldown") or obj.Value)
+					if val and val > 0 then hasCooldown = true; break end
 				end
-
-				if hasCooldown then
-					print("[冷却] 检测到利维坦冷却中, 重进服务器...")
-					task.wait(2)
-					-- 重进服务器
-					local ts = game:GetService("TeleportService")
-					pcall(function()
-						ts:Teleport(game.PlaceId, LocalPlayer)
-					end)
-					-- 备选方案
-					pcall(function()
-						local commF = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
-						if commF then
-							commF:InvokeServer("Rejoin")
-						end
-					end)
-				end
+			end
+			if hasCooldown then
+				print("[冷却] 检测到利维坦冷却, 重进服务器...")
+				task.wait(2)
+				pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer) end)
+				pcall(function()
+					local commF = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+					if commF then commF:InvokeServer("Rejoin") end
+				end)
 			end
 		end)
 	end
 end)
 
--- ==================== 自动买票 ====================
+-- 自动买票
 task.spawn(function()
 	while task.wait(3) do
 		if not _G.AutoBuyTicket then continue end
-
-		-- 方法1: 直接发包买票
 		pcall(function()
 			local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 			local commF = remotes and remotes:FindFirstChild("CommF_")
@@ -392,8 +274,6 @@ task.spawn(function()
 				commF:InvokeServer("PurchaseTicket")
 			end
 		end)
-
-		-- 方法2: 点击 GUI 买票按钮
 		pcall(function()
 			local pg = LocalPlayer:FindFirstChild("PlayerGui")
 			if not pg then return end
@@ -401,53 +281,24 @@ task.spawn(function()
 				if btn:IsA("TextButton") or btn:IsA("ImageButton") then
 					local t = ((btn:IsA("TextButton") and btn.Text) or btn.Name or ""):lower()
 					if t:find("buy") and (t:find("ticket") or t:find("票") or t:find("levi")) then
-						local absPos = btn.AbsolutePosition
-						local absSize = btn.AbsoluteSize
+						local ax = btn.AbsolutePosition.X + btn.AbsoluteSize.X/2
+						local ay = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y/2
 						local vim = game:GetService("VirtualInputManager")
-						vim:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, true, game, 0)
+						vim:SendMouseButtonEvent(ax, ay, 0, true, game, 0)
 						task.wait(0.05)
-						vim:SendMouseButtonEvent(absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, 0, false, game, 0)
-						print("[购买] 已点击买票按钮: " .. btn.Name)
+						vim:SendMouseButtonEvent(ax, ay, 0, false, game, 0)
+						print("[购买] 已点击: " .. btn.Name)
 						return
 					end
 				end
 			end
 		end)
-
-		-- 方法3: 传送到 NPC 处买票 (Third Sea Tiki Outpost)
-		local char = LocalPlayer.Character
-		local root = char and char:FindFirstChild("HumanoidRootPart")
-		if root then
-			-- Tiki Outpost NPC 坐标 (第三海)
-			local ticketNPCPos = Vector3.new(-17000, 50, 0) -- 大致位置
-			root.CFrame = CFrame.new(ticketNPCPos)
-			task.wait(0.5)
-			-- 找附近 ProximityPrompt
-			for _, obj in ipairs(Workspace:GetDescendants()) do
-				local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-				if pp and pp.Enabled ~= false then
-					local txt = (pp.ActionText or pp.ObjectText or ""):lower()
-					if txt:find("ticket") or txt:find("buy") or txt:find("purchase") or txt:find("票") or txt:find("购买") then
-						local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-						if part and (part.Position - root.Position).Magnitude < 20 then
-							fireproximityprompt(pp)
-							print("[购买] 已交互 NPC: " .. obj.Name)
-							task.wait(1)
-							return
-						end
-					end
-				end
-			end
-		end
 	end
 end)
 
--- ==================== 通知 ====================
 task.spawn(function()
 	task.wait(1)
-	print("=" .. string.rep("=", 40))
-	print("  Blox Fruits 利维坦自动刷取 已加载")
-	if WindUI then print("  按 G 打开 GUI") end
-	print("  当前利维坦部位数量: " .. #findLeviParts())
-	print("=" .. string.rep("=", 40))
+	print(string.rep("=", 40))
+	print("  利维坦自动刷取 已加载 | 部位数: " .. #findLeviParts())
+	print(string.rep("=", 40))
 end)
