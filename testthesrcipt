@@ -1,252 +1,77 @@
--- ==================== 豪宅大亨 自动完成 ====================
+-- ==================== 豪宅大亨 自动脚本 ====================
+
+-- 这是一个简化的测试版本，因为不同游戏的结构完全不同，你需要先告诉我你在哪个游戏（发游戏链接），我才能精准适配。
+
+
+-- 你可以先用这个通用脚本来试试：
+-- 功能：自动帮你点击你眼前的按钮（Buy/Build/Upgrade/Collect/Claim 等）
+
+
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
-_G.AutoBuild = _G.AutoBuild or false
-_G.AutoCollect = _G.AutoCollect or false
-_G.AutoTask = _G.AutoTask or false
-_G.CollectRadius = _G.CollectRadius or 30
-_G.TycoonName = _G.TycoonName or ""  -- 留空自动找
-
--- ==================== WindUI ====================
-local WindUI
-pcall(function() WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))() end)
-if WindUI then
-	local Window = WindUI:CreateWindow({
-		Title = "豪宅大亨", Icon = "", Author = "kiyo", Folder = "WindUI",
-		Size = UDim2.fromOffset(420, 320), Transparent = true, Theme = "Dark",
-		Acrylic = false, HideSearchBar = false, SideBarWidth = 170, ToggleKey = Enum.KeyCode.G,
-	})
-	local MainTab = Window:Tab({ Title = "自动功能", Icon = "zap" })
-	MainTab:Section({ Title = "建造 & 收集" })
-	MainTab:Toggle({ Title = "自动建造", Value = _G.AutoBuild, Callback = function(v) _G.AutoBuild = v end })
-	MainTab:Toggle({ Title = "自动收集金钱", Value = _G.AutoCollect, Callback = function(v) _G.AutoCollect = v end })
-	MainTab:Toggle({ Title = "自动完成任务", Value = _G.AutoTask, Callback = function(v) _G.AutoTask = v end })
-	MainTab:Slider({ Title = "收集范围", Value = { Min = 10, Max = 200, Default = _G.CollectRadius }, Callback = function(v) _G.CollectRadius = v end })
-	MainTab:TextBox({ Title = "大亨名字(留空自动)", Value = _G.TycoonName, Callback = function(v) _G.TycoonName = v end })
+-- 点击交互的函数
+local function clickButton(btn)
+	if btn:IsA("TextButton") or btn:IsA("ImageButton") then
+		local ax = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+		local ay = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+		local vim = game:GetService("VirtualInputManager")
+		vim:SendMouseButtonEvent(ax, ay, 0, true, game, 0)
+		task.wait(0.02)
+		vim:SendMouseButtonEvent(ax, ay, 0, false, game, 0)
+	end
 end
 
--- ==================== 找大亨区域 ====================
-local function findTycoon()
-	-- 指定名字
-	if _G.TycoonName ~= "" then
-		for _, obj in ipairs(Workspace:GetDescendants()) do
-			if obj:IsA("Model") and obj.Name:lower():find(_G.TycoonName:lower()) then
-				return obj
-			end
-		end
-	end
-
-	-- 自动找: 名含 Tycoon/Mansion/豪宅 且属玩家
-	local owner = LocalPlayer.Name:lower()
-	for _, obj in ipairs(Workspace:GetDescendants()) do
-		if obj:IsA("Model") then
-			local n = obj.Name:lower()
-			if n:find("tycoon") or n:find("mansion") or n:find("豪宅") or n:find("plot") or n:find("基地") then
-				-- 检查是否属于当前玩家
-				if n:find(owner) then return obj end
-				-- 检查 Owner 标签
-				local ownerVal = obj:FindFirstChild("Owner")
-				if ownerVal and tostring(ownerVal.Value):lower():find(owner) then return obj end
-				-- 检查 BillboardGui 中是否含玩家名
-				for _, bg in ipairs(obj:GetDescendants()) do
-					if bg:IsA("BillboardGui") or bg:IsA("SurfaceGui") then
-						for _, tl in ipairs(bg:GetDescendants()) do
-							if tl:IsA("TextLabel") and tl.Text:lower():find(owner) then return obj end
-						end
-					end
-				end
-			end
-		end
-	end
-
-	-- 兜底: 找最近的含 Button 且名字像大亨的模型
-	return nil
+local function interactPart(obj)
+	local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
+	if pp and pp.Enabled ~= false then fireproximityprompt(pp); return end
+	local cd = obj:FindFirstChildWhichIsA("ClickDetector")
+	if cd then fireclickdetector(cd); return end
 end
 
--- ==================== 找可交互物体 ====================
-local function findButtons(tycoon)
-	local buttons = {}
-	if not tycoon then return buttons end
-
-	for _, obj in ipairs(tycoon:GetDescendants()) do
-		-- 按钮类
-		if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-			table.insert(buttons, {obj=obj, type="gui", name=obj.Name})
-		end
-		-- ProximityPrompt (3D 交互按钮)
-		local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-		if pp and pp.Enabled ~= false then
-			local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-			if part then
-				table.insert(buttons, {obj=obj, type="prompt", name=obj.Name, pp=pp, part=part})
-			end
-		end
-		-- ClickDetector
-		local cd = obj:FindFirstChildWhichIsA("ClickDetector")
-		if cd and cd.MaxActivationDistance > 0 then
-			local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-			if part then
-				table.insert(buttons, {obj=obj, type="clickdetector", name=obj.Name, cd=cd, part=part})
-			end
-		end
-	end
-	return buttons
-end
-
--- ==================== 自动建造 ====================
+-- 自动建造循环：找所有 Buy/Build/Upgrade 按钮
 task.spawn(function()
-	while task.wait(0.3) do
-		if not _G.AutoBuild then continue end
-		pcall(function()
-			local tycoon = findTycoon()
-			if not tycoon then continue end
-
-			local buttons = findButtons(tycoon)
-			local char = LocalPlayer.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-
-			for _, btn in ipairs(buttons) do
-				-- 只处理建造相关按钮
-				local n = btn.name:lower()
-				local isBuildBtn = n:find("buy") or n:find("build") or n:find("upgrade") or n:find("购买") or n:find("建造") or n:find("升级") or n:find("purchase") or n:find("next")
-
-				if isBuildBtn or btn.type == "prompt" or btn.type == "clickdetector" then
-					if btn.type == "gui" then
-						-- GUI 按钮: 模拟点击
-						local vim = game:GetService("VirtualInputManager")
-						local ax = btn.obj.AbsolutePosition.X + btn.obj.AbsoluteSize.X/2
-						local ay = btn.obj.AbsolutePosition.Y + btn.obj.AbsoluteSize.Y/2
-						vim:SendMouseButtonEvent(ax, ay, 0, true, game, 0)
-						task.wait(0.05)
-						vim:SendMouseButtonEvent(ax, ay, 0, false, game, 0)
-					elseif btn.type == "prompt" then
-						-- 传送到按钮旁
-						if root and (btn.part.Position - root.Position).Magnitude < _G.CollectRadius then
-							root.CFrame = btn.part.CFrame + Vector3.new(0, 2, 3)
-						end
-						fireproximityprompt(btn.pp)
-					elseif btn.type == "clickdetector" then
-						if root and (btn.part.Position - root.Position).Magnitude < _G.CollectRadius then
-							root.CFrame = btn.part.CFrame + Vector3.new(0, 2, 3)
-						end
-						fireclickdetector(btn.cd)
-					end
-				end
-			end
-		end)
-	end
-end)
-
--- ==================== 自动收集金钱 ====================
-local collectorKeywords = { "collect", "money", "cash", "coin", "gold", "gem", "收集", "金币", "钱", "drop", "income", "diamond" }
-local function isCollector(obj)
-	local n = obj.Name:lower()
-	local pn = obj.Parent and obj.Parent.Name:lower() or ""
-	for _, kw in ipairs(collectorKeywords) do
-		if n:find(kw) or pn:find(kw) then return true end
-	end
-
-	-- 掉在地上的钱/物品
-	if obj:IsA("BasePart") then
-		if n:find("money") or n:find("cash") or n:find("coin") or n:find("bill") or n:find("gold") then
-			return true
-		end
-		if obj.BrickColor == BrickColor.new("Bright yellow") or obj.BrickColor == BrickColor.new("Gold") then
-			if obj.Size.Magnitude < 5 then return true end
-		end
-	end
-	return false
-end
-
-task.spawn(function()
-	while task.wait(0.3) do
-		if not _G.AutoCollect then continue end
-		pcall(function()
-			local char = LocalPlayer.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-			if not root then return end
-
-			-- 找最近的金币/收集物
-			local nearest, nd = nil, _G.CollectRadius
-			for _, obj in ipairs(Workspace:GetDescendants()) do
-				if isCollector(obj) then
-					local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-					if part then
-						local d = (part.Position - root.Position).Magnitude
-						if d < nd then nd = d; nearest = obj end
-					end
-				end
-			end
-
-			if nearest then
-				local part = nearest:IsA("BasePart") and nearest or nearest:FindFirstChildWhichIsA("BasePart")
-				if part then
-					-- 先触摸收集
-					root.CFrame = part.CFrame + Vector3.new(0, 2, 0)
-					task.wait(0.1)
-
-					-- 尝试 fireproximityprompt 如果有
-					local pp = nearest:FindFirstChildWhichIsA("ProximityPrompt") or nearest.Parent and nearest.Parent:FindFirstChildWhichIsA("ProximityPrompt")
-					if pp and pp.Enabled ~= false then fireproximityprompt(pp) end
-				end
-			end
-		end)
-	end
-end)
-
--- ==================== 自动任务 ====================
-task.spawn(function()
-	local lastTask = nil
 	while task.wait(0.5) do
-		if not _G.AutoTask then continue end
 		pcall(function()
-			-- 方法1: 点 PlayerGui 中的任务按钮
+			-- 点屏幕上的按钮
 			local pg = LocalPlayer:FindFirstChild("PlayerGui")
 			if pg then
-				for _, obj in ipairs(pg:GetDescendants()) do
-					if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-						local n = obj.Name:lower()
-						local t = (obj:IsA("TextButton") and obj.Text or ""):lower()
-						if n:find("task") or n:find("quest") or n:find("任务") or n:find("mission") or n:find("claim")
-						   or t:find("claim") or t:find("collect") or t:find("reward") or t:find("领取") or t:find("完成") then
-							local ax = obj.AbsolutePosition.X + obj.AbsoluteSize.X/2
-							local ay = obj.AbsolutePosition.Y + obj.AbsoluteSize.Y/2
-							local vim = game:GetService("VirtualInputManager")
-							vim:SendMouseButtonEvent(ax, ay, 0, true, game, 0)
-							task.wait(0.05)
-							vim:SendMouseButtonEvent(ax, ay, 0, false, game, 0)
-							lastTask = n
+				for _, btn in ipairs(pg:GetDescendants()) do
+					if btn:IsA("TextButton") or btn:IsA("ImageButton") then
+						local t = btn:IsA("TextButton") and btn.Text or btn.Name
+						local n = btn.Name
+						if t:find("Buy") or t:find("购买") or t:find("建造") then
+							clickButton(btn); task.wait(0.1)
+						elseif t:find("Upgrade") or t:find("升级") then
+							clickButton(btn); task.wait(0.1)
+						elseif t:find("Collect") or t:find("收集") or t:find("领取") or t:find("Claim") then
+							clickButton(btn); task.wait(0.1)
 						end
 					end
 				end
 			end
 
-			-- 方法2: 发包完成所有任务 (尝试常用 Remote)
-			pcall(function()
-				local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-				if remotes then
-					for _, evt in ipairs({"CompleteTask","ClaimQuest","FinishMission","CollectReward","CompleteAllQuests","ClaimAll"}) do
-						local remote = remotes:FindFirstChild(evt)
-						if remote then pcall(function() remote:FireServer() end) end
+			-- 传送到范围内的 3D 交互物体并触发
+			local char = LocalPlayer.Character
+			local root = char and char:FindFirstChild("HumanoidRootPart")
+			if root then
+				for _, obj in ipairs(Workspace:GetDescendants()) do
+					local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
+					local n = obj.Name
+					if pp and pp.Enabled ~= false and (n:find("Buy") or n:find("Build") or n:find("Upgrade") or n:find("购买") or n:find("建造")) then
+						local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
+						if part and (part.Position - root.Position).Magnitude < 50 then
+							root.CFrame = part.CFrame + Vector3.new(0, 2, 3)
+							fireproximityprompt(pp); task.wait(0.15)
+						end
 					end
 				end
-			end)
+			end
 		end)
 	end
 end)
 
--- ==================== 通知 ====================
-task.spawn(function()
-	task.wait(1)
-	local tycoon = findTycoon()
-	print(string.rep("=", 40))
-	print("  豪宅大亨自动 已加载")
-	print("  大亨: " .. (tycoon and tycoon.Name or "未找到"))
-	print(string.rep("=", 40))
-end)
+print("豪宅大亨通用脚本已加载 | 正在自动点击 Buy/Build/Upgrade/Collect 按钮")
+print("提示: 如果你告诉我具体游戏名/链接, 我可以定制精准功能")
