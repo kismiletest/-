@@ -1,191 +1,127 @@
--- ==================== Blox Fruits 自动清背包 / 毁果实 / 用完钱 ====================
+-- ==================== Blox Fruits 毁号脚本 ====================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- ==================== 全局变量 ====================
-_G.DestroyFruits = _G.DestroyFruits or false
-_G.AutoBuyBoat = _G.AutoBuyBoat or false
-_G.DestroyFrags = _G.DestroyFrags or false
+-- ==================== 白屏遮罩 ====================
+local overlay = Instance.new("Frame")
+overlay.Size = UDim2.new(1, 0, 1, 0)
+overlay.BackgroundColor3 = Color3.new(1, 1, 1)
+overlay.BorderSizePixel = 0
+overlay.Visible = true
+overlay.ZIndex = 1000
 
--- ==================== 工具函数 ====================
-local function getRemotes()
-	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-	local commF = remotes and remotes:FindFirstChild("CommF_")
-	local commE = remotes and remotes:FindFirstChild("CommE")
-	return remotes, commF, commE
+local whiteGui = Instance.new("ScreenGui")
+whiteGui.Name = "DestroyOverlay"
+whiteGui.ResetOnSpawn = false
+whiteGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+whiteGui.Parent = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer.PlayerGui
+overlay.Parent = whiteGui
+
+-- ==================== 远程 ====================
+local function getCommF()
+	local r = ReplicatedStorage:FindFirstChild("Remotes")
+	if not r then return nil end
+	return r:FindFirstChild("CommF_") or r:FindFirstChild("CommF")
 end
 
-local function getBackpackFruits()
-	local fruits = {}
-	local bp = LocalPlayer:FindFirstChild("Backpack")
-	if bp then
-		for _, tool in ipairs(bp:GetChildren()) do
-			if tool:IsA("Tool") and tool.ToolTip == "Blox Fruit" then
-				table.insert(fruits, tool)
-			end
-		end
-	end
-	-- 手上的果实
-	local char = LocalPlayer.Character
-	if char then
-		local held = char:FindFirstChildOfClass("Tool")
-		if held and held.ToolTip == "Blox Fruit" then
-			table.insert(fruits, held)
-		end
-	end
-	return fruits
+local function getCommE()
+	local r = ReplicatedStorage:FindFirstChild("Remotes")
+	if not r then return nil end
+	return r:FindFirstChild("CommE")
 end
 
--- ==================== 毁掉背包所有果实 ====================
+-- ==================== 毁果实 ====================
 task.spawn(function()
-	while task.wait(0.3) do
-		if not _G.DestroyFruits then continue end
-
-		local fruits = getBackpackFruits()
-		if #fruits == 0 then
-			print("[毁果实] 背包已空，停止。")
-			_G.DestroyFruits = false
-			continue
-		end
-
+	while true do
+		task.wait(0.3)
 		pcall(function()
-			for _, fruit in ipairs(fruits) do
-				local char = LocalPlayer.Character
-				local hum = char and char:FindFirstChild("Humanoid")
+			local bp = LocalPlayer:FindFirstChild("Backpack")
+			if not bp then return end
 
-				-- 装备果实
-				if hum then
-					hum:EquipTool(fruit)
-					task.wait(0.1)
-				end
-
-				-- 方法1: 丢掉 (Drop 到 Workspace)
-				if fruit.Parent == char then
-					fruit.Parent = Workspace
-					print("[丢] 已扔掉: " .. fruit.Name)
-					task.wait(0.1)
-				end
-
-				-- 方法2: 摧毁果实对象
-				if fruit.Parent then
-					pcall(function() fruit:Destroy() end)
-					print("[毁] 已删除: " .. fruit.Name)
+			local fruits = {}
+			for _, t in ipairs(bp:GetChildren()) do
+				if t:IsA("Tool") and t.ToolTip == "Blox Fruit" then
+					table.insert(fruits, t)
 				end
 			end
+
+			local char = LocalPlayer.Character
+			if char then
+				for _, t in ipairs(char:GetChildren()) do
+					if t:IsA("Tool") and t.ToolTip == "Blox Fruit" then
+						table.insert(fruits, t)
+					end
+				end
+			end
+
+			if #fruits == 0 then
+				print("[毁果实] 已完成, 背包空了")
+				return
+			end
+
+			local fruit = fruits[1]
+			local hum = char and char:FindFirstChild("Humanoid")
+
+			-- 装备
+			if hum and fruit.Parent ~= char then
+				pcall(function() hum:EquipTool(fruit) end)
+				task.wait(0.2)
+			end
+
+			-- 丢到 Workspace 再删除
+			pcall(function() fruit.Parent = Workspace end)
+			task.wait(0.05)
+			pcall(function() fruit:Destroy() end)
+
+			print("[毁果实] 删除了: " .. fruit.Name)
 		end)
 	end
 end)
 
 -- ==================== 自动买船 (消耗 Beli) ====================
 task.spawn(function()
-	while task.wait(1) do
-		if not _G.AutoBuyBoat then continue end
-
+	while true do
+		task.wait(0.8)
 		pcall(function()
-			local _, commF, _ = getRemotes()
+			local commF = getCommF()
 			if not commF then return end
 
-			-- 购买船只 (Beli 消耗核心)
 			commF:InvokeServer("BuyBoat")
 			commF:InvokeServer("Boat", "Buy")
-			commF:InvokeServer("PurchaseBoat")
-			print("[买船] 已尝试购买船只 (-Beli)")
-
-			-- 备选: 直接买最贵的船
-			pcall(function()
-				commF:InvokeServer("BuyBoat", "Luxury")
-				commF:InvokeServer("BuyBoat", "Destroyer")
-				commF:InvokeServer("BuyBoat", "Enforcer")
-			end)
-
-			task.wait(0.5)
+			pcall(function() commF:InvokeServer("BuyBoat", "Enforcer") end)
+			pcall(function() commF:InvokeServer("BuyBoat", "Destroyer") end)
+			print("[买船] 购买船只消耗 Beli")
 		end)
 	end
 end)
 
--- ==================== 用掉所有碎片 (觉醒 / 重置等) ====================
+-- ==================== 毁碎片 ====================
 task.spawn(function()
-	while task.wait(0.6) do
-		if not _G.DestroyFrags then continue end
-
+	while true do
+		task.wait(0.8)
 		pcall(function()
-			local _, commF, commE = getRemotes()
+			local commF = getCommF()
+			local commE = getCommE()
 
-			-- 方法1: 去觉醒(消耗碎片)
 			if commF then
-				commF:InvokeServer("Awakening", "Buy")
+				pcall(function() commF:InvokeServer("Awakening", "Buy") end)
 			end
-
-			-- 方法2: 种族抽奖 (消耗碎片)
 			if commE then
-				commE:FireServer("RaceV2", "Roll")
+				pcall(function() commE:FireServer("RaceV2", "Roll") end)
 			end
 
-			-- 方法3: 刷新能力
-			if commF then
-				commF:InvokeServer("Fragments", "Spend")
-			end
-
-			task.wait(0.3)
+			print("[碎片] 消耗碎片")
 		end)
 	end
 end)
 
--- ==================== 自动换果实 (买+丢循环清仓库) ====================
-task.spawn(function()
-	while task.wait(0.3) do
-		if not _G.AutoRollFruit then continue end
-
-		-- 先丢掉当前手上果实
-		local char = LocalPlayer.Character
-		if char then
-			local held = char:FindFirstChildOfClass("Tool")
-			if held and held.ToolTip == "Blox Fruit" then
-				held.Parent = Workspace
-				task.wait(0.1)
-				pcall(function() held:Destroy() end)
-			end
-		end
-
-		-- 再买一个新的 (消耗 Beli)
-		pcall(function()
-			local _, commF, _ = getRemotes()
-			if commF then
-				commF:InvokeServer("Cousin", "Buy")
-				print("[换果实] 已购买新果实")
-			end
-		end)
-
-		-- 点 GUI 上的抽果实按钮 (如果游戏改版了远程)
-		pcall(function()
-			local pg = LocalPlayer:FindFirstChild("PlayerGui")
-			if pg then
-				for _, btn in ipairs(pg:GetDescendants()) do
-					if btn:IsA("TextButton") then
-						local t = btn.Text:lower()
-						if t:find("roll") or t:find("spin") or t:find("buy") or t:find("抽") or t:find("购买") or t:find("refresh") then
-							local ax = btn.AbsolutePosition.X + btn.AbsoluteSize.X/2
-							local ay = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y/2
-							local vim = game:GetService("VirtualInputManager")
-							vim:SendMouseButtonEvent(ax, ay, 0, true, game, 0)
-							task.wait(0.03)
-							vim:SendMouseButtonEvent(ax, ay, 0, false, game, 0)
-						end
-					end
-				end
-			end
-		end)
-	end
-end)
-
--- ==================== 控制台快捷命令 ====================
-print(string.rep("=", 50))
-print("  Blox Fruits 自动毁物品脚本 已加载")
-print("")
-print("  控制台输入以下命令启动:")
-print("  _G.DestroyFruits = true   -- 毁掉所有果实")
-print("  _G.AutoBuyBoat = true     -- 自动买船 (消耗 Beli)")
-print("  _G.DestroyFrags = true    -- 用掉所有碎片")
-print("  _G.AutoRollFruit = true   -- 自动买新果实+丢掉循环")
-print(string.rep("=", 50))
+-- ==================== 通知 ====================
+print(string.rep("=", 40))
+print("  毁号脚本已启动")
+print("  屏幕已变白 - 正在执行:")
+print("  1. 删除所有果实")
+print("  2. 无限买船消耗 Beli")
+print("  3. 消耗所有碎片")
+print(string.rep("=", 40))
