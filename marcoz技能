@@ -1,0 +1,128 @@
+-- 初始化全局开关状态 
+getgenv().AutoSoruEnabled = false 
+
+local Players = game:GetService("Players") 
+local LocalPlayer = Players.LocalPlayer 
+local Mouse = LocalPlayer:GetMouse() 
+local VirtualInputManager = game:GetService("VirtualInputManager") 
+local RunService = game:GetService("RunService") 
+
+----------------------------------- 
+-- 1. 创建 GUI 开关 
+----------------------------------- 
+local ScreenGui = Instance.new("ScreenGui") 
+ScreenGui.Parent = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui") 
+
+local Frame = Instance.new("Frame") 
+Frame.Size = UDim2.new(0, 160, 0, 50) 
+Frame.Position = UDim2.new(0.5, -80, 0, 0) 
+Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35) 
+Frame.BorderSizePixel = 0 
+Frame.Active = true 
+Frame.Draggable = true 
+Frame.Parent = ScreenGui 
+
+local UICorner = Instance.new("UICorner") 
+UICorner.CornerRadius = UDim.new(0, 8) 
+UICorner.Parent = Frame 
+
+local ToggleButton = Instance.new("TextButton") 
+ToggleButton.Size = UDim2.new(1, 0, 1, 0) 
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 65, 65) 
+ToggleButton.Text = "自动瞄准 & Z键: 关" 
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255) 
+ToggleButton.Font = Enum.Font.GothamBold 
+ToggleButton.TextSize = 14 
+ToggleButton.Parent = Frame 
+
+local BtnCorner = Instance.new("UICorner") 
+BtnCorner.CornerRadius = UDim.new(0, 8) 
+BtnCorner.Parent = ToggleButton 
+
+ToggleButton.MouseButton1Click:Connect(function() 
+    getgenv().AutoSoruEnabled = not getgenv().AutoSoruEnabled 
+    if getgenv().AutoSoruEnabled then 
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(65, 255, 65) 
+        ToggleButton.Text = "自动瞄准 & Z键: 开" 
+    else 
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 65, 65) 
+        ToggleButton.Text = "自动瞄准 & Z键: 关" 
+    end 
+end) 
+
+----------------------------------- 
+-- 2. 获取最近的玩家 
+----------------------------------- 
+local function getNearestPlayer() 
+    local nearestPlayer = nil 
+    local shortestDistance = math.huge 
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") 
+
+    if not myRoot then return nil end 
+
+    for _, player in pairs(Players:GetPlayers()) do 
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then 
+            local humanoid = player.Character:FindFirstChild("Humanoid") 
+            if humanoid and humanoid.Health > 0 then 
+                local distance = (myRoot.Position - player.Character.HumanoidRootPart.Position).Magnitude 
+                if distance < shortestDistance then 
+                    shortestDistance = distance 
+                    nearestPlayer = player 
+                end 
+            end 
+        end 
+    end 
+    return nearestPlayer 
+end 
+
+----------------------------------- 
+-- 3. 拦截 Mouse.Hit (Aimbot) 
+----------------------------------- 
+local oldIndex 
+oldIndex = hookmetamethod(game, "__index", function(self, key) 
+    if getgenv().AutoSoruEnabled and self == Mouse then 
+        if key == "Hit" or key == "Target" then 
+            local nearest = getNearestPlayer() 
+            if nearest and nearest.Character and nearest.Character:FindFirstChild("HumanoidRootPart") then 
+                if key == "Hit" then 
+                    return nearest.Character.HumanoidRootPart.CFrame 
+                elseif key == "Target" then 
+                    return nearest.Character.HumanoidRootPart 
+                end 
+            end 
+        end 
+    end 
+    return oldIndex(self, key) 
+end) 
+
+----------------------------------- 
+-- 4. 循环检测 UI 冷却并触发 Z 键 
+----------------------------------- 
+task.spawn(function() 
+    while task.wait() do 
+        if getgenv().AutoSoruEnabled then 
+            pcall(function() 
+                local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui") 
+                if not PlayerGui then return end 
+                
+                local CooldownUI = PlayerGui.MobileContextButtons.ContextButtonFrame.BoundActionSoru.Button.Cooldown 
+                
+                local percentageVal = 0 
+                if CooldownUI:FindFirstChild("Percentage") and CooldownUI.Percentage:IsA("NumberValue") then 
+                    percentageVal = CooldownUI.Percentage.Value 
+                elseif CooldownUI:GetAttribute("Percentage") then 
+                    percentageVal = CooldownUI:GetAttribute("Percentage") 
+                else 
+                    percentageVal = CooldownUI.Percentage 
+                end 
+
+                if type(percentageVal) == "number" and percentageVal >= 0.98 then 
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Z, false, game) 
+                    task.wait() 
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Z, false, game) 
+                    task.wait(0.1) 
+                end 
+            end) 
+        end 
+    end 
+end)
