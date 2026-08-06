@@ -1,304 +1,149 @@
--- ==================== Blox Fruits 自动刷利维坦 ====================
+-- ==================== Rivals 自瞄脚本 ====================
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
 
-_G.AutoLeviathan = _G.AutoLeviathan or false
-_G.AutoSpawnBoat = _G.AutoSpawnBoat or false
-_G.AutoCollectLevi = _G.AutoCollectLevi or false
-_G.ESP_Leviathan = _G.ESP_Leviathan or false
-_G.AutoRejoinCD = _G.AutoRejoinCD or false
-_G.AutoBuyTicket = _G.AutoBuyTicket or false
-_G.BoatSpeed = _G.BoatSpeed or 100
+-- ==================== 全局变量 ====================
+_G.Aimbot = _G.Aimbot or false
+_G.AimbotFOV = _G.AimbotFOV or 150
+_G.AimbotSmooth = _G.AimbotSmooth or 0.3
+_G.AimbotPart = _G.AimbotPart or "Head"
+_G.AimbotTeamCheck = _G.AimbotTeamCheck or true
+_G.AimbotWallCheck = _G.AimbotWallCheck or false
+_G.AimbotShowFOV = _G.AimbotShowFOV or false
+_G.AimbotKeybind = _G.AimbotKeybind or "C"
 
-local leviNames = { "Leviathan","Levi","利维坦","LeviSegment","LeviHead",
-	"Heart","心脏","Leviathan Heart","LeviathanHeart","SeaBeast",
-	"FrozenWatcher","Frozen","LeviSpine","LeviTail","LeviBody",
-	"MainSegment","Segment" }
-
--- WindUI
+-- ==================== WindUI ====================
 local WindUI
 pcall(function() WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))() end)
 if WindUI then
 	local Window = WindUI:CreateWindow({
-		Title = "利维坦自动", Icon = "", Author = "kiyo", Folder = "WindUI",
-		Size = UDim2.fromOffset(460, 360), Transparent = true, Theme = "Dark",
-		Acrylic = false, HideSearchBar = false, SideBarWidth = 180, ToggleKey = Enum.KeyCode.G,
+		Title = "Rivals Aimbot", Icon = "", Author = "", Folder = "WindUI",
+		Size = UDim2.fromOffset(420, 380), Transparent = true, Theme = "Dark",
+		Acrylic = false, HideSearchBar = false, SideBarWidth = 170, ToggleKey = Enum.KeyCode.G,
 	})
-	local MainTab = Window:Tab({ Title = "利维坦", Icon = "sword" })
-	MainTab:Section({ Title = "自动刷取" })
-	MainTab:Toggle({ Title = "自动刷利维坦", Value = _G.AutoLeviathan, Callback = function(v) _G.AutoLeviathan = v end })
-	MainTab:Toggle({ Title = "自动召唤船", Value = _G.AutoSpawnBoat, Callback = function(v) _G.AutoSpawnBoat = v end })
-	MainTab:Toggle({ Title = "自动收集掉落", Value = _G.AutoCollectLevi, Callback = function(v) _G.AutoCollectLevi = v end })
-	MainTab:Toggle({ Title = "自动重进 (冷却后)", Value = _G.AutoRejoinCD, Callback = function(v) _G.AutoRejoinCD = v end })
-	MainTab:Toggle({ Title = "自动买票", Value = _G.AutoBuyTicket, Callback = function(v) _G.AutoBuyTicket = v end })
-	MainTab:Slider({ Title = "船只速度", Value = { Min = 30, Max = 300, Default = _G.BoatSpeed }, Callback = function(v) _G.BoatSpeed = v end })
-	MainTab:Section({ Title = "透视" })
-	MainTab:Toggle({ Title = "利维坦 ESP", Value = _G.ESP_Leviathan, Callback = function(v) _G.ESP_Leviathan = v end })
+	local Tab = Window:Tab({ Title = "自瞄", Icon = "crosshair" })
+
+	Tab:Section({ Title = "自瞄设置" })
+	Tab:Toggle({ Title = "自瞄开关", Value = _G.Aimbot, Callback = function(v) _G.Aimbot = v end })
+	Tab:Slider({ Title = "FOV 范围", Value = { Min = 30, Max = 600, Default = _G.AimbotFOV }, Callback = function(v) _G.AimbotFOV = v end })
+	Tab:Slider({ Title = "平滑度", Value = { Min = 0, Max = 1, Default = _G.AimbotSmooth, Float = 0.05 }, Callback = function(v) _G.AimbotSmooth = v end })
+	Tab:Dropdown({ Title = "瞄准部位", Values = {"Head","Torso","UpperTorso","LowerTorso","HumanoidRootPart"}, Value = _G.AimbotPart, Callback = function(v) _G.AimbotPart = v end })
+	Tab:Toggle({ Title = "队友检测", Value = _G.AimbotTeamCheck, Callback = function(v) _G.AimbotTeamCheck = v end })
+	Tab:Toggle({ Title = "穿墙检测", Value = _G.AimbotWallCheck, Callback = function(v) _G.AimbotWallCheck = v end })
+	Tab:Toggle({ Title = "显示 FOV 圈", Value = _G.AimbotShowFOV, Callback = function(v) _G.AimbotShowFOV = v end })
 end
 
-local function isLeviPart(obj)
-	local name = obj.Name:lower()
-	local pn = obj.Parent and obj.Parent.Name:lower() or ""
-	local gn = obj.Parent and obj.Parent.Parent and obj.Parent.Parent.Name:lower() or ""
-	for _, kw in ipairs(leviNames) do
-		local l = kw:lower()
-		if name:find(l) or pn:find(l) or gn:find(l) then return true end
-	end
-	return false
-end
-
-local function findLeviParts()
-	local parts, seen = {}, {}
-	local function scan(f)
-		if not f then return end
-		for _, c in ipairs(f:GetChildren()) do
-			if not seen[c] and isLeviPart(c) then
-				seen[c] = true
-				if c:IsA("BasePart") or c:IsA("Model") then
-					local root = c:IsA("BasePart") and c or c:FindFirstChildWhichIsA("BasePart")
-					if root then
-						table.insert(parts, {obj=c, part=root, hum=c:FindFirstChildOfClass("Humanoid") or c:FindFirstChild("Humanoid"), name=c.Name})
-					end
-				end
-			end
-			if c:IsA("Model") or c:IsA("Folder") then scan(c) end
-		end
-	end
-	scan(Workspace:FindFirstChild("SeaBeasts"))
-	scan(Workspace:FindFirstChild("SeaEvents"))
-	scan(Workspace:FindFirstChild("Bosses"))
-	scan(Workspace)
-	return parts
-end
-
-local function getRemotes()
-	local m = ReplicatedStorage:FindFirstChild("Modules")
-	local n = m and m:FindFirstChild("Net")
-	return ReplicatedStorage:FindFirstChild("Remotes"), m, n
-end
-
-local function findMyBoat()
-	for _, obj in ipairs(Workspace:GetDescendants()) do
-		if obj:IsA("Model") then
-			local seat = obj:FindFirstChildWhichIsA("VehicleSeat")
-			if seat and seat.Occupant == LocalPlayer.Character then return obj end
-		end
-	end
-end
-
-local function spawnBoat()
-	local _, _, net = getRemotes()
-	local commF = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
-	if commF then pcall(function() commF:InvokeServer("Boat") end) end
-end
-
--- 攻击逻辑
-task.spawn(function()
-	local lastAttack = 0
-	while task.wait() do
-		if not _G.AutoLeviathan then task.wait(0.5); continue end
-		local elapsed = tick() - lastAttack
-		if elapsed < 0.15 then task.wait(0.15 - elapsed) end
-		lastAttack = tick()
-
-		pcall(function()
-			local leviParts = findLeviParts()
-			if #leviParts == 0 then
-				if _G.AutoSpawnBoat then spawnBoat() end
-				return
-			end
-			local char = LocalPlayer.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-			if not root then return end
-			local _, _, net = getRemotes()
-			if not net then return end
-			local RA = net:FindFirstChild("RE/RegisterAttack") or net:FindFirstChild("RegisterAttack")
-			local RH = net:FindFirstChild("RE/RegisterHit") or net:FindFirstChild("RegisterHit")
-			if not RA or not RH then return end
-
-			local nearest, nd = nil, math.huge
-			for _, lp in ipairs(leviParts) do
-				local d = (lp.part.Position - root.Position).Magnitude
-				if d < nd then nd = d; nearest = lp end
-			end
-			if not nearest then return end
-
-			if nd > 100 then
-				local boat = findMyBoat()
-				local seat = boat and boat:FindFirstChildWhichIsA("VehicleSeat")
-				if seat then
-					seat.CFrame = CFrame.new(nearest.part.Position + Vector3.new(0,20,-30))
-				else
-					root.CFrame = CFrame.new(nearest.part.Position + Vector3.new(0,20,-30))
-				end
-			end
-
-			local hitList = {}
-			for _, lp in ipairs(leviParts) do
-				local model = lp.obj:IsA("Model") and lp.obj or lp.obj.Parent
-				if model then table.insert(hitList, {model, lp.part}) end
-			end
-			if #hitList > 0 then
-				RA:FireServer(0.3)
-				RH:FireServer(nearest.part, hitList)
-			end
-
-			for _, lp in ipairs(leviParts) do
-				local n = lp.name:lower()
-				if n:find("heart") or n:find("心脏") then
-					local model = lp.obj:IsA("Model") and lp.obj or lp.obj.Parent
-					if model then
-						RA:FireServer(0.3)
-						RH:FireServer(lp.part, {{model, lp.part}})
-					end
-				end
-			end
-		end)
-	end
-end)
-
--- 自动收集掉落
-task.spawn(function()
-	while task.wait(0.5) do
-		if not _G.AutoCollectLevi then continue end
-		pcall(function()
-			local char = LocalPlayer.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
-			if not root then return end
-			for _, obj in ipairs(Workspace:GetDescendants()) do
-				local n = obj.Name:lower()
-				if n:find("item") or n:find("chest") or n:find("reward") or n:find("drop") or n:find("scale") or n:find("heart") then
-					local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
-					local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-					if pp and pp.Enabled ~= false and part and (part.Position - root.Position).Magnitude < 100 then
-						root.CFrame = part.CFrame + Vector3.new(0,3,0)
-						fireproximityprompt(pp)
-					end
-				end
-			end
-		end)
-	end
-end)
-
--- 利维坦 ESP
+-- ==================== FOV 圈 ====================
+local fovCircle
 if Drawing then
-	task.spawn(function()
-		while task.wait(0.3) do
-			if not _G.ESP_Leviathan then continue end
-			local leviParts = findLeviParts()
-			local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-			local myPos = myRoot and myRoot.Position
-			for _, lp in ipairs(leviParts) do
-				local pos, onScreen = Camera:WorldToViewportPoint(lp.part.Position)
-				if not onScreen then continue end
-				local dist = myPos and math.floor((lp.part.Position - myPos).Magnitude) or 0
-				local hpText = ""
-				if lp.hum then
-					local hp = lp.hum.MaxHealth > 0 and math.floor(lp.hum.Health/lp.hum.MaxHealth*100) or 0
-					hpText = " HP:" .. hp .. "%"
-				end
-				local d = Drawing.new("Text")
-				d.Text = lp.name .. " | " .. dist .. "m" .. hpText
-				d.Color = Color3.fromRGB(255,80,80); d.Size = 14; d.Center = true; d.Outline = true; d.Visible = true
-				d.Position = Vector2.new(pos.X, pos.Y); d.Font = 2
-				task.delay(0.35, function() pcall(function() d:Remove() end) end)
-			end
-		end
-	end)
+	fovCircle = Drawing.new("Circle")
+	fovCircle.Visible = _G.AimbotShowFOV
+	fovCircle.Color = Color3.fromRGB(255, 50, 50)
+	fovCircle.Radius = _G.AimbotFOV
+	fovCircle.Thickness = 1.5
+	fovCircle.Filled = false
+	fovCircle.NumSides = 64
 end
 
--- 船只速度
-task.spawn(function()
-	while task.wait(0.5) do
-		if not _G.AutoLeviathan then continue end
-		pcall(function()
-			local boat = findMyBoat()
-			if not boat then return end
-			for _, v in ipairs(boat:GetDescendants()) do
-				if v:IsA("BodyVelocity") or v:IsA("BodyMover") or v:IsA("RocketPropulsion") then
-					if v.MaxForce then v.MaxForce = Vector3.new(1,1,1)*1e6 end
-				end
-			end
-		end)
+RunService.RenderStepped:Connect(function()
+	if fovCircle then
+		fovCircle.Visible = _G.AimbotShowFOV
+		fovCircle.Radius = _G.AimbotFOV
+		local mp = UIS:GetMouseLocation()
+		fovCircle.Position = mp.X > 0 and mp or Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 	end
 end)
 
--- 自动重进 (冷却后)
-task.spawn(function()
-	while task.wait(5) do
-		if not _G.AutoRejoinCD then continue end
-		pcall(function()
-			local leviParts = findLeviParts()
-			-- 有利维坦就跳过
-			if #leviParts > 0 then return end
-			local seaBeasts = Workspace:FindFirstChild("SeaBeasts")
-			local seaEvents = Workspace:FindFirstChild("SeaEvents")
-			local hasEnemy = (seaBeasts and #seaBeasts:GetChildren() > 0) or (seaEvents and #seaEvents:GetChildren() > 0)
-			if hasEnemy then return end
+-- ==================== 工具函数 ====================
+local function isEnemy(player)
+	if not player or player == LocalPlayer then return false end
+	if _G.AimbotTeamCheck then
+		if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then return false end
+		local char = player.Character
+		if char then
+			local teamTag = char:GetAttribute("Team") or char:FindFirstChild("Team")
+			if teamTag then
+				local myTag = LocalPlayer.Character and LocalPlayer.Character:GetAttribute("Team")
+				if myTag and tostring(teamTag) == tostring(myTag) then return false end
+			end
+		end
+	end
+	return true
+end
 
-			local hasCooldown = false
-			for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-				local n = obj.Name:lower()
-				if n:find("cooldown") or n:find("levi") then
-					local val = tonumber(obj:GetAttribute("Value") or obj:GetAttribute("Cooldown") or obj.Value)
-					if val and val > 0 then hasCooldown = true; break end
-				end
-			end
-			if hasCooldown then
-				print("[冷却] 检测到利维坦冷却, 重进服务器...")
-				task.wait(2)
-				pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer) end)
-				pcall(function()
-					local commF = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
-					if commF then commF:InvokeServer("Rejoin") end
-				end)
-			end
-		end)
+local function isAlive(player)
+	local char = player.Character
+	if not char then return false end
+	local hum = char:FindFirstChildOfClass("Humanoid") or char:FindFirstChild("Humanoid")
+	return hum and hum.Health > 0
+end
+
+local function isVisible(targetPart)
+	if not _G.AimbotWallCheck then return true end
+	local camPos = Camera.CFrame.Position
+	local dir = (targetPart.Position - camPos).Unit * (targetPart.Position - camPos).Magnitude
+	local ray = Ray.new(camPos, dir)
+	local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character}, false, true)
+	return not hit or hit:IsDescendantOf(targetPart.Parent)
+end
+
+-- ==================== 自瞄逻辑 ====================
+local lastAimTime = 0
+RunService.RenderStepped:Connect(function()
+	if not _G.Aimbot then return end
+
+	local mousePos = UIS:GetMouseLocation()
+	if mousePos.X <= 0 or mousePos.Y <= 0 then return end
+
+	local fov = _G.AimbotFOV
+	local closest, closestDist = nil, fov
+	local camPos = Camera.CFrame.Position
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if not isEnemy(player) then continue end
+		if not isAlive(player) then continue end
+
+		local targetPart = player.Character:FindFirstChild(_G.AimbotPart)
+		if not targetPart then continue end
+
+		-- 屏幕坐标
+		local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+		if not onScreen then continue end
+
+		local screenPoint = Vector2.new(pos.X, pos.Y)
+		local dist = (screenPoint - mousePos).Magnitude
+		if dist < closestDist then
+			-- 穿墙检测
+			if not isVisible(targetPart) then continue end
+			closestDist = dist
+			closest = targetPart
+		end
+	end
+
+	if closest then
+		local targetPos = Camera:WorldToViewportPoint(closest.Position)
+		local targetScreen = Vector2.new(targetPos.X, targetPos.Y)
+		local smooth = _G.AimbotSmooth
+
+		if smooth <= 0 then
+			-- 直接锁定
+			mousemoverel(targetScreen.X - mousePos.X, targetScreen.Y - mousePos.Y)
+		else
+			-- 平滑移动
+			local deltaX = (targetScreen.X - mousePos.X) * (1 - smooth)
+			local deltaY = (targetScreen.Y - mousePos.Y) * (1 - smooth)
+			mousemoverel(deltaX, deltaY)
+		end
 	end
 end)
 
--- 自动买票
-task.spawn(function()
-	while task.wait(3) do
-		if not _G.AutoBuyTicket then continue end
-		pcall(function()
-			local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-			local commF = remotes and remotes:FindFirstChild("CommF_")
-			if commF then
-				commF:InvokeServer("BuyLeviTicket")
-				commF:InvokeServer("BuyTicket", "Leviathan")
-				commF:InvokeServer("PurchaseTicket")
-			end
-		end)
-		pcall(function()
-			local pg = LocalPlayer:FindFirstChild("PlayerGui")
-			if not pg then return end
-			for _, btn in ipairs(pg:GetDescendants()) do
-				if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-					local t = ((btn:IsA("TextButton") and btn.Text) or btn.Name or ""):lower()
-					if t:find("buy") and (t:find("ticket") or t:find("票") or t:find("levi")) then
-						local ax = btn.AbsolutePosition.X + btn.AbsoluteSize.X/2
-						local ay = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y/2
-						local vim = game:GetService("VirtualInputManager")
-						vim:SendMouseButtonEvent(ax, ay, 0, true, game, 0)
-						task.wait(0.05)
-						vim:SendMouseButtonEvent(ax, ay, 0, false, game, 0)
-						print("[购买] 已点击: " .. btn.Name)
-						return
-					end
-				end
-			end
-		end)
-	end
-end)
-
-task.spawn(function()
-	task.wait(1)
-	print(string.rep("=", 40))
-	print("  利维坦自动刷取 已加载 | 部位数: " .. #findLeviParts())
-	print(string.rep("=", 40))
-end)
+-- ==================== 通知 ====================
+print(string.rep("=", 45))
+print("  Rivals 自瞄已加载")
+if WindUI then print("  按 G 打开 GUI | 按住 C 键自瞄") end
+print(string.rep("=", 45))
