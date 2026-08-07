@@ -51,7 +51,21 @@ _G.G_FastAttackMode = _G.G_FastAttackMode or "模式2(部分账号失效用)"
 _G.G_AttackMobs = _G.G_AttackMobs ~= true
 _G.G_AttackPlayers = _G.G_AttackPlayers ~= true
 _G.G_DragonGunM1 = _G.G_DragonGunM1 or false
+_G.G_M1FireInterval = _G.G_M1FireInterval or 0.2
 _G.G_FruitM1 = _G.G_FruitM1 or false
+
+-- 杂项变量
+_G.G_currentZoom = _G.G_currentZoom or 0
+_G.G_DodgeNoCooldown = _G.G_DodgeNoCooldown or false
+_G.G_DashLengthEnabled = _G.G_DashLengthEnabled or false
+_G.G_DashLength = _G.G_DashLength or 5
+_G.G_RemoveFog = _G.G_RemoveFog or false
+_G.G_RemoveGhostShip = _G.G_RemoveGhostShip or false
+_G.G_spinEnabled = _G.G_spinEnabled or false
+_G.G_spinSpeed = _G.G_spinSpeed or 10
+_G.G_NoMove = _G.G_NoMove or false
+
+-- 自动技能变量
 
 -- 初始化 ESP 变量
 _G.G_ESPEnabled = _G.G_ESPEnabled ~= false
@@ -174,7 +188,7 @@ end)
 local Window = WindUI:CreateWindow({
     Title = "kiyo hub",
     Icon = "",
-    Author = "by kiyo",
+    Author = "kiyo",
     Folder = "WindUI",
     Size = UDim2.fromOffset(580, 460),
     Transparent = true,
@@ -1519,7 +1533,7 @@ task.spawn(function()
         end
         return closest
     end
-    while task.wait(0.085) do
+    while task.wait(_G.G_M1FireInterval or 0.2) do
         if not _G.G_DragonGunM1 then continue end
         pcall(function()
             local char = LocalPlayer.Character
@@ -1607,6 +1621,141 @@ local function SetFruitM1Enabled(enabled)
     end
 end
 if _G.G_FruitM1 then SetFruitM1Enabled(true) end
+
+-- ================= 视角缩放 =================
+local function ApplyCameraZoom()
+	if _G.G_currentZoom > 0 then
+		LocalPlayer.CameraMaxZoomDistance = _G.G_currentZoom
+	end
+end
+LocalPlayer.CharacterAdded:Connect(function() task.wait(1); ApplyCameraZoom() end)
+task.spawn(function() task.wait(0.5); ApplyCameraZoom() end)
+
+-- ================= 冲刺无冷却 =================
+local DodgeNoCooldownRunning = false
+local function DodgeNoCooldown()
+	if _G.G_DodgeNoCooldown and not DodgeNoCooldownRunning then
+		DodgeNoCooldownRunning = true
+		task.spawn(function()
+			if not getgc then DodgeNoCooldownRunning = false; return end
+			for _, v in next, getgc() do
+				local char = LocalPlayer.Character
+				if char and char:FindFirstChild("Dodge") then
+					if typeof(v) == "function" and getfenv(v).script == char.Dodge then
+						for i2, v2 in next, debug.getupvalues(v) do
+							if tostring(v2) == "0.4" then
+								task.spawn(function()
+									while _G.G_DodgeNoCooldown do
+										debug.setupvalue(v, i2, 0)
+										task.wait(0.1)
+									end
+									DodgeNoCooldownRunning = false
+								end)
+							end
+						end
+					end
+				end
+			end
+		end)
+	end
+end
+if _G.G_DodgeNoCooldown then DodgeNoCooldown() end
+LocalPlayer.CharacterAdded:Connect(function() if _G.G_DodgeNoCooldown then task.wait(1); DodgeNoCooldown() end end)
+
+-- ================= 冲刺距离 =================
+local DashConnection = nil
+local function ManageDashLength()
+	if _G.G_DashLengthEnabled then
+		if DashConnection then task.cancel(DashConnection) end
+		DashConnection = task.spawn(function()
+			while _G.G_DashLengthEnabled do
+				task.wait(0.1)
+				local character = LocalPlayer.Character
+				if character then
+					character:SetAttribute("DashLength", _G.G_DashLength)
+					character:SetAttribute("DashLengthAir", _G.G_DashLength)
+				end
+			end
+		end)
+	else
+		if DashConnection then
+			local character = LocalPlayer.Character
+			if character then character:SetAttribute("DashLength", 1); character:SetAttribute("DashLengthAir", 1) end
+			task.cancel(DashConnection); DashConnection = nil
+		end
+	end
+end
+if _G.G_DashLengthEnabled then ManageDashLength() end
+
+-- ================= 移除雾 =================
+local function DoRemoveFog()
+	pcall(function()
+		local ls = game:GetService("Lighting")
+		if ls:FindFirstChild("LightingLayers") then ls.LightingLayers:Destroy() end
+		if ls:FindFirstChild("Sky") then ls.Sky:Destroy() end
+		ls.FogEnd = 9000000000
+	end)
+end
+if _G.G_RemoveFog then DoRemoveFog() end
+
+-- ================= 移除鬼船 =================
+local ghostShipConnection = nil
+local function RemoveGhostShipParts()
+	local map = Workspace:FindFirstChild("Map"); if not map then return end
+	local interior = map:FindFirstChild("GhostShipInterior"); if not interior then return end
+	for _, v in pairs(interior:GetChildren()) do
+		if v.Name ~= "Teleport" and v.Name ~= "TeleportSpawn" then pcall(function() v:Destroy() end) end
+	end
+end
+local function StartRemoveGhostShip()
+	RemoveGhostShipParts()
+	if not ghostShipConnection then
+		local map = Workspace:FindFirstChild("Map")
+		if map then
+			ghostShipConnection = map.ChildAdded:Connect(function(child)
+				if child.Name == "GhostShipInterior" then task.wait(0.1); RemoveGhostShipParts() end
+			end)
+		end
+	end
+end
+local function StopRemoveGhostShip()
+	if ghostShipConnection then ghostShipConnection:Disconnect(); ghostShipConnection = nil end
+end
+if _G.G_RemoveGhostShip then StartRemoveGhostShip() end
+
+-- ================= 旋转 =================
+local spinConnection
+local function StartSpin()
+	if spinConnection then return end
+	spinConnection = RunService.RenderStepped:Connect(function()
+		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+		root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(_G.G_spinSpeed), 0)
+	end)
+end
+local function StopSpin()
+	if spinConnection then spinConnection:Disconnect(); spinConnection = nil end
+end
+if _G.G_spinEnabled then StartSpin() end
+
+-- ================= 反移动 =================
+local noMoveConnection = nil
+local function StartNoMove()
+	if noMoveConnection then return end
+	local function apply(char)
+		if not char:FindFirstChild("AntiMover") then Instance.new("Folder", char).Name = "AntiMover" end
+	end
+	if LocalPlayer.Character then apply(LocalPlayer.Character) end
+	noMoveConnection = LocalPlayer.CharacterAdded:Connect(apply)
+end
+local function StopNoMove()
+	if noMoveConnection then noMoveConnection:Disconnect(); noMoveConnection = nil end
+	pcall(function()
+		local anti = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("AntiMover")
+		if anti then anti:Destroy() end
+	end)
+end
+if _G.G_NoMove then StartNoMove() end
 
 -- ================= 构建 WindUI 界面 =================
 local FOVSection = FOVTab:Section({ Title = "自瞄范围设置" })
@@ -1844,6 +1993,17 @@ AuraTab:Toggle({
     Callback = function(v) _G.G_DragonGunM1 = v end
 })
 
+AuraTab:Slider({
+    Title = "枪械 m1 发射间隔",
+    Step = 0.001,
+    Value = {
+        Min = 0.001,
+        Max = 0.2,
+        Default = _G.G_M1FireInterval or 0.2
+    },
+    Callback = function(v) _G.G_M1FireInterval = v end
+})
+
 AuraTab:Toggle({
     Title = "果实 m1",
     Value = _G.G_FruitM1,
@@ -1881,6 +2041,45 @@ MiscTab:Toggle({
     end
 })
 
+MiscTab:Slider({
+    Title = "视角缩放距离",
+    Value = { Min = 1, Max = 10000, Default = _G.G_currentZoom or 128 },
+    Callback = function(v) _G.G_currentZoom = v; ApplyCameraZoom() end
+})
+
+MiscTab:Toggle({
+    Title = "冲刺无冷却",
+    Value = _G.G_DodgeNoCooldown,
+    Callback = function(v) _G.G_DodgeNoCooldown = v; if v then DodgeNoCooldown() end end
+})
+
+MiscTab:Toggle({
+    Title = "冲刺距离修改",
+    Value = _G.G_DashLengthEnabled,
+    Callback = function(v) _G.G_DashLengthEnabled = v; ManageDashLength() end
+})
+
+MiscTab:Slider({
+    Title = "冲刺距离",
+    Value = { Min = 20, Max = 300, Default = _G.G_DashLength or 50 },
+    Callback = function(v) _G.G_DashLength = v; if _G.G_DashLengthEnabled then ManageDashLength() end end
+})
+
+MiscTab:Toggle({
+    Title = "移除雾 (需重进恢复)",
+    Value = _G.G_RemoveFog,
+    Callback = function(v) _G.G_RemoveFog = v; if v then DoRemoveFog() end end
+})
+
+MiscTab:Toggle({
+    Title = "移除鬼船 (保留传送点)",
+    Value = _G.G_RemoveGhostShip,
+    Callback = function(v)
+        _G.G_RemoveGhostShip = v
+        if v then StartRemoveGhostShip() else StopRemoveGhostShip() end
+    end
+})
+
 MiscTab:Toggle({
     Title = "自动血拳卡帧",
     Value = _G.G_AutoFpsLock,
@@ -1893,7 +2092,7 @@ MiscTab:Toggle({
 MiscTab:Toggle({
     Title = "自动武装色",
     Value = _G.G_AutoHaki,
-    Callback = function(v) _G.G_AutoHaki = v end
+    Callback = function(v) _G.G_AutoHaki =  end
 })
 
 MiscTab:Toggle({
@@ -1913,6 +2112,55 @@ MiscTab:Button({
     Callback = function()
         pcall(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/ttker951-dot/y1/refs/heads/main/fly"))()
+        end)
+    end
+})
+
+MiscTab:Toggle({
+    Title = "解帧数限制 (仅电脑)",
+    Value = false,
+    Callback = function(v)
+        if v and setfpscap then setfpscap(999) end
+    end
+})
+
+MiscTab:Toggle({
+    Title = "旋转",
+    Value = _G.G_spinEnabled,
+    Callback = function(v) _G.G_spinEnabled = v; if v then StartSpin() else StopSpin() end end
+})
+
+MiscTab:Slider({
+    Title = "旋转速度",
+    Value = { Min = 1, Max = 100, Default = _G.G_spinSpeed },
+    Callback = function(v) _G.G_spinSpeed = v end
+})
+
+MiscTab:Toggle({
+    Title = "反移动(释放技能不移动)",
+    Value = _G.G_NoMove,
+    Callback = function(v) _G.G_NoMove = v; if v then StartNoMove() else StopNoMove() end end
+})
+
+MiscTab:Button({
+    Title = "减画质",
+    Callback = function()
+        pcall(function()
+            for _, descendant in pairs(game:GetDescendants()) do
+                if descendant:IsA("Part") or descendant:IsA("Union") or descendant:IsA("CornerWedgePart") or descendant:IsA("TrussPart") then
+                    descendant.Material = "Plastic"
+                    descendant.Reflectance = 0
+                elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
+                    descendant.Transparency = 1
+                elseif descendant:IsA("ParticleEmitter") or descendant:IsA("Trail") then
+                    descendant.Lifetime = NumberRange.new(0)
+                elseif descendant:IsA("Explosion") then
+                    descendant.BlastPressure = 1
+                    descendant.BlastRadius = 1
+                elseif descendant:IsA("Fire") or descendant:IsA("SpotLight") or descendant:IsA("Smoke") then
+                    descendant.Enabled = false
+                end
+            end
         end)
     end
 })
