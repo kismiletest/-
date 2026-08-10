@@ -5,10 +5,10 @@ local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- ==================== 1. 减低技能画质 ====================
+-- ==================== 1. 大幅减低技能画质 ====================
 local gfxSettings = {
 	["Rendering"] = {
-		QualityLevel = 1,          -- 1 = 最低画质
+		QualityLevel = 1,
 		FRAME_RATE_MANAGER_MAX_FPS = 60,
 		EnableFRM = false,
 	},
@@ -23,7 +23,6 @@ local gfxSettings = {
 	},
 }
 
--- 应用设置
 pcall(function()
 	local settings = UserSettings()
 	local gameSettings = settings.GameSettings
@@ -41,25 +40,55 @@ pcall(function()
 	end
 end)
 
--- 清理所有粒子/特效
+-- 激进取消化：每 0.3 秒扫描并清理所有特效
 task.spawn(function()
-	while task.wait(1) do
+	while task.wait(0.3) do
 		pcall(function()
 			for _, obj in ipairs(Workspace:GetDescendants()) do
-				if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+				if obj:IsA("ParticleEmitter") then
+					obj.Enabled = false
+					obj.Rate = 0
+					obj:Emit(0)
+				elseif obj:IsA("Trail") then
+					obj.Enabled = false
+					obj.Lifetime = 0.01
+				elseif obj:IsA("Beam") then
 					obj.Enabled = false
 				elseif obj:IsA("Explosion") then
-					obj.BlastPressure = 1; obj.BlastRadius = 1
-				elseif obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
+					obj.BlastPressure = 0
+					obj.BlastRadius = 0
+					obj.Visible = false
+				elseif obj:IsA("Fire") then
 					obj.Enabled = false
+					obj.Heat = 0
+					obj.Size = 0
+				elseif obj:IsA("Smoke") then
+					obj.Enabled = false
+				elseif obj:IsA("Sparkles") then
+					obj.Enabled = false
+				elseif obj:IsA("PointLight") then
+					obj.Enabled = false
+					obj.Brightness = 0
+				elseif obj:IsA("SpotLight") then
+					obj.Enabled = false
+					obj.Brightness = 0
+				elseif obj:IsA("SurfaceLight") then
+					obj.Enabled = false
+					obj.Brightness = 0
+				elseif obj:IsA("BillboardGui") then
+					obj.Enabled = false
+				elseif obj:IsA("Decal") then
+					obj.Transparency = 1
+				elseif obj:IsA("Texture") then
+					obj.Transparency = 1
 				end
 			end
 		end)
 	end
 end)
 
--- ==================== 2. 天空灰色 ====================
-Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)    -- 灰色环境光
+-- ==================== 2. 天空变灰色 (真正的灰色天空) ====================
+Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
 Lighting.Ambient = Color3.fromRGB(80, 80, 80)
 Lighting.Brightness = 2
 Lighting.ClockTime = 12
@@ -69,7 +98,7 @@ Lighting.FogStart = 0
 Lighting.ColorShift_Top = Color3.fromRGB(100, 100, 100)
 Lighting.ColorShift_Bottom = Color3.fromRGB(80, 80, 80)
 
--- 删除天空盒
+-- 删除原有 Sky / 后处理
 pcall(function()
 	if Lighting:FindFirstChild("Sky") then Lighting.Sky:Destroy() end
 	if Lighting:FindFirstChild("Atmosphere") then Lighting.Atmosphere:Destroy() end
@@ -80,16 +109,118 @@ pcall(function()
 	if Lighting:FindFirstChild("DepthOfField") then Lighting.DepthOfField:Destroy() end
 end)
 
--- 持续保持灰色
+-- 创建纯灰色天空
+local grayColor = Color3.fromRGB(95, 95, 95)
+local graySky = Instance.new("Sky")
+graySky.Name = "GraySky"
+graySky.SkyboxBk = grayColor
+graySky.SkyboxDn = grayColor
+graySky.SkyboxFt = grayColor
+graySky.SkyboxLf = grayColor
+graySky.SkyboxRt = grayColor
+graySky.SkyboxUp = grayColor
+graySky.SunAngularSize = 0
+graySky.MoonAngularSize = 0
+graySky.StarCount = 0
+graySky.SunTextureId = ""
+graySky.MoonTextureId = ""
+graySky.Parent = Lighting
+
+-- 持续保持灰色天空 (防止被还原)
 task.spawn(function()
-	while task.wait(5) do
+	while task.wait(3) do
+		pcall(function()
+			local existingSky = Lighting:FindFirstChild("GraySky")
+			if not existingSky or not existingSky:IsA("Sky") then
+				local newS = Instance.new("Sky", Lighting)
+				newS.Name = "GraySky"
+				newS.SkyboxBk = grayColor
+				newS.SkyboxDn = grayColor
+				newS.SkyboxFt = grayColor
+				newS.SkyboxLf = grayColor
+				newS.SkyboxRt = grayColor
+				newS.SkyboxUp = grayColor
+				newS.SunAngularSize = 0
+				newS.MoonAngularSize = 0
+				newS.StarCount = 0
+			end
+		end)
+		pcall(function()
+			local otherSky = Lighting:FindFirstChildWhichIsA("Sky")
+			if otherSky and otherSky.Name ~= "GraySky" then otherSky:Destroy() end
+		end)
 		Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
 		Lighting.FogColor = Color3.fromRGB(100, 100, 100)
 		Lighting.FogEnd = 500
 	end
 end)
 
--- ==================== 3. 人体僵硬 (移除动画) ====================
+-- ==================== 3. FPS 显示 UI ====================
+local FPS_DISPLAY = nil
+if Drawing then
+	FPS_DISPLAY = Drawing.new("Text")
+	FPS_DISPLAY.Text = "FPS: --"
+	FPS_DISPLAY.Size = 22
+	FPS_DISPLAY.Color = Color3.fromRGB(0, 255, 100)
+	FPS_DISPLAY.Center = false
+	FPS_DISPLAY.Outline = true
+	FPS_DISPLAY.OutlineColor = Color3.fromRGB(0, 0, 0)
+	FPS_DISPLAY.Position = Vector2.new(10, 10)
+	FPS_DISPLAY.Visible = true
+	FPS_DISPLAY.Font = 2
+
+	local fpsHistory = {}
+	local fpsIndex = 0
+	task.spawn(function()
+		local lastTime = os.clock()
+		RunService.RenderStepped:Connect(function()
+			local now = os.clock()
+			local delta = now - lastTime
+			lastTime = now
+			if delta > 0 then
+				local fps = math.floor(1 / delta + 0.5)
+				fpsIndex = fpsIndex + 1
+				fpsHistory[fpsIndex] = fps
+				if fpsIndex >= 20 then
+					local total = 0
+					for _, v in pairs(fpsHistory) do total = total + v end
+					local avg = math.floor(total / 20)
+					FPS_DISPLAY.Text = "FPS: " .. avg .. "  |  低配优化"
+					fpsHistory = {}
+					fpsIndex = 0
+				end
+			end
+		end)
+	end)
+else
+	-- 备用：ScreenGui FPS
+	task.spawn(function()
+		local sg = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+		sg.Name = "FPS_Display"
+		local label = Instance.new("TextLabel", sg)
+		label.Name = "FPSLabel"
+		label.Size = UDim2.new(0, 180, 0, 28)
+		label.Position = UDim2.new(0, 10, 0, 10)
+		label.BackgroundTransparency = 0.5
+		label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		label.TextColor3 = Color3.fromRGB(0, 255, 100)
+		label.TextSize = 18
+		label.TextStrokeTransparency = 0
+		label.Font = Enum.Font.SourceSansBold
+		label.Text = "FPS: --"
+		local lastTime = os.clock()
+		RunService.RenderStepped:Connect(function()
+			local now = os.clock()
+			local delta = now - lastTime
+			lastTime = now
+			if delta > 0 then
+				label.Text = "FPS: " .. math.floor(1 / delta + 0.5) .. "  |  低配优化"
+			end
+		end)
+	end)
+end
+
+-- ==================== 4. 人体僵硬 (移除动画) ====================
 local removeAnimCharConn, removeAnimTrackConn
 
 local function disableAnim(char)
@@ -116,7 +247,8 @@ startNoAnim()
 -- ==================== 通知 ====================
 print(string.rep("=", 40))
 print("  低配优化已开启:")
-print("  1. 技能画质最低 | 粒子/轨迹/光束/爆炸 全禁用")
-print("  2. 天空灰色 | Fog 拉近 | 后处理全删")
-print("  3. 角色僵硬 | 所有动画停止")
+print("  1. 技能画质最低 | 粒子/光效/贴图/光束 全禁用")
+print("  2. 真正的灰色天空 | 无太阳/月亮/星星")
+print("  3. FPS 显示 | 左上角实时帧数")
+print("  4. 角色僵硬 | 所有动画停止")
 print(string.rep("=", 40))
