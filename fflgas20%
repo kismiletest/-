@@ -87,117 +87,43 @@ task.spawn(function()
 	end
 end)
 
--- ==================== 2. 天空变灰色 (真正的灰色天空) ====================
-Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-Lighting.Ambient = Color3.fromRGB(80, 80, 80)
-Lighting.Brightness = 2
-Lighting.ClockTime = 12
-Lighting.FogColor = Color3.fromRGB(100, 100, 100)
-Lighting.FogEnd = 500
-Lighting.FogStart = 0
-Lighting.ColorShift_Top = Color3.fromRGB(100, 100, 100)
-Lighting.ColorShift_Bottom = Color3.fromRGB(80, 80, 80)
-
--- 删除原有 Sky / 后处理
-pcall(function()
-	if Lighting:FindFirstChild("Sky") then Lighting.Sky:Destroy() end
-	if Lighting:FindFirstChild("Atmosphere") then Lighting.Atmosphere:Destroy() end
-	if Lighting:FindFirstChild("Bloom") then Lighting.Bloom:Destroy() end
-	if Lighting:FindFirstChild("Blur") then Lighting.Blur:Destroy() end
-	if Lighting:FindFirstChild("SunRays") then Lighting.SunRays:Destroy() end
-	if Lighting:FindFirstChild("ColorCorrection") then Lighting.ColorCorrection:Destroy() end
-	if Lighting:FindFirstChild("DepthOfField") then Lighting.DepthOfField:Destroy() end
-end)
-
--- 创建纯灰色天空
-local grayColor = Color3.fromRGB(95, 95, 95)
-local graySky = Instance.new("Sky")
-graySky.Name = "GraySky"
-graySky.SkyboxBk = grayColor
-graySky.SkyboxDn = grayColor
-graySky.SkyboxFt = grayColor
-graySky.SkyboxLf = grayColor
-graySky.SkyboxRt = grayColor
-graySky.SkyboxUp = grayColor
-graySky.SunAngularSize = 0
-graySky.MoonAngularSize = 0
-graySky.StarCount = 0
-graySky.SunTextureId = ""
-graySky.MoonTextureId = ""
-graySky.Parent = Lighting
-
--- 持续保持灰色天空 (防止被还原)
+-- ==================== 2. FPS 显示 UI ====================
 task.spawn(function()
-	while task.wait(3) do
-		pcall(function()
-			local existingSky = Lighting:FindFirstChild("GraySky")
-			if not existingSky or not existingSky:IsA("Sky") then
-				local newS = Instance.new("Sky", Lighting)
-				newS.Name = "GraySky"
-				newS.SkyboxBk = grayColor
-				newS.SkyboxDn = grayColor
-				newS.SkyboxFt = grayColor
-				newS.SkyboxLf = grayColor
-				newS.SkyboxRt = grayColor
-				newS.SkyboxUp = grayColor
-				newS.SunAngularSize = 0
-				newS.MoonAngularSize = 0
-				newS.StarCount = 0
-			end
-		end)
-		pcall(function()
-			local otherSky = Lighting:FindFirstChildWhichIsA("Sky")
-			if otherSky and otherSky.Name ~= "GraySky" then otherSky:Destroy() end
-		end)
-		Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-		Lighting.FogColor = Color3.fromRGB(100, 100, 100)
-		Lighting.FogEnd = 500
-	end
-end)
+	local function createFPS()
+		-- 优先使用 Drawing
+		local success = pcall(function()
+			local d = Drawing.new("Text")
+			d.Text = "FPS: --"
+			d.Size = 22
+			d.Color = Color3.fromRGB(0, 255, 100)
+			d.Center = false
+			d.Outline = true
+			d.OutlineColor = Color3.fromRGB(0, 0, 0)
+			d.Position = Vector2.new(10, 10)
+			d.Visible = true
+			d.Font = 2
 
--- ==================== 3. FPS 显示 UI ====================
-local FPS_DISPLAY = nil
-if Drawing then
-	FPS_DISPLAY = Drawing.new("Text")
-	FPS_DISPLAY.Text = "FPS: --"
-	FPS_DISPLAY.Size = 22
-	FPS_DISPLAY.Color = Color3.fromRGB(0, 255, 100)
-	FPS_DISPLAY.Center = false
-	FPS_DISPLAY.Outline = true
-	FPS_DISPLAY.OutlineColor = Color3.fromRGB(0, 0, 0)
-	FPS_DISPLAY.Position = Vector2.new(10, 10)
-	FPS_DISPLAY.Visible = true
-	FPS_DISPLAY.Font = 2
-
-	local fpsHistory = {}
-	local fpsIndex = 0
-	task.spawn(function()
-		local lastTime = os.clock()
-		RunService.RenderStepped:Connect(function()
-			local now = os.clock()
-			local delta = now - lastTime
-			lastTime = now
-			if delta > 0 then
-				local fps = math.floor(1 / delta + 0.5)
-				fpsIndex = fpsIndex + 1
-				fpsHistory[fpsIndex] = fps
-				if fpsIndex >= 20 then
-					local total = 0
-					for _, v in pairs(fpsHistory) do total = total + v end
-					local avg = math.floor(total / 20)
-					FPS_DISPLAY.Text = "FPS: " .. avg .. "  |  低配优化"
-					fpsHistory = {}
-					fpsIndex = 0
+			local lastTime = os.clock()
+			local smoothFPS = 0
+			RunService.RenderStepped:Connect(function()
+				local now = os.clock()
+				local delta = now - lastTime
+				lastTime = now
+				if delta > 0 then
+					local fps = 1 / delta
+					smoothFPS = smoothFPS * 0.9 + fps * 0.1
+					d.Text = "FPS: " .. math.floor(smoothFPS + 0.5) .. "  |  低配优化"
 				end
-			end
+			end)
 		end)
-	end)
-else
-	-- 备用：ScreenGui FPS
-	task.spawn(function()
-		local sg = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+		if success then return end
+
+		-- 备用：ScreenGui (用 CoreGui 避免 PlayerGui 未加载)
+		local sg = Instance.new("ScreenGui")
 		sg.Name = "FPS_Display"
-		local label = Instance.new("TextLabel", sg)
+		sg.Parent = game:GetService("CoreGui")
+
+		local label = Instance.new("TextLabel")
 		label.Name = "FPSLabel"
 		label.Size = UDim2.new(0, 180, 0, 28)
 		label.Position = UDim2.new(0, 10, 0, 10)
@@ -208,19 +134,25 @@ else
 		label.TextStrokeTransparency = 0
 		label.Font = Enum.Font.SourceSansBold
 		label.Text = "FPS: --"
+		label.Parent = sg
+
 		local lastTime = os.clock()
+		local smoothFPS = 0
 		RunService.RenderStepped:Connect(function()
 			local now = os.clock()
 			local delta = now - lastTime
 			lastTime = now
 			if delta > 0 then
-				label.Text = "FPS: " .. math.floor(1 / delta + 0.5) .. "  |  低配优化"
+				local fps = 1 / delta
+				smoothFPS = smoothFPS * 0.9 + fps * 0.1
+				label.Text = "FPS: " .. math.floor(smoothFPS + 0.5) .. "  |  低配优化"
 			end
 		end)
-	end)
-end
+	end
+	createFPS()
+end)
 
--- ==================== 4. 人体僵硬 (移除动画) ====================
+-- ==================== 3. 人体僵硬 (移除动画) ====================
 local removeAnimCharConn, removeAnimTrackConn
 
 local function disableAnim(char)
@@ -248,7 +180,6 @@ startNoAnim()
 print(string.rep("=", 40))
 print("  低配优化已开启:")
 print("  1. 技能画质最低 | 粒子/光效/贴图/光束 全禁用")
-print("  2. 真正的灰色天空 | 无太阳/月亮/星星")
-print("  3. FPS 显示 | 左上角实时帧数")
-print("  4. 角色僵硬 | 所有动画停止")
+print("  2. FPS 显示 | 左上角实时帧数")
+print("  3. 角色僵硬 | 所有动画停止")
 print(string.rep("=", 40))
