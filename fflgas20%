@@ -99,7 +99,7 @@ task.spawn(function()
 			d.Center = false
 			d.Outline = true
 			d.OutlineColor = Color3.fromRGB(0, 0, 0)
-			d.Position = Vector2.new(10, 10)
+			d.Position = Vector2.new(10, 40)
 			d.Visible = true
 			d.Font = 2
 
@@ -126,7 +126,7 @@ task.spawn(function()
 		local label = Instance.new("TextLabel")
 		label.Name = "FPSLabel"
 		label.Size = UDim2.new(0, 180, 0, 28)
-		label.Position = UDim2.new(0, 10, 0, 10)
+		label.Position = UDim2.new(0, 10, 0, 40)
 		label.BackgroundTransparency = 0.5
 		label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 		label.TextColor3 = Color3.fromRGB(0, 255, 100)
