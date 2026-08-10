@@ -87,8 +87,10 @@ task.spawn(function()
 	end
 end)
 
--- ==================== 2. FPS 显示 UI ====================
+-- ==================== 2. FPS 显示 UI (可拖拽) ====================
 task.spawn(function()
+	local UIS = game:GetService("UserInputService")
+
 	local function createFPS()
 		-- 优先使用 Drawing
 		local success = pcall(function()
@@ -115,26 +117,58 @@ task.spawn(function()
 					d.Text = "FPS: " .. math.floor(smoothFPS + 0.5) .. "  |  低配优化"
 				end
 			end)
+
+			-- 拖拽功能
+			local dragging = false
+			local dragOffset = Vector2.new(0, 0)
+			UIS.InputBegan:Connect(function(input, gpe)
+				if gpe then return end
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					local mp = UIS:GetMouseLocation()
+					if mp.X >= d.Position.X - 5 and mp.X <= d.Position.X + 200
+						and mp.Y >= d.Position.Y - 5 and mp.Y <= d.Position.Y + 30 then
+						dragging = true
+						dragOffset = d.Position - mp
+					end
+				end
+			end)
+			UIS.InputChanged:Connect(function(input)
+				if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+					local mp = UIS:GetMouseLocation()
+					d.Position = mp + dragOffset
+				end
+			end)
+			UIS.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					dragging = false
+				end
+			end)
 		end)
 		if success then return end
 
-		-- 备用：ScreenGui (用 CoreGui 避免 PlayerGui 未加载)
+		-- 备用：ScreenGui 可拖拽 FPS
 		local sg = Instance.new("ScreenGui")
 		sg.Name = "FPS_Display"
 		sg.Parent = game:GetService("CoreGui")
 
+		local frame = Instance.new("Frame")
+		frame.Name = "FPSFrame"
+		frame.Size = UDim2.new(0, 180, 0, 28)
+		frame.Position = UDim2.new(0, 10, 0, 40)
+		frame.BackgroundTransparency = 0.5
+		frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		frame.Parent = sg
+
 		local label = Instance.new("TextLabel")
 		label.Name = "FPSLabel"
-		label.Size = UDim2.new(0, 180, 0, 28)
-		label.Position = UDim2.new(0, 10, 0, 40)
-		label.BackgroundTransparency = 0.5
-		label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		label.Size = UDim2.new(1, 0, 1, 0)
+		label.BackgroundTransparency = 1
 		label.TextColor3 = Color3.fromRGB(0, 255, 100)
 		label.TextSize = 18
 		label.TextStrokeTransparency = 0
 		label.Font = Enum.Font.SourceSansBold
 		label.Text = "FPS: --"
-		label.Parent = sg
+		label.Parent = frame
 
 		local lastTime = os.clock()
 		local smoothFPS = 0
@@ -146,6 +180,28 @@ task.spawn(function()
 				local fps = 1 / delta
 				smoothFPS = smoothFPS * 0.9 + fps * 0.1
 				label.Text = "FPS: " .. math.floor(smoothFPS + 0.5) .. "  |  低配优化"
+			end
+		end)
+
+		-- 拖拽
+		local dragging = false
+		local dragStart, frameStart
+		frame.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				dragging = true
+				dragStart = input.Position
+				frameStart = frame.Position
+			end
+		end)
+		UIS.InputChanged:Connect(function(input)
+			if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+				local delta = input.Position - dragStart
+				frame.Position = UDim2.new(0, frameStart.X.Offset + delta.X, 0, frameStart.Y.Offset + delta.Y)
+			end
+		end)
+		UIS.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				dragging = false
 			end
 		end)
 	end
