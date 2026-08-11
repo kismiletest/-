@@ -1,451 +1,493 @@
--- ts file was generated at discord.gg/25ms
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local lp = Players.LocalPlayer
 
-local fenv = getfenv()
+-- WINDUI PRIMERO
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
-fenv._a = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
-fenv._a = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+local Window = WindUI:CreateWindow({
+Title = "Ski Hub | Blox Fruits",
+Author = "by fabiXD",
+Folder = "SkiHub",
+Icon = "home",
+NewElements = true,
+})
 
-local _call3 = game:GetService('UserInputService')
-local _call6 = _call3.WindowFocused:Connect(function() end)
+-- VARIABLES
+local soruAimEnabled = false
+local infSoruEnabled = false
+local silentAimPlayersEnabled = false
+local silentAimNPCsEnabled = false
+local predictionEnabled = false
+local predictionAmount = 0.1
+local zSkillOrM1 = false
+local zSkillsEnabled = false
+local autoKenEnabled = false
+local autoKenRunning = false
+local espEnabled = false
+local infJumpEnabled = false
+local walkWaterEnabled = false
+local camLockEnabled = false
+local camLockPred = 0.1
+local dashEnabled = false
+local dashLength = 1
+local bunnyHopEnabled = false
+local bunnyHopHooked = false
+local noDodgeCDEnabled = false
+local busoEnabled = false
+local v3Enabled = false
+local v3LoopRunning = false
+local infEnergyEnabled = false
+local fastAttackEnabled = false
+local walkSpeedValue = 16
+local autoV4Enabled = false
+local fruitCheckEnabled = false
+local fruitTeleportEnabled = false
+local targetInfoEnabled = false
+local fpsBoostEnabled = false
+local fpsPingEnabled = false
+local antiAfkEnabled = false
+local maxRange = 500
 
-_call3.WindowFocusReleased:Connect(function(_11, _11_2, _11_3, _11_4, _11_5) end)
-type(_call6)
-task.spawn(function(_14, _14_2, _14_3, _14_4, _14_5)
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    task.wait()
-    error('internal 583: <25ms: infinitelooperror>')
+local infJumpConn = nil
+local waterPart = nil
+local walkWaterConn = nil
+local camLockConn = nil
+local dashConnection = nil
+local infSoruConn = nil
+local energyConnection = nil
+local fastAttackConn = nil
+local fruitLoop = nil
+local teleportLoop = nil
+local fpsConn = nil
+local fpsBoostConn = nil
+local NoDodgeCoroutine = nil
+local uiConn = nil
+local sizeConn = nil
+local PlayersPosition = nil
+local NPCPosition = nil
+local currentTool = nil
+local characterConnections = {}
+local Booms = {"TAP"}
+local Skills = {"X"}
+local aimlockActive = false
+local nearestZTarget = nil
+local godhumanZActive = false
+local aimRenderConn = nil
+local aimTimeoutTask = nil
+local silentInstalled = false
+local walkSpeedConn = nil
+
+-- Remotes con pcall
+local CommE, CommF
+pcall(function() CommE = ReplicatedStorage:WaitForChild("Remotes", 5):WaitForChild("CommE", 5) end)
+pcall(function() CommF = ReplicatedStorage:WaitForChild("Remotes", 5):WaitForChild("CommF_", 5) end)
+
+-- ============================================================
+-- TEAM CHECK
+-- ============================================================
+local function isAllyWithMe(targetPlayer)
+local myGui = lp:FindFirstChild("PlayerGui")
+if not myGui then return false end
+local scrolling = myGui:FindFirstChild("Main")
+and myGui.Main:FindFirstChild("Allies")
+and myGui.Main.Allies:FindFirstChild("Container")
+and myGui.Main.Allies.Container:FindFirstChild("Allies")
+and myGui.Main.Allies.Container.Allies:FindFirstChild("ScrollingFrame")
+if scrolling then
+for _, frame in pairs(scrolling:GetDescendants()) do
+if frame:IsA("ImageButton") and frame.Name == targetPlayer.Name then return true end
+end
+end
+return false
+end
+
+local function isEnemy(targetPlayer)
+if not targetPlayer or targetPlayer == lp then return false end
+local myTeam = lp.Team
+local targetTeam = targetPlayer.Team
+if myTeam and targetTeam then
+if myTeam.Name == "Pirates" and targetTeam.Name == "Marines" then return true
+elseif myTeam.Name == "Marines" and targetTeam.Name == "Pirates" then return true end
+if myTeam.Name == "Pirates" and targetTeam.Name == "Pirates" then
+if isAllyWithMe(targetPlayer) then return false end
+return true
+end
+if myTeam.Name == "Marines" and targetTeam.Name == "Marines" then return false end
+end
+return true
+end
+
+-- ============================================================
+-- BASE FUNCTIONS
+-- ============================================================
+local function getHRP()
+local char = lp.Character
+return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHum()
+local char = lp.Character
+return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local function getPredictedPosition(hrp)
+if not hrp then return nil end
+local humanoid = hrp.Parent:FindFirstChildOfClass("Humanoid")
+if not humanoid then return hrp.Position end
+if not predictionEnabled or humanoid.WalkSpeed < 5 then return hrp.Position end
+return hrp.Position + (hrp.AssemblyLinearVelocity * predictionAmount)
+end
+
+local function getClosestPlayer()
+local hrp = getHRP()
+if not hrp then return nil end
+local closest, closestDist = nil, maxRange
+for _, p in ipairs(Players:GetPlayers()) do
+if p ~= lp and isEnemy(p) and p.Character then
+local hum = p.Character:FindFirstChildOfClass("Humanoid")
+local eHRP = p.Character:FindFirstChild("HumanoidRootPart")
+if hum and hum.Health > 0 and eHRP then
+local dist = (eHRP.Position - hrp.Position).Magnitude
+if dist < closestDist then closestDist = dist; closest = p end
+end
+end
+end
+return closest
+end
+
+local function getClosestNPC()
+local hrp = getHRP()
+if not hrp then return nil end
+local closest, closestDist = nil, maxRange
+local enemies = workspace:FindFirstChild("Enemies")
+if not enemies then return nil end
+for _, v in ipairs(enemies:GetChildren()) do
+local eHRP = v:FindFirstChild("HumanoidRootPart")
+local hum = v:FindFirstChildOfClass("Humanoid")
+if eHRP and hum and hum.Health > 0 then
+local dist = (eHRP.Position - hrp.Position).Magnitude
+if dist < closestDist then closestDist = dist; closest = v end
+end
+end
+return closest
+end
+
+local function GetNearestTarget(maxDist)
+local char = lp.Character
+if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+local hrp = char.HumanoidRootPart
+local closest, closestDist = nil, maxDist or 100
+for _, plr in ipairs(Players:GetPlayers()) do
+if plr ~= lp and isEnemy(plr) and plr.Character then
+local otherHRP = plr.Character:FindFirstChild("HumanoidRootPart")
+local hum = plr.Character:FindFirstChild("Humanoid")
+if otherHRP and hum and hum.Health > 0 then
+local dist = (otherHRP.Position - hrp.Position).Magnitude
+if dist < closestDist then closestDist = dist; closest = plr.Character end
+end
+end
+end
+return closest
+end
+
+-- ============================================================
+-- SORU AIM
+-- ============================================================
+local mouse = lp:GetMouse()
+pcall(function()
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+setreadonly(mt, false)
+mt.__index = newcclosure(function(self, key)
+if not soruAimEnabled then return oldIndex(self, key) end
+if (key == "Hit" or key == "Target") and self == mouse then
+local enemy = getClosestPlayer()
+if enemy and enemy.Character then
+local eHRP = enemy.Character:FindFirstChild("HumanoidRootPart")
+if eHRP then
+if key == "Hit" then return CFrame.new(eHRP.Position)
+elseif key == "Target" then return eHRP end
+end
+end
+end
+return oldIndex(self, key)
 end)
-task.spawn(function(_17, _17_2, _17_3, _17_4, _17_5)
-    task.wait()
-    task.wait()
-    error('internal 583: <25ms: infinitelooperror>')
+setreadonly(mt, true)
 end)
-task.spawn(function(_20, _20_2, _20_3, _20_4, _20_5)
-    error('internal 583: <25ms: infinitelooperror>')
+
+-- ============================================================
+-- INF SORU
+-- ============================================================
+local function setupInfSoru(char)
+if infSoruEnabled then pcall(function() char:SetAttribute("FlashstepCooldown", 2) end) end
+end
+local function startInfSoru()
+if lp.Character then pcall(function() lp.Character:SetAttribute("FlashstepCooldown", 2) end) end
+if infSoruConn then infSoruConn:Disconnect() end
+infSoruConn = lp.CharacterAdded:Connect(setupInfSoru)
+end
+local function stopInfSoru()
+if infSoruConn then infSoruConn:Disconnect(); infSoruConn = nil end
+pcall(function() if lp.Character then lp.Character:SetAttribute("FlashstepCooldown", 0) end end)
+end
+
+-- ============================================================
+-- SILENT AIM
+-- ============================================================
+local function installSilentAim()
+if silentInstalled then return end
+silentInstalled = true
+
+RunService.Heartbeat:Connect(function()
+if not silentAimPlayersEnabled and not silentAimNPCsEnabled then
+PlayersPosition = nil; NPCPosition = nil; return
+end
+if silentAimPlayersEnabled then
+local enemy = getClosestPlayer()
+if enemy and enemy.Character then
+local eHRP = enemy.Character:FindFirstChild("HumanoidRootPart")
+PlayersPosition = eHRP and getPredictedPosition(eHRP) or nil
+else PlayersPosition = nil end
+else PlayersPosition = nil end
+if silentAimNPCsEnabled then
+local npc = getClosestNPC()
+if npc then
+local eHRP = npc:FindFirstChild("HumanoidRootPart")
+NPCPosition = eHRP and getPredictedPosition(eHRP) or nil
+else NPCPosition = nil end
+else NPCPosition = nil end
 end)
-task.spawn(function(_23, _23_2, _23_3, _23_4, _23_5)
-    error('internal 583: <25ms: infinitelooperror>')
+
+pcall(function()
+local ok, hookMeta = pcall(getrawmetatable, game)
+if ok and hookMeta then
+setreadonly(hookMeta, false)
+local OldHook
+OldHook = hookmetamethod(game, "__namecall", function(self, V1, V2, ...)
+local Method = (getnamecallmethod and getnamecallmethod():lower()) or ""
+if tostring(self) == "RemoteEvent" and Method == "fireserver" then
+if typeof(V1) == "Vector3" then
+if silentAimPlayersEnabled and PlayersPosition then return OldHook(self, PlayersPosition, V2, ...)
+elseif silentAimNPCsEnabled and NPCPosition then return OldHook(self, NPCPosition, V2, ...) end
+end
+if type(V1) == "string" and table.find(Booms, V1) and zSkillOrM1 then
+if silentAimPlayersEnabled and PlayersPosition then return OldHook(self, V1, PlayersPosition, nil, ...)
+elseif silentAimNPCsEnabled and NPCPosition then return OldHook(self, V1, NPCPosition, nil, ...) end
+end
+elseif Method == "invokeserver" then
+if type(V1) == "string" and table.find(Skills, V1) then
+if silentAimPlayersEnabled and PlayersPosition then return OldHook(self, V1, PlayersPosition, nil, ...)
+elseif silentAimNPCsEnabled and NPCPosition then return OldHook(self, V1, NPCPosition, nil, ...) end
+end
+end
+return OldHook(self, V1, V2, ...)
 end)
-task.spawn(function(_26, _26_2, _26_3, _26_4, _26_5)
-    error('internal 583: <25ms: infinitelooperror>')
+setreadonly(hookMeta, true)
+end
 end)
-task.spawn(function(_29, _29_2, _29_3, _29_4, _29_5)
-    error('internal 583: <25ms: infinitelooperror>')
+end
+
+-- ============================================================
+-- Z SKILL AIMLOCK
+-- ============================================================
+local function stopAimlock()
+if not aimlockActive then return end
+aimlockActive = false; nearestZTarget = nil; godhumanZActive = false
+if aimRenderConn then pcall(function() aimRenderConn:Disconnect() end); aimRenderConn = nil end
+if aimTimeoutTask then pcall(function() task.cancel(aimTimeoutTask) end); aimTimeoutTask = nil end
+end
+
+local function startAimlock()
+if not zSkillsEnabled or aimlockActive then return end
+nearestZTarget = GetNearestTarget(1000)
+if not nearestZTarget then return end
+aimlockActive = true
+aimRenderConn = RunService.RenderStepped:Connect(function()
+if not zSkillsEnabled then stopAimlock() return end
+if aimlockActive and nearestZTarget and nearestZTarget:FindFirstChild("HumanoidRootPart") then
+local cam = workspace.CurrentCamera
+if cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, nearestZTarget.HumanoidRootPart.Position) end
+else stopAimlock() end
 end)
-task.spawn(function(_32, _32_2, _32_3, _32_4, _32_5)
-    error('internal 583: <25ms: infinitelooperror>')
+aimTimeoutTask = task.delay(1, function()
+if aimlockActive then stopAimlock() end
 end)
-task.spawn(function(_35, _35_2, _35_3, _35_4, _35_5)
-    error('internal 583: <25ms: infinitelooperror>')
+end
+
+pcall(function()
+if not getgenv().ZSkillHooked then
+getgenv().ZSkillHooked = true
+local oldNC
+oldNC = hookmetamethod(game, "__namecall", function(self, ...)
+local method = getnamecallmethod()
+local args = {...}
+if method == "InvokeServer" or method == "FireServer" then
+local a1 = args[1]
+if typeof(a1) == "string" and a1:upper() == "Z" then
+if currentTool and currentTool.Name == "Godhuman" then godhumanZActive = true end
+end
+end
+return oldNC(self, ...)
 end)
-task.spawn(function(_38, _38_2, _38_3, _38_4, _38_5)
-    error('internal 583: <25ms: infinitelooperror>')
+end
 end)
-task.spawn(function(_41, _41_2, _41_3, _41_4, _41_5)
-    error('internal 583: <25ms: infinitelooperror>')
+
+UIS.TouchEnded:Connect(function(touch)
+if not zSkillsEnabled then return end
+local cam = workspace.CurrentCamera
+if not cam or not touch or not touch.Position then return end
+if touch.Position.X > cam.ViewportSize.X / 2 then
+if currentTool and currentTool.Name == "Godhuman" and godhumanZActive then
+if not aimlockActive then startAimlock() end
+end
+end
 end)
-task.spawn(function(_44, _44_2, _44_3, _44_4, _44_5)
-    error('internal 583: <25ms: infinitelooperror>')
+
+-- ============================================================
+-- AUTO KEN
+-- ============================================================
+local function startAutoKenLoop()
+if autoKenRunning then return end
+autoKenRunning = true
+task.spawn(function()
+while autoKenEnabled do
+task.wait(0.1)
+pcall(function()
+local char = lp.Character
+if not char then return end
+if game:GetService("CollectionService"):HasTag(char, "Ken") then
+local playerGui = lp:FindFirstChild("PlayerGui")
+if playerGui then
+local kenButton = playerGui:FindFirstChild("MobileContextButtons")
+and playerGui.MobileContextButtons.ContextButtonFrame:FindFirstChild("BoundActionKen")
+if kenButton and kenButton:GetAttribute("Selected") ~= true then
+kenButton:SetAttribute("Selected", true)
+end
+end
+local observationManager = getrenv()._G.OM
+if observationManager and not observationManager.active then
+observationManager.radius = 0
+observationManager:setActive(true)
+if CommE then CommE:FireServer("Ken", true) end
+end
+end
 end)
-task.spawn(function(_47, _47_2, _47_3, _47_4, _47_5) end)
-task.spawn(function(_50, _50_2, _50_3, _50_4, _50_5) end)
-task.spawn(function(_53, _53_2, _53_3, _53_4, _53_5) end)
-task.spawn(function(_56, _56_2, _56_3, _56_4, _56_5) end)
-task.spawn(function(_59, _59_2, _59_3, _59_4, _59_5) end)
-task.spawn(function(_62, _62_2, _62_3, _62_4, _62_5) end)
-task.spawn(function(_65, _65_2, _65_3, _65_4, _65_5) end)
-task.spawn(function(_68, _68_2, _68_3, _68_4, _68_5) end)
-task.spawn(function(_71, _71_2, _71_3, _71_4, _71_5) end)
-task.spawn(function(_74, _74_2, _74_3, _74_4, _74_5) end)
-task.spawn(function(_77, _77_2, _77_3, _77_4, _77_5) end)
-task.spawn(function(_80, _80_2, _80_3, _80_4, _80_5) end)
-task.spawn(function(_83, _83_2, _83_3, _83_4, _83_5) end)
-task.spawn(function(_86, _86_2, _86_3, _86_4, _86_5) end)
-task.spawn(function(_89, _89_2, _89_3, _89_4, _89_5) end)
-task.spawn(function(_92, _92_2, _92_3, _92_4, _92_5) end)
-task.spawn(function(_95, _95_2, _95_3, _95_4, _95_5) end)
-task.spawn(function(_98, _98_2, _98_3, _98_4, _98_5) end)
-task.spawn(function(_101, _101_2, _101_3, _101_4, _101_5) end)
-task.spawn(function(_104, _104_2, _104_3, _104_4, _104_5) end)
-task.spawn(function(_107, _107_2, _107_3, _107_4, _107_5) end)
-task.spawn(function(_110, _110_2, _110_3, _110_4, _110_5) end)
-task.spawn(function(_113, _113_2, _113_3, _113_4, _113_5) end)
-task.spawn(function(_116, _116_2, _116_3, _116_4, _116_5) end)
-task.spawn(function(_119, _119_2, _119_3, _119_4, _119_5) end)
-task.spawn(function(_122, _122_2, _122_3, _122_4, _122_5) end)
-task.spawn(function(_125, _125_2, _125_3, _125_4, _125_5) end)
-task.spawn(function(_128, _128_2, _128_3, _128_4, _128_5) end)
-task.spawn(function(_131, _131_2, _131_3, _131_4, _131_5) end)
-task.spawn(function(_134, _134_2, _134_3, _134_4, _134_5) end)
-task.spawn(function(_137, _137_2, _137_3, _137_4, _137_5) end)
-task.spawn(function(_140, _140_2, _140_3, _140_4, _140_5) end)
-task.spawn(function(_143, _143_2, _143_3, _143_4, _143_5) end)
-task.spawn(function(_146, _146_2, _146_3, _146_4, _146_5) end)
-task.spawn(function(_149, _149_2, _149_3, _149_4, _149_5) end)
-task.spawn(function(_152, _152_2, _152_3, _152_4, _152_5) end)
-task.spawn(function(_155, _155_2, _155_3, _155_4, _155_5) end)
-task.spawn(function(_158, _158_2, _158_3, _158_4, _158_5) end)
-task.spawn(function(_161, _161_2, _161_3, _161_4, _161_5) end)
-task.spawn(function(_164, _164_2, _164_3, _164_4, _164_5) end)
-task.spawn(function(_167, _167_2, _167_3, _167_4, _167_5) end)
-task.spawn(function(_170, _170_2, _170_3, _170_4, _170_5) end)
-task.spawn(function(_173, _173_2, _173_3, _173_4, _173_5) end)
-task.spawn(function(_176, _176_2, _176_3, _176_4, _176_5) end)
-task.spawn(function(_179, _179_2, _179_3, _179_4, _179_5) end)
-task.spawn(function(_182, _182_2, _182_3, _182_4, _182_5) end)
-task.spawn(function(_185, _185_2, _185_3, _185_4, _185_5) end)
-task.spawn(function(_188, _188_2, _188_3, _188_4, _188_5) end)
-task.spawn(function(_191, _191_2, _191_3, _191_4, _191_5) end)
-task.spawn(function(_194, _194_2, _194_3, _194_4, _194_5) end)
-task.spawn(function(_197, _197_2, _197_3, _197_4, _197_5) end)
-task.spawn(function(_200, _200_2, _200_3, _200_4, _200_5) end)
-task.spawn(function(_203, _203_2, _203_3, _203_4, _203_5) end)
-task.spawn(function(_206, _206_2, _206_3, _206_4, _206_5) end)
-task.spawn(function(_209, _209_2, _209_3, _209_4, _209_5) end)
-task.spawn(function(_212, _212_2, _212_3, _212_4, _212_5) end)
-task.spawn(function(_215, _215_2, _215_3, _215_4, _215_5) end)
-task.spawn(function(_218, _218_2, _218_3, _218_4, _218_5) end)
-task.spawn(function(_221, _221_2, _221_3, _221_4, _221_5) end)
-task.spawn(function(_224, _224_2, _224_3, _224_4, _224_5) end)
-task.spawn(function(_227, _227_2, _227_3, _227_4, _227_5) end)
-task.spawn(function(_230, _230_2, _230_3, _230_4, _230_5) end)
-task.spawn(function(_233, _233_2, _233_3, _233_4, _233_5) end)
-task.spawn(function(_236, _236_2, _236_3, _236_4, _236_5) end)
-task.spawn(function(_239, _239_2, _239_3, _239_4, _239_5) end)
-task.spawn(function(_242, _242_2, _242_3, _242_4, _242_5) end)
-task.spawn(function(_245, _245_2, _245_3, _245_4, _245_5) end)
-task.spawn(function(_248, _248_2, _248_3, _248_4, _248_5) end)
-task.spawn(function(_251, _251_2, _251_3, _251_4, _251_5) end)
-task.spawn(function(_254, _254_2, _254_3, _254_4, _254_5) end)
-task.spawn(function(_257, _257_2, _257_3, _257_4, _257_5) end)
-task.spawn(function(_260, _260_2, _260_3, _260_4, _260_5) end)
-task.spawn(function(_263, _263_2, _263_3, _263_4, _263_5) end)
-task.spawn(function(_266, _266_2, _266_3, _266_4, _266_5) end)
-task.spawn(function(_269, _269_2, _269_3, _269_4, _269_5) end)
-task.spawn(function(_272, _272_2, _272_3, _272_4, _272_5) end)
-task.spawn(function(_275, _275_2, _275_3, _275_4, _275_5) end)
-task.spawn(function(_278, _278_2, _278_3, _278_4, _278_5) end)
-task.spawn(function(_281, _281_2, _281_3, _281_4, _281_5) end)
-task.spawn(function(_284, _284_2, _284_3, _284_4, _284_5) end)
-task.spawn(function(_287, _287_2, _287_3, _287_4, _287_5) end)
-task.spawn(function(_290, _290_2, _290_3, _290_4, _290_5) end)
-task.spawn(function(_293, _293_2, _293_3, _293_4, _293_5) end)
-task.spawn(function(_296, _296_2, _296_3, _296_4, _296_5) end)
-task.spawn(function(_299, _299_2, _299_3, _299_4, _299_5) end)
-task.spawn(function(_302, _302_2, _302_3, _302_4, _302_5) end)
-task.spawn(function(_305, _305_2, _305_3, _305_4, _305_5) end)
-task.spawn(function(_308, _308_2, _308_3, _308_4, _308_5) end)
-task.spawn(function(_311, _311_2, _311_3, _311_4, _311_5) end)
-task.spawn(function(_314, _314_2, _314_3, _314_4, _314_5) end)
-error('internal 583: <25ms: infinitelooperror>')
+end
+autoKenRunning = false
+end)
+end
+
+-- ============================================================
+-- ESP
+-- ============================================================
+local ESPs = {}
+local espFolder = game.CoreGui:FindFirstChild("GlobalESP")
+if not espFolder then
+espFolder = Instance.new("Folder")
+espFolder.Name = "GlobalESP"
+espFolder.Parent = game.CoreGui
+end
+
+local function getESPColor(p)
+if p == lp then return Color3.fromRGB(0, 255, 0) end
+if isAllyWithMe(p) then return Color3.fromRGB(0, 255, 0) end
+if isEnemy(p) then return Color3.fromRGB(255, 80, 80) end
+return Color3.fromRGB(0, 255, 0)
+end
+
+local function createESP(targetPlayer)
+if ESPs[targetPlayer] then return end
+local char = targetPlayer.Character
+if not char then return end
+local head = char:FindFirstChild("Head")
+if not head then return end
+local billboard = Instance.new("BillboardGui")
+billboard.Name = targetPlayer.Name; billboard.Adornee = head
+billboard.Size = UDim2.fromOffset(220, 50); billboard.AlwaysOnTop = true
+billboard.StudsOffset = Vector3.new(0, 3, 0); billboard.Parent = espFolder
+local levelLabel = Instance.new("TextLabel")
+levelLabel.Name = "LevelLabel"; levelLabel.Size = UDim2.new(1, 0, 0.5, 0)
+levelLabel.BackgroundTransparency = 1; levelLabel.Text = "Lv. ???"
+levelLabel.TextColor3 = Color3.fromRGB(0, 170, 255); levelLabel.TextStrokeTransparency = 0.2
+levelLabel.Font = Enum.Font.SourceSansBold; levelLabel.TextSize = 14
+levelLabel.Parent = billboard
+local mainLabel = Instance.new("TextLabel")
+mainLabel.Name = "MainLabel"; mainLabel.Size = UDim2.new(1, 0, 0.5, 0)
+mainLabel.Position = UDim2.new(0, 0, 0.5, 0); mainLabel.BackgroundTransparency = 1
+mainLabel.Text = "[0] " .. targetPlayer.DisplayName .. " (0m)"
+mainLabel.TextColor3 = getESPColor(targetPlayer); mainLabel.TextStrokeTransparency = 0.2
+mainLabel.Font = Enum.Font.SourceSansBold; mainLabel.TextSize = 16
+mainLabel.Parent = billboard
+ESPs[targetPlayer] = billboard
+end
+
+RunService.Heartbeat:Connect(function()
+if not espEnabled then
+for _, gui in pairs(ESPs) do if gui then gui.Enabled = false end end
+return
+end
+for _, targetPlayer in pairs(Players:GetPlayers()) do
+if targetPlayer ~= lp then
+if not ESPs[targetPlayer] then createESP(targetPlayer) end
+local gui = ESPs[targetPlayer]
+if gui then
+local char = targetPlayer.Character
+local head = char and char:FindFirstChild("Head")
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+local myHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+if char and head and hrp and hum and myHRP then
+gui.Adornee = head; gui.Enabled = true
+local dist = (myHRP.Position - hrp.Position).Magnitude
+local nameLabel = gui:FindFirstChild("MainLabel")
+local levelLabel = gui:FindFirstChild("LevelLabel")
+if levelLabel then
+local dataFolder = targetPlayer:FindFirstChild("Data")
+local levelValue = dataFolder and dataFolder:FindFirstChild("Level")
+levelLabel.Text = levelValue and ("Lv. " .. levelValue.Value) or "Lv. ???"
+end
+if nameLabel then
+nameLabel.Text = "[" .. math.floor(hum.Health) .. "] " .. targetPlayer.DisplayName .. " (" .. math.floor(dist) .. "m)"
+nameLabel.TextColor3 = getESPColor(targetPlayer)
+end
+else gui.Enabled = false end
+end
+end
+end
+end)
+
+-- ============================================================
+-- V3 AUTO
+-- ============================================================
+local v3Loop = nil
+local function startV3Loop()
+if v3LoopRunning then return end
+v3LoopRunning = true
+v3Loop = task.spawn(function()
+while v3LoopRunning do
+if not lp or not lp.Parent then break end
+pcall(function() if CommE then CommE:FireServer("ActivateAbility") end end)
+task.wait(31)
+end
+v3Loop = nil
+end)
+end
+local function stopV3Loop() v3LoopRunning = false; v3Loop = nil end
+
+-- ============================================================
+-- BUNNY HOP
+-- ============================================================
+local function installBunnyHop()
+if bunnyHopHooked then return end
+bunnyHopHooked = true
+pcall(function()
+local old
+old = hookmetamethod(game, "__namecall", function(self, ...)
+local method = getnamecallmethod()
+local args = {...}
+if (method == "InvokeServer" or method == "FireServer") then
+local a1 = args[1]
