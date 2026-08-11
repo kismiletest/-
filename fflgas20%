@@ -107,6 +107,10 @@ local function enableFollow()
         if _G.FollowPlayer then
             local char = LocalPlayer.Character
             if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                -- 关键修复：关闭自动转向，防止游戏强行把你的视角掰向目标玩家
+                if hum then hum.AutoRotate = false end
+                
                 for _, v in ipairs(char:GetDescendants()) do
                     if v:IsA("BasePart") and v.CanCollide and v.Name ~= "FollowPlatform_Kiyo" then
                         v.CanCollide = false
@@ -127,32 +131,39 @@ local function enableFollow()
                     local headPos = target.Character.Head.Position
                     local targetPos = headPos + Vector3.new(0, _G.FollowHeight, 0)
                     
-                    -- 1. 保持玩家视角的旋转，不锁死面向，解决“直接锁打不到”的问题
-                    local currentRot = root.CFrame - root.Position
+                    -- 关键修复：直接提取当前角色自身的旋转，绝不看向目标
+                    local myRotation = root.CFrame.Rotation
                     
-                    -- 2. 平滑移动 (跟随效果)
+                    -- 平滑移动 (跟随效果)
                     local dist = (targetPos - root.Position).Magnitude
                     local speed = 250 -- 跟随速度 (已从330下调至250，防止被反作弊拉回)
                     
                     if dist > 2 then
                         local moveDist = math.min(speed * dt, dist)
                         local dir = (targetPos - root.Position).Unit
-                        root.CFrame = CFrame.new(root.Position + dir * moveDist) * currentRot
+                        -- 只改变位置，严格保持你自己的视角旋转
+                        root.CFrame = CFrame.new(root.Position + dir * moveDist) * myRotation
                     else
-                        root.CFrame = CFrame.new(targetPos) * currentRot
+                        root.CFrame = CFrame.new(targetPos) * myRotation
                     end
                     
                     -- 速度归零
                     root.Velocity = Vector3.new(0, 0, 0)
                     root.RotVelocity = Vector3.new(0, 0, 0)
                     
-                    -- 3. 脚下生成透明垫板：让游戏判定你处于“站立”状态，这样所有技能和普攻(M1)才能正常释放
+                    -- 脚下生成透明垫板：让游戏判定你处于“站立”状态，这样所有技能和普攻(M1)才能正常释放
                     local p = createPlatform()
                     p.CFrame = CFrame.new(root.Position - Vector3.new(0, 3.2, 0))
                 end
             end
         else
-            -- 关闭跟随或失去目标时，清理垫板
+            -- 关闭跟随或失去目标时，清理垫板并恢复自动转向
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then hum.AutoRotate = true end
+            end
+            
             if platform then
                 platform:Destroy()
                 platform = nil
