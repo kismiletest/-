@@ -1,6 +1,7 @@
 -- ==================== Blox Fruits 跟随锁定玩家 ====================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 _G.FollowPlayer = false
@@ -85,6 +86,10 @@ local noclipConnection
 local followConnection
 local platform
 
+-- 使用 Vector3Value 来让 TweenService 只计算位置，不碰视角旋转
+local followPosValue = Instance.new("Vector3Value")
+followPosValue.Value = Vector3.zero
+
 local function createPlatform()
     if not platform or not platform.Parent then
         platform = Instance.new("Part")
@@ -102,13 +107,21 @@ local function enableFollow()
     if noclipConnection then noclipConnection:Disconnect() end
     if followConnection then followConnection:Disconnect() end
 
-    -- 开启无碰撞，防止卡在建筑或玩家身上
+    local currentTween = nil
+
+    -- 初始化位置值为玩家当前位置
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        followPosValue.Value = root.Position
+    end
+
+    -- 开启无碰撞与关闭自动转向
     noclipConnection = RunService.Stepped:Connect(function()
         if _G.FollowPlayer then
             local char = LocalPlayer.Character
             if char then
                 local hum = char:FindFirstChildOfClass("Humanoid")
-                -- 关键修复：关闭自动转向，防止游戏强行把你的视角掰向目标玩家
                 if hum then hum.AutoRotate = false end
                 
                 for _, v in ipairs(char:GetDescendants()) do
@@ -120,7 +133,7 @@ local function enableFollow()
         end
     end)
 
-    -- 平滑跟随与垫板逻辑
+    -- 使用 TweenService 驱动的跟随逻辑
     followConnection = RunService.Heartbeat:Connect(function(dt)
         if _G.FollowPlayer and _G.TargetPlayerName then
             local target = Players:FindFirstChild(_G.TargetPlayerName)
@@ -131,42 +144,49 @@ local function enableFollow()
                     local headPos = target.Character.Head.Position
                     local targetPos = headPos + Vector3.new(0, _G.FollowHeight, 0)
                     
-                    -- 关键修复：直接提取当前角色自身的旋转，绝不看向目标
-                    local myRotation = root.CFrame.Rotation
+                    local dist = (targetPos - followPosValue.Value).Magnitude
                     
-                    -- 平滑移动 (跟随效果)
-                    local dist = (targetPos - root.Position).Magnitude
-                    local speed = 250 -- 跟随速度 (已从330下调至250，防止被反作弊拉回)
-                    
+                    -- 只有当距离大于 2 时才生成新的 Tween，防止频繁创建导致卡顿
                     if dist > 2 then
-                        local moveDist = math.min(speed * dt, dist)
-                        local dir = (targetPos - root.Position).Unit
-                        -- 只改变位置，严格保持你自己的视角旋转
-                        root.CFrame = CFrame.new(root.Position + dir * moveDist) * myRotation
-                    else
-                        root.CFrame = CFrame.new(targetPos) * myRotation
+                        local speed = 250
+                        -- 动态计算时间：时间 = 距离 / 速度
+                        local duration = dist / speed
+                        
+                        -- 取消上一个还在飞的 Tween，防止位置冲突
+                        if currentTween then currentTween:Cancel() end
+                        
+                        -- 创建只针对 Vector3Value 的 Tween (Sine风格会让起步和停止更加丝滑)
+                        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+                        currentTween = TweenService:Create(followPosValue, tweenInfo, {Value = targetPos})
+                        currentTween:Play()
                     end
                     
-                    -- 速度归零
+                    -- 强制锁定当前视角的旋转
+                    local myRotation = root.CFrame.Rotation
+                    
+                    -- 将 Tween 算出的平滑位置 + 你自己的鼠标视角 结合起来
+                    root.CFrame = CFrame.new(followPosValue.Value) * myRotation
+                    
+                    -- 彻底清零所有速度与角速度（防止被击飞/水流等外力干扰产生翻滚）
                     root.Velocity = Vector3.new(0, 0, 0)
                     root.RotVelocity = Vector3.new(0, 0, 0)
+                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                     
-                    -- 脚下生成透明垫板：让游戏判定你处于“站立”状态，这样所有技能和普攻(M1)才能正常释放
+                    -- 生成垫板
                     local p = createPlatform()
                     p.CFrame = CFrame.new(root.Position - Vector3.new(0, 3.2, 0))
                 end
             end
         else
-            -- 关闭跟随或失去目标时，清理垫板并恢复自动转向
+            -- 关闭时清理
+            if currentTween then currentTween:Cancel() currentTween = nil end
+            if platform then platform:Destroy() platform = nil end
+            
             local char = LocalPlayer.Character
             if char then
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum then hum.AutoRotate = true end
-            end
-            
-            if platform then
-                platform:Destroy()
-                platform = nil
             end
         end
     end)
