@@ -1,241 +1,451 @@
--- ==================== Blox Fruits 低配优化 ====================
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
+-- ts file was generated at discord.gg/25ms
 
--- ==================== 1. 大幅减低技能画质 ====================
-local gfxSettings = {
-	["Rendering"] = {
-		QualityLevel = 1,
-		FRAME_RATE_MANAGER_MAX_FPS = 60,
-		EnableFRM = false,
-	},
-	["Material"] = {
-		QualityLevel = 1,
-	},
-	["Texture"] = {
-		QualityLevel = 1,
-	},
-	["MeshPart"] = {
-		QualityLevel = 1,
-	},
-}
+local fenv = getfenv()
 
-pcall(function()
-	local settings = UserSettings()
-	local gameSettings = settings.GameSettings
-	if gameSettings then
-		for category, values in pairs(gfxSettings) do
-			pcall(function()
-				local cat = gameSettings:FindFirstChild(category)
-				if cat then
-					for k, v in pairs(values) do
-						pcall(function() cat[k] = v end)
-					end
-				end
-			end)
-		end
-	end
+fenv._a = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._b = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+fenv._a = "Aww, look at you, a skid trying to dump my obfuscated code!!! Silly skid, it's not that easy, maybe next time ;3"
+
+local _call3 = game:GetService('UserInputService')
+local _call6 = _call3.WindowFocused:Connect(function() end)
+
+_call3.WindowFocusReleased:Connect(function(_11, _11_2, _11_3, _11_4, _11_5) end)
+type(_call6)
+task.spawn(function(_14, _14_2, _14_3, _14_4, _14_5)
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    task.wait()
+    error('internal 583: <25ms: infinitelooperror>')
 end)
-
--- 激进取消化：每 0.3 秒扫描并清理所有特效
-task.spawn(function()
-	while task.wait(0.3) do
-		pcall(function()
-			for _, obj in ipairs(Workspace:GetDescendants()) do
-				if obj:IsA("ParticleEmitter") then
-					obj.Enabled = false
-					obj.Rate = 0
-					obj:Emit(0)
-				elseif obj:IsA("Trail") then
-					obj.Enabled = false
-					obj.Lifetime = 0.01
-				elseif obj:IsA("Beam") then
-					obj.Enabled = false
-				elseif obj:IsA("Explosion") then
-					obj.BlastPressure = 0
-					obj.BlastRadius = 0
-					obj.Visible = false
-				elseif obj:IsA("Fire") then
-					obj.Enabled = false
-					obj.Heat = 0
-					obj.Size = 0
-				elseif obj:IsA("Smoke") then
-					obj.Enabled = false
-				elseif obj:IsA("Sparkles") then
-					obj.Enabled = false
-				elseif obj:IsA("PointLight") then
-					obj.Enabled = false
-					obj.Brightness = 0
-				elseif obj:IsA("SpotLight") then
-					obj.Enabled = false
-					obj.Brightness = 0
-				elseif obj:IsA("SurfaceLight") then
-					obj.Enabled = false
-					obj.Brightness = 0
-				elseif obj:IsA("BillboardGui") then
-					obj.Enabled = false
-				elseif obj:IsA("Decal") then
-					obj.Transparency = 1
-				elseif obj:IsA("Texture") then
-					obj.Transparency = 1
-				end
-			end
-		end)
-	end
+task.spawn(function(_17, _17_2, _17_3, _17_4, _17_5)
+    task.wait()
+    task.wait()
+    error('internal 583: <25ms: infinitelooperror>')
 end)
-
--- ==================== 2. FPS 显示 UI (可拖拽) ====================
-task.spawn(function()
-	local UIS = game:GetService("UserInputService")
-
-	local function createFPS()
-		-- 优先使用 Drawing
-		local success = pcall(function()
-			local d = Drawing.new("Text")
-			d.Text = "FPS: --"
-			d.Size = 22
-			d.Color = Color3.fromRGB(0, 255, 100)
-			d.Center = false
-			d.Outline = true
-			d.OutlineColor = Color3.fromRGB(0, 0, 0)
-			d.Position = Vector2.new(10, 40)
-			d.Visible = true
-			d.Font = 2
-
-			local lastTime = os.clock()
-			local smoothFPS = 0
-			RunService.RenderStepped:Connect(function()
-				local now = os.clock()
-				local delta = now - lastTime
-				lastTime = now
-				if delta > 0 then
-					local fps = 1 / delta
-					smoothFPS = smoothFPS * 0.9 + fps * 0.1
-					d.Text = "FPS: " .. math.floor(smoothFPS + 0.5) .. "  |  低配优化"
-				end
-			end)
-
-			-- 拖拽功能
-			local dragging = false
-			local dragOffset = Vector2.new(0, 0)
-			UIS.InputBegan:Connect(function(input, gpe)
-				if gpe then return end
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then
-					local mp = UIS:GetMouseLocation()
-					if mp.X >= d.Position.X - 5 and mp.X <= d.Position.X + 200
-						and mp.Y >= d.Position.Y - 5 and mp.Y <= d.Position.Y + 30 then
-						dragging = true
-						dragOffset = d.Position - mp
-					end
-				end
-			end)
-			UIS.InputChanged:Connect(function(input)
-				if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-					local mp = UIS:GetMouseLocation()
-					d.Position = mp + dragOffset
-				end
-			end)
-			UIS.InputEnded:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then
-					dragging = false
-				end
-			end)
-		end)
-		if success then return end
-
-		-- 备用：ScreenGui 可拖拽 FPS
-		local sg = Instance.new("ScreenGui")
-		sg.Name = "FPS_Display"
-		sg.Parent = game:GetService("CoreGui")
-
-		local frame = Instance.new("Frame")
-		frame.Name = "FPSFrame"
-		frame.Size = UDim2.new(0, 180, 0, 28)
-		frame.Position = UDim2.new(0, 10, 0, 40)
-		frame.BackgroundTransparency = 0.5
-		frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		frame.Parent = sg
-
-		local label = Instance.new("TextLabel")
-		label.Name = "FPSLabel"
-		label.Size = UDim2.new(1, 0, 1, 0)
-		label.BackgroundTransparency = 1
-		label.TextColor3 = Color3.fromRGB(0, 255, 100)
-		label.TextSize = 18
-		label.TextStrokeTransparency = 0
-		label.Font = Enum.Font.SourceSansBold
-		label.Text = "FPS: --"
-		label.Parent = frame
-
-		local lastTime = os.clock()
-		local smoothFPS = 0
-		RunService.RenderStepped:Connect(function()
-			local now = os.clock()
-			local delta = now - lastTime
-			lastTime = now
-			if delta > 0 then
-				local fps = 1 / delta
-				smoothFPS = smoothFPS * 0.9 + fps * 0.1
-				label.Text = "FPS: " .. math.floor(smoothFPS + 0.5) .. "  |  低配优化"
-			end
-		end)
-
-		-- 拖拽
-		local dragging = false
-		local dragStart, frameStart
-		frame.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				dragging = true
-				dragStart = input.Position
-				frameStart = frame.Position
-			end
-		end)
-		UIS.InputChanged:Connect(function(input)
-			if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-				local delta = input.Position - dragStart
-				frame.Position = UDim2.new(0, frameStart.X.Offset + delta.X, 0, frameStart.Y.Offset + delta.Y)
-			end
-		end)
-		UIS.InputEnded:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				dragging = false
-			end
-		end)
-	end
-	createFPS()
+task.spawn(function(_20, _20_2, _20_3, _20_4, _20_5)
+    error('internal 583: <25ms: infinitelooperror>')
 end)
-
--- ==================== 3. 人体僵硬 (移除动画) ====================
-local removeAnimCharConn, removeAnimTrackConn
-
-local function disableAnim(char)
-	local hum = char:WaitForChild("Humanoid", 5)
-	if not hum then return end
-	local animator = hum:WaitForChild("Animator", 5)
-	if not animator then return end
-	for _, t in pairs(animator:GetPlayingAnimationTracks()) do t:Stop() end
-	if removeAnimTrackConn then removeAnimTrackConn:Disconnect() end
-	removeAnimTrackConn = animator.AnimationPlayed:Connect(function(t) t:Stop() end)
-end
-
-local function startNoAnim()
-	if LocalPlayer.Character then disableAnim(LocalPlayer.Character) end
-	if not removeAnimCharConn then
-		removeAnimCharConn = LocalPlayer.CharacterAdded:Connect(function(char)
-			task.wait(0.5); disableAnim(char)
-		end)
-	end
-end
-
-startNoAnim()
-
--- ==================== 通知 ====================
-print(string.rep("=", 40))
-print("  低配优化已开启:")
-print("  1. 技能画质最低 | 粒子/光效/贴图/光束 全禁用")
-print("  2. FPS 显示 | 左上角实时帧数")
-print("  3. 角色僵硬 | 所有动画停止")
-print(string.rep("=", 40))
+task.spawn(function(_23, _23_2, _23_3, _23_4, _23_5)
+    error('internal 583: <25ms: infinitelooperror>')
+end)
+task.spawn(function(_26, _26_2, _26_3, _26_4, _26_5)
+    error('internal 583: <25ms: infinitelooperror>')
+end)
+task.spawn(function(_29, _29_2, _29_3, _29_4, _29_5)
+    error('internal 583: <25ms: infinitelooperror>')
+end)
+task.spawn(function(_32, _32_2, _32_3, _32_4, _32_5)
+    error('internal 583: <25ms: infinitelooperror>')
+end)
+task.spawn(function(_35, _35_2, _35_3, _35_4, _35_5)
+    error('internal 583: <25ms: infinitelooperror>')
+end)
+task.spawn(function(_38, _38_2, _38_3, _38_4, _38_5)
+    error('internal 583: <25ms: infinitelooperror>')
+end)
+task.spawn(function(_41, _41_2, _41_3, _41_4, _41_5)
+    error('internal 583: <25ms: infinitelooperror>')
+end)
+task.spawn(function(_44, _44_2, _44_3, _44_4, _44_5)
+    error('internal 583: <25ms: infinitelooperror>')
+end)
+task.spawn(function(_47, _47_2, _47_3, _47_4, _47_5) end)
+task.spawn(function(_50, _50_2, _50_3, _50_4, _50_5) end)
+task.spawn(function(_53, _53_2, _53_3, _53_4, _53_5) end)
+task.spawn(function(_56, _56_2, _56_3, _56_4, _56_5) end)
+task.spawn(function(_59, _59_2, _59_3, _59_4, _59_5) end)
+task.spawn(function(_62, _62_2, _62_3, _62_4, _62_5) end)
+task.spawn(function(_65, _65_2, _65_3, _65_4, _65_5) end)
+task.spawn(function(_68, _68_2, _68_3, _68_4, _68_5) end)
+task.spawn(function(_71, _71_2, _71_3, _71_4, _71_5) end)
+task.spawn(function(_74, _74_2, _74_3, _74_4, _74_5) end)
+task.spawn(function(_77, _77_2, _77_3, _77_4, _77_5) end)
+task.spawn(function(_80, _80_2, _80_3, _80_4, _80_5) end)
+task.spawn(function(_83, _83_2, _83_3, _83_4, _83_5) end)
+task.spawn(function(_86, _86_2, _86_3, _86_4, _86_5) end)
+task.spawn(function(_89, _89_2, _89_3, _89_4, _89_5) end)
+task.spawn(function(_92, _92_2, _92_3, _92_4, _92_5) end)
+task.spawn(function(_95, _95_2, _95_3, _95_4, _95_5) end)
+task.spawn(function(_98, _98_2, _98_3, _98_4, _98_5) end)
+task.spawn(function(_101, _101_2, _101_3, _101_4, _101_5) end)
+task.spawn(function(_104, _104_2, _104_3, _104_4, _104_5) end)
+task.spawn(function(_107, _107_2, _107_3, _107_4, _107_5) end)
+task.spawn(function(_110, _110_2, _110_3, _110_4, _110_5) end)
+task.spawn(function(_113, _113_2, _113_3, _113_4, _113_5) end)
+task.spawn(function(_116, _116_2, _116_3, _116_4, _116_5) end)
+task.spawn(function(_119, _119_2, _119_3, _119_4, _119_5) end)
+task.spawn(function(_122, _122_2, _122_3, _122_4, _122_5) end)
+task.spawn(function(_125, _125_2, _125_3, _125_4, _125_5) end)
+task.spawn(function(_128, _128_2, _128_3, _128_4, _128_5) end)
+task.spawn(function(_131, _131_2, _131_3, _131_4, _131_5) end)
+task.spawn(function(_134, _134_2, _134_3, _134_4, _134_5) end)
+task.spawn(function(_137, _137_2, _137_3, _137_4, _137_5) end)
+task.spawn(function(_140, _140_2, _140_3, _140_4, _140_5) end)
+task.spawn(function(_143, _143_2, _143_3, _143_4, _143_5) end)
+task.spawn(function(_146, _146_2, _146_3, _146_4, _146_5) end)
+task.spawn(function(_149, _149_2, _149_3, _149_4, _149_5) end)
+task.spawn(function(_152, _152_2, _152_3, _152_4, _152_5) end)
+task.spawn(function(_155, _155_2, _155_3, _155_4, _155_5) end)
+task.spawn(function(_158, _158_2, _158_3, _158_4, _158_5) end)
+task.spawn(function(_161, _161_2, _161_3, _161_4, _161_5) end)
+task.spawn(function(_164, _164_2, _164_3, _164_4, _164_5) end)
+task.spawn(function(_167, _167_2, _167_3, _167_4, _167_5) end)
+task.spawn(function(_170, _170_2, _170_3, _170_4, _170_5) end)
+task.spawn(function(_173, _173_2, _173_3, _173_4, _173_5) end)
+task.spawn(function(_176, _176_2, _176_3, _176_4, _176_5) end)
+task.spawn(function(_179, _179_2, _179_3, _179_4, _179_5) end)
+task.spawn(function(_182, _182_2, _182_3, _182_4, _182_5) end)
+task.spawn(function(_185, _185_2, _185_3, _185_4, _185_5) end)
+task.spawn(function(_188, _188_2, _188_3, _188_4, _188_5) end)
+task.spawn(function(_191, _191_2, _191_3, _191_4, _191_5) end)
+task.spawn(function(_194, _194_2, _194_3, _194_4, _194_5) end)
+task.spawn(function(_197, _197_2, _197_3, _197_4, _197_5) end)
+task.spawn(function(_200, _200_2, _200_3, _200_4, _200_5) end)
+task.spawn(function(_203, _203_2, _203_3, _203_4, _203_5) end)
+task.spawn(function(_206, _206_2, _206_3, _206_4, _206_5) end)
+task.spawn(function(_209, _209_2, _209_3, _209_4, _209_5) end)
+task.spawn(function(_212, _212_2, _212_3, _212_4, _212_5) end)
+task.spawn(function(_215, _215_2, _215_3, _215_4, _215_5) end)
+task.spawn(function(_218, _218_2, _218_3, _218_4, _218_5) end)
+task.spawn(function(_221, _221_2, _221_3, _221_4, _221_5) end)
+task.spawn(function(_224, _224_2, _224_3, _224_4, _224_5) end)
+task.spawn(function(_227, _227_2, _227_3, _227_4, _227_5) end)
+task.spawn(function(_230, _230_2, _230_3, _230_4, _230_5) end)
+task.spawn(function(_233, _233_2, _233_3, _233_4, _233_5) end)
+task.spawn(function(_236, _236_2, _236_3, _236_4, _236_5) end)
+task.spawn(function(_239, _239_2, _239_3, _239_4, _239_5) end)
+task.spawn(function(_242, _242_2, _242_3, _242_4, _242_5) end)
+task.spawn(function(_245, _245_2, _245_3, _245_4, _245_5) end)
+task.spawn(function(_248, _248_2, _248_3, _248_4, _248_5) end)
+task.spawn(function(_251, _251_2, _251_3, _251_4, _251_5) end)
+task.spawn(function(_254, _254_2, _254_3, _254_4, _254_5) end)
+task.spawn(function(_257, _257_2, _257_3, _257_4, _257_5) end)
+task.spawn(function(_260, _260_2, _260_3, _260_4, _260_5) end)
+task.spawn(function(_263, _263_2, _263_3, _263_4, _263_5) end)
+task.spawn(function(_266, _266_2, _266_3, _266_4, _266_5) end)
+task.spawn(function(_269, _269_2, _269_3, _269_4, _269_5) end)
+task.spawn(function(_272, _272_2, _272_3, _272_4, _272_5) end)
+task.spawn(function(_275, _275_2, _275_3, _275_4, _275_5) end)
+task.spawn(function(_278, _278_2, _278_3, _278_4, _278_5) end)
+task.spawn(function(_281, _281_2, _281_3, _281_4, _281_5) end)
+task.spawn(function(_284, _284_2, _284_3, _284_4, _284_5) end)
+task.spawn(function(_287, _287_2, _287_3, _287_4, _287_5) end)
+task.spawn(function(_290, _290_2, _290_3, _290_4, _290_5) end)
+task.spawn(function(_293, _293_2, _293_3, _293_4, _293_5) end)
+task.spawn(function(_296, _296_2, _296_3, _296_4, _296_5) end)
+task.spawn(function(_299, _299_2, _299_3, _299_4, _299_5) end)
+task.spawn(function(_302, _302_2, _302_3, _302_4, _302_5) end)
+task.spawn(function(_305, _305_2, _305_3, _305_4, _305_5) end)
+task.spawn(function(_308, _308_2, _308_3, _308_4, _308_5) end)
+task.spawn(function(_311, _311_2, _311_3, _311_4, _311_5) end)
+task.spawn(function(_314, _314_2, _314_3, _314_4, _314_5) end)
+error('internal 583: <25ms: infinitelooperror>')
