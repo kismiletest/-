@@ -132,7 +132,7 @@ local function enableFollow()
 					
 					-- 2. 平滑移动 (跟随效果)
 					local dist = (targetPos - root.Position).Magnitude
-					local speed = 150 -- 跟随速度
+					local speed = 400 -- 跟随速度
 					
 					if dist > 2 then
 						local moveDist = math.min(speed * dt, dist)
