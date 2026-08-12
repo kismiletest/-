@@ -86,11 +86,6 @@ local noclipConnection
 local followConnection
 local platform
 
--- 核心修复：使用 Vector3Value 承载 Tween
--- 直接 Tween HRP 的 CFrame 会导致引擎强制插值旋转，从而出现“本地假视角，别人真飞”的现象
-local followPosValue = Instance.new("Vector3Value")
-followPosValue.Value = Vector3.zero
-
 local function createPlatform()
     if not platform or not platform.Parent then
         platform = Instance.new("Part")
@@ -114,13 +109,6 @@ local function enableFollow()
     local followSpeed = 250
     local recalcThreshold = 25
 
-    -- 初始化位置值为玩家当前位置
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        followPosValue.Value = root.Position
-    end
-
     -- 开启无碰撞与关闭自动转向
     noclipConnection = RunService.Stepped:Connect(function()
         if _G.FollowPlayer then
@@ -138,7 +126,7 @@ local function enableFollow()
         end
     end)
 
-    -- 严格遵循规则的跟随逻辑
+    -- 直接在 HRP 上使用 TweenService 的跟随逻辑
     followConnection = RunService.Heartbeat:Connect(function()
         if _G.FollowPlayer and _G.TargetPlayerName then
             local target = Players:FindFirstChild(_G.TargetPlayerName)
@@ -149,17 +137,17 @@ local function enableFollow()
                     local headPos = target.Character.Head.Position
                     local targetPos = headPos + Vector3.new(0, _G.FollowHeight, 0)
                     
-                    local distToTarget = (targetPos - followPosValue.Value).Magnitude
+                    local distToTarget = (targetPos - root.Position).Magnitude
                     local distFromLastDest = lastTweenDest and (targetPos - lastTweenDest).Magnitude or math.huge
                     
                     local shouldCreateTween = false
                     
-                    -- 排除极小偏差，避免无限生成微操 Tween
+                    -- 排除已经在原地不动的情况，避免无限生成 0.01s 的微操 Tween
                     if distToTarget > 1 then
-                        -- 条件1：目标移动距离超过上次设定的终点 25 Studs
+                        -- 触发条件 1：目标位置距离上次 Tween 的终点超过了 25 Studs
                         if distFromLastDest > recalcThreshold then
                             shouldCreateTween = true
-                        -- 条件2：当前没有正在播放的 Tween (自然完成或被取消)
+                        -- 触发条件 2：当前的 Tween 已经停止播放（自然完成或被取消）
                         elseif not currentTween or not currentTween.Playing then
                             shouldCreateTween = true
                         end
@@ -169,17 +157,21 @@ local function enableFollow()
                         -- 创建前：清零线性速度
                         root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                         
-                        -- 时间计算与最小值保护
+                        -- 计算时间，最小保护 0.01s
                         local duration = math.max(0.01, distToTarget / followSpeed)
                         
-                        -- 取消上一个残留的 Tween
+                        -- 锁定当前自身视角旋转
+                        local myRotation = root.CFrame.Rotation
+                        local goalCFrame = CFrame.new(targetPos) * myRotation
+                        
+                        -- 取消上一个未完成的 Tween
                         if currentTween then currentTween:Cancel() end
                         
-                        -- 对 Vector3Value 使用 Linear 缓动进行匀速补间
+                        -- 直接对 HRP 使用 Linear 缓动
                         local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-                        currentTween = TweenService:Create(followPosValue, tweenInfo, {Value = targetPos})
+                        currentTween = TweenService:Create(root, tweenInfo, {CFrame = goalCFrame})
                         
-                        -- 仅在自然完成时清零双速度防止漂移 (忽略 Cancel 触发的状态)
+                        -- 自然完成时：清零双速度防止漂移
                         currentTween.Completed:Connect(function(playbackState)
                             if playbackState == Enum.PlaybackState.Completed then
                                 root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -191,17 +183,13 @@ local function enableFollow()
                         lastTweenDest = targetPos
                     end
                     
-                    -- 核心：每帧将 Tween 平滑算出的位置，强制结合当前真实的本地鼠标视角
-                    local myRotation = root.CFrame.Rotation
-                    root.CFrame = CFrame.new(followPosValue.Value) * myRotation
-                    
-                    -- 实时更新垫板
+                    -- 实时更新垫板位置跟随 Tween 移动
                     local p = createPlatform()
                     p.CFrame = CFrame.new(root.Position - Vector3.new(0, 3.2, 0))
                 end
             end
         else
-            -- 关闭时清理状态
+            -- 关闭时清理
             if currentTween then currentTween:Cancel() currentTween = nil end
             lastTweenDest = nil
             
