@@ -117,6 +117,15 @@ local function enableFollow()
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum then hum.AutoRotate = false end
                 
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    -- 【核心修复 1：物理级防掉落】
+                    -- 物理引擎每帧都会给 Y 轴施加重力速度，这里直接把所有向下的速度强行归零
+                    if root.AssemblyLinearVelocity.Y < 0 then
+                        root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+                    end
+                end
+                
                 for _, v in ipairs(char:GetDescendants()) do
                     if v:IsA("BasePart") and v.CanCollide and v.Name ~= "FollowPlatform_Kiyo" then
                         v.CanCollide = false
@@ -181,6 +190,15 @@ local function enableFollow()
                         
                         currentTween:Play()
                         lastTweenDest = targetPos
+                    else
+                        -- 【核心修复 2：代码级兜底防掉落】
+                        -- 当距离极小(<=1)且没有 Tween 正在接管时，直接用代码把坐标死死钉在目标点上
+                        -- 防止在 Tween 停止的间隙被重力拉扯掉下去
+                        if not currentTween or not currentTween.Playing then
+                            local myRotation = root.CFrame.Rotation
+                            root.CFrame = CFrame.new(targetPos) * myRotation
+                            root.AssemblyLinearVelocity = Vector3.zero
+                        end
                     end
                     
                     -- 实时更新垫板位置跟随 Tween 移动
