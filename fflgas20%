@@ -9,9 +9,9 @@ _G.FollowPlayer = false
 _G.TargetPlayerName = nil
 _G.FollowHeight = 90
 _G.FollowSpeed = 250
-_G.AntiFallMode = false -- 新增：防掉下来模式开关
+_G.AntiFallMode = false
+_G.AutoSword = false -- 新增：跟随时自动拿刀开关
 
--- 安全高度底线（Blox Fruits 海平面大约在 Y=0 到 Y=-10，设为10最安全）
 local SAFE_Y_HEIGHT = 10 
 
 -- 获取当前服务器其他玩家列表
@@ -23,6 +23,43 @@ local function getPlayerNames()
         end
     end
     return list
+end
+
+-- ==================== 工具函数：识别与寻找刀剑 ====================
+local function isSword(tool)
+    if not tool or not tool:IsA("Tool") then return false end
+    
+    -- 1. 最精准的判断：Blox Fruits 的近战武器 ToolTip 标签都是 "Melee"
+    if tool.ToolTip and tool.ToolTip:find("Melee") then
+        return true
+    end
+    
+    -- 2. 兜底判断：通过名字关键词匹配（防止某些特殊武器没有标签）
+    local name = tool.Name:lower()
+    local keywords = {"sword", "katana", "saber", "sabre", "blade", "cutlass", "剑", "刀", "刃", "斧", "棍"}
+    for _, kw in ipairs(keywords) do
+        if name:find(kw) then return true end
+    end
+    
+    return false
+end
+
+local function findSword()
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer.Backpack
+    -- 优先从背包找（避免卸下手里正在用的其他东西）
+    if backpack then
+        for _, v in ipairs(backpack:GetChildren()) do
+            if isSword(v) then return v end
+        end
+    end
+    -- 背包没有再从身上找
+    if char then
+        for _, v in ipairs(char:GetChildren()) do
+            if isSword(v) then return v end
+        end
+    end
+    return nil
 end
 
 -- ==================== WindUI 界面 ====================
@@ -41,7 +78,7 @@ local Window = WindUI:CreateWindow({
     Icon = "crosshair",
     Author = "kiyo",
     Folder = "WindUI_Follow",
-    Size = UDim2.fromOffset(450, 350), -- 稍微拉高一点窗口
+    Size = UDim2.fromOffset(450, 380),
     Transparent = true,
     Theme = "Dark",
     Acrylic = false,
@@ -95,9 +132,17 @@ local followToggle = MainTab:Toggle({
     end
 })
 
-MainTab:Section({ Title = "保护设置" }) -- 新增分区
+-- 新增：自动拿刀开关
+local autoSwordToggle = MainTab:Toggle({
+    Title = "跟随时自动拿刀",
+    Value = _G.AutoSword,
+    Callback = function(v)
+        _G.AutoSword = v
+    end
+})
 
--- 新增：防掉下来模式开关
+MainTab:Section({ Title = "保护设置" })
+
 local antiFallToggle = MainTab:Toggle({
     Title = "防掉下来模式 (虚空保护)",
     Value = _G.AntiFallMode,
@@ -151,24 +196,21 @@ local function enableFollow()
     local currentTween = nil
     local lastTweenDest = nil
     local recalcThreshold = 25
+    local lastSwordCheckTime = 0 -- 拿刀操作的节流时间戳
 
-    -- 物理维护循环（拆分了跟随专属逻辑和全局防掉落逻辑）
     noclipConnection = RunService.Stepped:Connect(function()
         local char = LocalPlayer.Character
         if not char then return end
         local root = char:FindFirstChild("HumanoidRootPart")
         
-        -- 1. 跟随模式下的专属处理
         if _G.FollowPlayer and root then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum.AutoRotate = false end
             
-            -- 抵消Tween间隙的重力下坠
             if root.AssemblyLinearVelocity.Y < 0 then
                 root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
             end
             
-            -- 跟随时全身无碰撞
             for _, v in ipairs(char:GetDescendants()) do
                 if v:IsA("BasePart") and v.CanCollide and v.Name ~= "FollowPlatform_Kiyo" then
                     v.CanCollide = false
@@ -176,10 +218,8 @@ local function enableFollow()
             end
         end
         
-        -- 2. 独立的防掉下来模式（无论是否跟随都生效）
         if _G.AntiFallMode and root then
             if root.Position.Y < SAFE_Y_HEIGHT then
-                -- 暴力拉回安全高度并清空向下速度，保持水平位置不变
                 root.CFrame = CFrame.new(root.Position.X, SAFE_Y_HEIGHT + 5, root.Position.Z) * root.CFrame.Rotation
                 root.AssemblyLinearVelocity = Vector3.zero
                 root.AssemblyAngularVelocity = Vector3.zero
@@ -188,6 +228,28 @@ local function enableFollow()
     end)
 
     followConnection = RunService.Heartbeat:Connect(function()
+        -- ==================== 自动拿刀逻辑 ====================
+        if _G.FollowPlayer and _G.AutoSword then
+            local currentTime = tick()
+            -- 节流保护：每 0.5 秒才执行一次检测，防止疯狂调用 EquipTool 导致掉线
+            if currentTime - lastSwordCheckTime > 0.5 then
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    local currentTool = char:FindFirstChildOfClass("Tool")
+                    -- 如果手里没东西，或者手里的东西不是刀，就去找刀装备
+                    if not currentTool or not isSword(currentTool) then
+                        local sword = findSword()
+                        if sword then
+                            hum:EquipTool(sword)
+                        end
+                    end
+                end
+                lastSwordCheckTime = currentTime
+            end
+        end
+        -- =======================================================
+
         if _G.FollowPlayer and _G.TargetPlayerName then
             local target = Players:FindFirstChild(_G.TargetPlayerName)
             if target and target.Character and target.Character:FindFirstChild("Head") then
@@ -197,8 +259,6 @@ local function enableFollow()
                     local headPos = target.Character.Head.Position
                     local targetY = headPos.Y + _G.FollowHeight
                     
-                    -- 【防掉下来模式智能干预】
-                    -- 如果目标掉进了海里/虚空，且开启了防掉落，则放弃跟随他的Y轴，只跟随X/Z轴
                     if _G.AntiFallMode and targetY < SAFE_Y_HEIGHT then
                         targetY = SAFE_Y_HEIGHT + 5
                     end
@@ -267,4 +327,4 @@ end
 
 enableFollow()
 
-print("跟随锁定玩家脚本已加载！(已加入防掉下来模式)")
+print("跟随锁定玩家脚本已加载！(已加入自动拿刀功能)")
