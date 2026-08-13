@@ -9,10 +9,7 @@ _G.FollowPlayer = false
 _G.TargetPlayerName = nil
 _G.FollowHeight = 90
 _G.FollowSpeed = 250
-_G.AntiFallMode = false
-_G.AutoSword = false -- 新增：跟随时自动拿刀开关
-
-local SAFE_Y_HEIGHT = 10 
+_G.AutoSword = false 
 
 -- 获取当前服务器其他玩家列表
 local function getPlayerNames()
@@ -25,18 +22,16 @@ local function getPlayerNames()
     return list
 end
 
--- ==================== 工具函数：识别与寻找刀剑 ====================
+-- ==================== 工具函数：增强版刀剑识别 ====================
 local function isSword(tool)
     if not tool or not tool:IsA("Tool") then return false end
     
-    -- 1. 最精准的判断：Blox Fruits 的近战武器 ToolTip 标签都是 "Melee"
-    if tool.ToolTip and tool.ToolTip:find("Melee") then
+    if tool.ToolTip and string.lower(tool.ToolTip):find("melee") then
         return true
     end
     
-    -- 2. 兜底判断：通过名字关键词匹配（防止某些特殊武器没有标签）
-    local name = tool.Name:lower()
-    local keywords = {"sword", "katana", "saber", "sabre", "blade", "cutlass", "剑", "刀", "刃", "斧", "棍"}
+    local name = string.lower(tool.Name)
+    local keywords = {"sword", "katana", "saber", "sabre", "blade", "cutlass", "剑", "刀", "刃", "斧", "棍", "拳套", "护手"}
     for _, kw in ipairs(keywords) do
         if name:find(kw) then return true end
     end
@@ -47,13 +42,11 @@ end
 local function findSword()
     local char = LocalPlayer.Character
     local backpack = LocalPlayer.Backpack
-    -- 优先从背包找（避免卸下手里正在用的其他东西）
     if backpack then
         for _, v in ipairs(backpack:GetChildren()) do
             if isSword(v) then return v end
         end
     end
-    -- 背包没有再从身上找
     if char then
         for _, v in ipairs(char:GetChildren()) do
             if isSword(v) then return v end
@@ -78,7 +71,7 @@ local Window = WindUI:CreateWindow({
     Icon = "crosshair",
     Author = "kiyo",
     Folder = "WindUI_Follow",
-    Size = UDim2.fromOffset(450, 380),
+    Size = UDim2.fromOffset(450, 320), -- 恢复原来高度
     Transparent = true,
     Theme = "Dark",
     Acrylic = false,
@@ -132,22 +125,11 @@ local followToggle = MainTab:Toggle({
     end
 })
 
--- 新增：自动拿刀开关
 local autoSwordToggle = MainTab:Toggle({
-    Title = "跟随时自动拿刀",
+    Title = "跟随时自动拿刀 (防卡手)",
     Value = _G.AutoSword,
     Callback = function(v)
         _G.AutoSword = v
-    end
-})
-
-MainTab:Section({ Title = "保护设置" })
-
-local antiFallToggle = MainTab:Toggle({
-    Title = "防掉下来模式 (虚空保护)",
-    Value = _G.AntiFallMode,
-    Callback = function(v)
-        _G.AntiFallMode = v
     end
 })
 
@@ -196,7 +178,8 @@ local function enableFollow()
     local currentTween = nil
     local lastTweenDest = nil
     local recalcThreshold = 25
-    local lastSwordCheckTime = 0 -- 拿刀操作的节流时间戳
+    local lastSwordCheckTime = 0 
+    local hasSwordInInventory = false 
 
     noclipConnection = RunService.Stepped:Connect(function()
         local char = LocalPlayer.Character
@@ -207,6 +190,7 @@ local function enableFollow()
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum.AutoRotate = false end
             
+            -- 跟随时的核心防掉落（保留）
             if root.AssemblyLinearVelocity.Y < 0 then
                 root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
             end
@@ -217,31 +201,32 @@ local function enableFollow()
                 end
             end
         end
-        
-        if _G.AntiFallMode and root then
-            if root.Position.Y < SAFE_Y_HEIGHT then
-                root.CFrame = CFrame.new(root.Position.X, SAFE_Y_HEIGHT + 5, root.Position.Z) * root.CFrame.Rotation
-                root.AssemblyLinearVelocity = Vector3.zero
-                root.AssemblyAngularVelocity = Vector3.zero
-            end
-        end
     end)
 
     followConnection = RunService.Heartbeat:Connect(function()
-        -- ==================== 自动拿刀逻辑 ====================
+        -- ==================== 绝对防卡手自动拿刀逻辑 ====================
         if _G.FollowPlayer and _G.AutoSword then
             local currentTime = tick()
-            -- 节流保护：每 0.5 秒才执行一次检测，防止疯狂调用 EquipTool 导致掉线
             if currentTime - lastSwordCheckTime > 0.5 then
                 local char = LocalPlayer.Character
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
                 if hum then
                     local currentTool = char:FindFirstChildOfClass("Tool")
-                    -- 如果手里没东西，或者手里的东西不是刀，就去找刀装备
-                    if not currentTool or not isSword(currentTool) then
-                        local sword = findSword()
-                        if sword then
-                            hum:EquipTool(sword)
+                    
+                    if not (currentTool and isSword(currentTool)) then
+                        if not hasSwordInInventory then
+                            local sword = findSword()
+                            if sword then
+                                hasSwordInInventory = true
+                                pcall(function() hum:EquipTool(sword) end)
+                            end
+                        else
+                            local sword = findSword()
+                            if sword then
+                                pcall(function() hum:EquipTool(sword) end)
+                            else
+                                hasSwordInInventory = false
+                            end
                         end
                     end
                 end
@@ -257,13 +242,7 @@ local function enableFollow()
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if root then
                     local headPos = target.Character.Head.Position
-                    local targetY = headPos.Y + _G.FollowHeight
-                    
-                    if _G.AntiFallMode and targetY < SAFE_Y_HEIGHT then
-                        targetY = SAFE_Y_HEIGHT + 5
-                    end
-                    
-                    local targetPos = Vector3.new(headPos.X, targetY, headPos.Z)
+                    local targetPos = headPos + Vector3.new(0, _G.FollowHeight, 0)
                     
                     local distToTarget = (targetPos - root.Position).Magnitude
                     local distFromLastDest = lastTweenDest and (targetPos - lastTweenDest).Magnitude or math.huge
@@ -327,4 +306,4 @@ end
 
 enableFollow()
 
-print("跟随锁定玩家脚本已加载！(已加入自动拿刀功能)")
+print("跟随锁定玩家脚本已加载！")
