@@ -10,6 +10,9 @@ _G.TargetPlayerName = nil
 _G.FollowHeight = 90
 _G.FollowSpeed = 250
 _G.AutoSword = false 
+_G.EscapeMode = false
+
+local savedPosBeforeEscape = nil
 
 -- 获取当前服务器其他玩家列表
 local function getPlayerNames()
@@ -25,7 +28,6 @@ end
 -- ==================== 工具函数：精准识别剑 ====================
 local function isSword(tool)
     if not tool or not tool:IsA("Tool") then return false end
-    -- BF的近战武器底层标签必定包含 "Melee"，这是最精准的判断
     if tool.ToolTip and string.lower(tool.ToolTip):find("melee") then
         return true
     end
@@ -35,13 +37,11 @@ end
 local function findSword()
     local char = LocalPlayer.Character
     local backpack = LocalPlayer.Backpack
-    -- 优先从背包拿
     if backpack then
         for _, v in ipairs(backpack:GetChildren()) do
             if isSword(v) then return v end
         end
     end
-    -- 背包没有再从身上拿
     if char then
         for _, v in ipairs(char:GetChildren()) do
             if isSword(v) then return v end
@@ -66,7 +66,7 @@ local Window = WindUI:CreateWindow({
     Icon = "crosshair",
     Author = "kiyo",
     Folder = "WindUI_Follow",
-    Size = UDim2.fromOffset(450, 320),
+    Size = UDim2.fromOffset(450, 350),
     Transparent = true,
     Theme = "Dark",
     Acrylic = false,
@@ -128,6 +128,51 @@ local autoSwordToggle = MainTab:Toggle({
     end
 })
 
+MainTab:Section({ Title = "紧急功能" })
+
+-- 新增：真正的瞬移逃跑
+local escapeToggle = MainTab:Toggle({
+    Title = "瞬移逃跑 (安全返回)",
+    Value = _G.EscapeMode,
+    Callback = function(v)
+        _G.EscapeMode = v
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        if v then
+            -- 开启：强制关闭跟随
+            if _G.FollowPlayer then
+                _G.FollowPlayer = false
+                pcall(function() followToggle:SetValue(false) end)
+            end
+            
+            -- 记录起飞前坐标
+            savedPosBeforeEscape = root.CFrame
+            
+            -- 锚定角色防止掉落，并直接单次传送
+            root.Anchored = true
+            root.CFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
+            
+            if WindUI and WindUI.Notify then
+                WindUI:Notify({ Title = "逃跑系统", Description = "已瞬移至太空！关闭开关可安全返回。", Duration = 3 })
+            end
+        else
+            -- 关闭：如果有存档点，直接传送回来并解除锚定
+            if savedPosBeforeEscape then
+                root.CFrame = savedPosBeforeEscape
+                root.AssemblyLinearVelocity = Vector3.zero
+                savedPosBeforeEscape = nil
+            end
+            root.Anchored = false -- 恢复正常物理
+            
+            if WindUI and WindUI.Notify then
+                WindUI:Notify({ Title = "逃跑系统", Description = "已安全返回原位置！", Duration = 2 })
+            end
+        end
+    end
+})
+
 -- ==================== G键 快捷开关逻辑 ====================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -179,22 +224,22 @@ local function enableFollow()
         local char = LocalPlayer.Character
         if not char then return end
         local root = char:FindFirstChild("HumanoidRootPart")
-        
+        if not root then return end
+
+        -- 逃跑模式下，彻底冻结物理引擎干预，什么都不做
+        if _G.EscapeMode then return end
+
         if _G.FollowPlayer and root then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum.AutoRotate = false end
             
-            -- 抵消下坠
             if root.AssemblyLinearVelocity.Y < 0 then
                 root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
             end
             
-            -- 【核心修复】：安全的无碰撞逻辑
-            -- 必须严格排除工具（剑/枪/果实）里面的零件，否则游戏服务器会判定你把武器扔了，导致强制变成空手！
             local currentTool = char:FindFirstChildOfClass("Tool")
             for _, v in ipairs(char:GetDescendants()) do
                 if v:IsA("BasePart") and v.CanCollide and v.Name ~= "FollowPlatform_Kiyo" then
-                    -- 如果这个零件属于当前手持的工具，绝对不能改它的碰撞！
                     if not currentTool or not v:IsDescendantOf(currentTool) then
                         v.CanCollide = false
                     end
@@ -204,20 +249,19 @@ local function enableFollow()
     end)
 
     followConnection = RunService.Heartbeat:Connect(function()
+        if _G.EscapeMode then return end -- 逃跑模式下阻断跟随逻辑
+
         -- ==================== 自动拿剑逻辑 ====================
         if _G.FollowPlayer and _G.AutoSword then
             local currentTime = tick()
-            -- 每 0.3 秒检测一次，保证响应快且不掉线
             if currentTime - lastSwordCheckTime > 0.3 then
                 local char = LocalPlayer.Character
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
                 if hum then
                     local currentTool = char:FindFirstChildOfClass("Tool")
-                    -- 只有当手里没东西，或者手里的不是近战（剑）时，才去拿剑
                     if not currentTool or not isSword(currentTool) then
                         local sword = findSword()
                         if sword then
-                            -- 安全校验装剑
                             pcall(function() hum:EquipTool(sword) end)
                         end
                     end
@@ -298,4 +342,4 @@ end
 
 enableFollow()
 
-print("跟随锁定玩家脚本已加载！(已彻底修复卡空手问题)")
+print("跟随锁定玩家脚本已加载！(已改为直接瞬移逃跑)")
