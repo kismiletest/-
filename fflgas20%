@@ -8,7 +8,11 @@ local LocalPlayer = Players.LocalPlayer
 _G.FollowPlayer = false
 _G.TargetPlayerName = nil
 _G.FollowHeight = 90
-_G.FollowSpeed = 250 -- 新增：跟随速度全局变量
+_G.FollowSpeed = 250
+_G.AntiFallMode = false -- 新增：防掉下来模式开关
+
+-- 安全高度底线（Blox Fruits 海平面大约在 Y=0 到 Y=-10，设为10最安全）
+local SAFE_Y_HEIGHT = 10 
 
 -- 获取当前服务器其他玩家列表
 local function getPlayerNames()
@@ -37,7 +41,7 @@ local Window = WindUI:CreateWindow({
     Icon = "crosshair",
     Author = "kiyo",
     Folder = "WindUI_Follow",
-    Size = UDim2.fromOffset(450, 320),
+    Size = UDim2.fromOffset(450, 350), -- 稍微拉高一点窗口
     Transparent = true,
     Theme = "Dark",
     Acrylic = false,
@@ -67,7 +71,6 @@ MainTab:Button({
 
 MainTab:Section({ Title = "锁定设置" })
 
--- 新增：跟随速度调整滑块
 MainTab:Slider({
     Title = "跟随速度",
     Value = { Min = 50, Max = 1000, Default = 250 },
@@ -77,7 +80,7 @@ MainTab:Slider({
 })
 
 MainTab:Slider({
-    Title = "跟随高度 (Studs)",
+    Title = "跟随高度",
     Value = { Min = 10, Max = 300, Default = 90 },
     Callback = function(v)
         _G.FollowHeight = v
@@ -92,17 +95,25 @@ local followToggle = MainTab:Toggle({
     end
 })
 
+MainTab:Section({ Title = "保护设置" }) -- 新增分区
+
+-- 新增：防掉下来模式开关
+local antiFallToggle = MainTab:Toggle({
+    Title = "防掉下来模式 (虚空保护)",
+    Value = _G.AntiFallMode,
+    Callback = function(v)
+        _G.AntiFallMode = v
+    end
+})
+
 -- ==================== G键 快捷开关逻辑 ====================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    
     if input.KeyCode == Enum.KeyCode.G then
         _G.FollowPlayer = not _G.FollowPlayer
-        
         if followToggle and followToggle.SetValue then
             pcall(function() followToggle:SetValue(_G.FollowPlayer) end)
         end
-        
         local stateText = _G.FollowPlayer and "已开启" or "已关闭"
         if WindUI and WindUI.Notify then
             WindUI:Notify({
@@ -139,28 +150,39 @@ local function enableFollow()
 
     local currentTween = nil
     local lastTweenDest = nil
-    -- 删除了原来的 local followSpeed = 250，改为直接读取 _G.FollowSpeed
     local recalcThreshold = 25
 
+    -- 物理维护循环（拆分了跟随专属逻辑和全局防掉落逻辑）
     noclipConnection = RunService.Stepped:Connect(function()
-        if _G.FollowPlayer then
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then hum.AutoRotate = false end
-                
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if root then
-                    if root.AssemblyLinearVelocity.Y < 0 then
-                        root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
-                    end
+        local char = LocalPlayer.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        
+        -- 1. 跟随模式下的专属处理
+        if _G.FollowPlayer and root then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.AutoRotate = false end
+            
+            -- 抵消Tween间隙的重力下坠
+            if root.AssemblyLinearVelocity.Y < 0 then
+                root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+            end
+            
+            -- 跟随时全身无碰撞
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.CanCollide and v.Name ~= "FollowPlatform_Kiyo" then
+                    v.CanCollide = false
                 end
-                
-                for _, v in ipairs(char:GetDescendants()) do
-                    if v:IsA("BasePart") and v.CanCollide and v.Name ~= "FollowPlatform_Kiyo" then
-                        v.CanCollide = false
-                    end
-                end
+            end
+        end
+        
+        -- 2. 独立的防掉下来模式（无论是否跟随都生效）
+        if _G.AntiFallMode and root then
+            if root.Position.Y < SAFE_Y_HEIGHT then
+                -- 暴力拉回安全高度并清空向下速度，保持水平位置不变
+                root.CFrame = CFrame.new(root.Position.X, SAFE_Y_HEIGHT + 5, root.Position.Z) * root.CFrame.Rotation
+                root.AssemblyLinearVelocity = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
             end
         end
     end)
@@ -173,7 +195,15 @@ local function enableFollow()
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if root then
                     local headPos = target.Character.Head.Position
-                    local targetPos = headPos + Vector3.new(0, _G.FollowHeight, 0)
+                    local targetY = headPos.Y + _G.FollowHeight
+                    
+                    -- 【防掉下来模式智能干预】
+                    -- 如果目标掉进了海里/虚空，且开启了防掉落，则放弃跟随他的Y轴，只跟随X/Z轴
+                    if _G.AntiFallMode and targetY < SAFE_Y_HEIGHT then
+                        targetY = SAFE_Y_HEIGHT + 5
+                    end
+                    
+                    local targetPos = Vector3.new(headPos.X, targetY, headPos.Z)
                     
                     local distToTarget = (targetPos - root.Position).Magnitude
                     local distFromLastDest = lastTweenDest and (targetPos - lastTweenDest).Magnitude or math.huge
@@ -190,10 +220,7 @@ local function enableFollow()
                     
                     if shouldCreateTween then
                         root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                        
-                        -- 核心修改：这里的 followSpeed 换成了 _G.FollowSpeed，实现实时生效
                         local duration = math.max(0.01, distToTarget / _G.FollowSpeed)
-                        
                         local myRotation = root.CFrame.Rotation
                         local goalCFrame = CFrame.new(targetPos) * myRotation
                         
@@ -240,4 +267,4 @@ end
 
 enableFollow()
 
-print("跟随锁定玩家脚本已加载！(已添加跟随速度调整)")
+print("跟随锁定玩家脚本已加载！(已加入防掉下来模式)")
