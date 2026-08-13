@@ -13,6 +13,7 @@ _G.AutoSword = false
 _G.EscapeMode = false
 
 local savedPosBeforeEscape = nil
+local hasTeleportedUp = false -- 用于确保只瞬移一次的凭证
 
 -- 获取当前服务器其他玩家列表
 local function getPlayerNames()
@@ -61,12 +62,13 @@ if not WindUI then
     return
 end
 
+-- 【修复1】：把窗口高度拉大到 460，防止底部的按钮被遮挡看不见！
 local Window = WindUI:CreateWindow({
     Title = "跟随锁定玩家",
     Icon = "crosshair",
     Author = "kiyo",
     Folder = "WindUI_Follow",
-    Size = UDim2.fromOffset(450, 350),
+    Size = UDim2.fromOffset(450, 460), 
     Transparent = true,
     Theme = "Dark",
     Acrylic = false,
@@ -94,7 +96,7 @@ MainTab:Button({
     end
 })
 
-MainTab:Section({ Title = "锁定设置" })
+MainTab:Section({ Title = "锁定与武器设置" })
 
 MainTab:Slider({
     Title = "跟随速度",
@@ -128,47 +130,20 @@ local autoSwordToggle = MainTab:Toggle({
     end
 })
 
-MainTab:Section({ Title = "紧急功能" })
+MainTab:Section({ Title = "紧急逃生" })
 
--- 新增：真正的瞬移逃跑
+-- 【修复2】：这里只负责改变开关状态，不执行复杂传送，防止UI卡死
 local escapeToggle = MainTab:Toggle({
-    Title = "瞬移逃跑 (安全返回)",
+    Title = "自动逃跑 (瞬移太空)",
     Value = _G.EscapeMode,
     Callback = function(v)
         _G.EscapeMode = v
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-
-        if v then
-            -- 开启：强制关闭跟随
-            if _G.FollowPlayer then
-                _G.FollowPlayer = false
-                pcall(function() followToggle:SetValue(false) end)
-            end
-            
-            -- 记录起飞前坐标
-            savedPosBeforeEscape = root.CFrame
-            
-            -- 锚定角色防止掉落，并直接单次传送
-            root.Anchored = true
-            root.CFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
-            
-            if WindUI and WindUI.Notify then
-                WindUI:Notify({ Title = "逃跑系统", Description = "已瞬移至太空！关闭开关可安全返回。", Duration = 3 })
-            end
-        else
-            -- 关闭：如果有存档点，直接传送回来并解除锚定
-            if savedPosBeforeEscape then
-                root.CFrame = savedPosBeforeEscape
-                root.AssemblyLinearVelocity = Vector3.zero
-                savedPosBeforeEscape = nil
-            end
-            root.Anchored = false -- 恢复正常物理
-            
-            if WindUI and WindUI.Notify then
-                WindUI:Notify({ Title = "逃跑系统", Description = "已安全返回原位置！", Duration = 2 })
-            end
+        hasTeleportedUp = false -- 重置传送凭证
+        
+        -- 开启逃跑时，强制关闭跟随
+        if v and _G.FollowPlayer then
+            _G.FollowPlayer = false
+            pcall(function() followToggle:SetValue(false) end)
         end
     end
 })
@@ -226,8 +201,38 @@ local function enableFollow()
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return end
 
-        -- 逃跑模式下，彻底冻结物理引擎干预，什么都不做
-        if _G.EscapeMode then return end
+        -- ==================== 真正的逃跑逻辑执行区 ====================
+        if _G.EscapeMode then
+            if not hasTeleportedUp then
+                -- 记录起飞前坐标
+                savedPosBeforeEscape = root.CFrame
+                -- 锚定防掉落 + 直接瞬移
+                root.Anchored = true
+                root.CFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
+                root.AssemblyLinearVelocity = Vector3.zero
+                
+                hasTeleportedUp = true -- 标记已完成瞬移，后续帧不再重复执行
+                
+                if WindUI and WindUI.Notify then
+                    WindUI:Notify({ Title = "逃跑系统", Description = "已瞬移至太空！关闭开关可安全返回。", Duration = 3 })
+                end
+            end
+            return -- 阻断下方所有逻辑
+        else
+            -- 关闭逃跑时，如果之前飞走过，就拉回来
+            if hasTeleportedUp and savedPosBeforeEscape then
+                root.CFrame = savedPosBeforeEscape
+                root.AssemblyLinearVelocity = Vector3.zero
+                root.Anchored = false -- 解除锚定恢复正常
+                savedPosBeforeEscape = nil
+                hasTeleportedUp = false
+                
+                if WindUI and WindUI.Notify then
+                    WindUI:Notify({ Title = "逃跑系统", Description = "已安全返回原位置！", Duration = 2 })
+                end
+            end
+        end
+        -- ===============================================================
 
         if _G.FollowPlayer and root then
             local hum = char:FindFirstChildOfClass("Humanoid")
@@ -249,7 +254,8 @@ local function enableFollow()
     end)
 
     followConnection = RunService.Heartbeat:Connect(function()
-        if _G.EscapeMode then return end -- 逃跑模式下阻断跟随逻辑
+        -- 逃跑时阻断跟随
+        if _G.EscapeMode then return end 
 
         -- ==================== 自动拿剑逻辑 ====================
         if _G.FollowPlayer and _G.AutoSword then
@@ -342,4 +348,4 @@ end
 
 enableFollow()
 
-print("跟随锁定玩家脚本已加载！(已改为直接瞬移逃跑)")
+print("跟随锁定玩家脚本已加载！(已修复UI显示与逃跑稳定性)")
