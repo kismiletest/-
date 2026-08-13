@@ -14,6 +14,7 @@ _G.EscapeMode = false
 
 local savedPosBeforeEscape = nil
 local hasTeleportedUp = false 
+local escapeTween = nil -- 用于管理逃跑和返回的动画
 
 -- 获取当前服务器其他玩家列表
 local function getPlayerNames()
@@ -131,14 +132,11 @@ local autoSwordToggle = MainTab:Toggle({
 
 MainTab:Section({ Title = "紧急逃生" })
 
--- 【修复】：这里只负责改变开关状态，绝对不碰底层标记，防止时序冲突
 local escapeToggle = MainTab:Toggle({
-    Title = "自动逃跑 (瞬移太空)",
+    Title = "自动逃跑 (网络同步瞬移)",
     Value = _G.EscapeMode,
     Callback = function(v)
         _G.EscapeMode = v
-        
-        -- 开启逃跑时，强制关闭跟随
         if v and _G.FollowPlayer then
             _G.FollowPlayer = false
             pcall(function() followToggle:SetValue(false) end)
@@ -199,31 +197,47 @@ local function enableFollow()
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return end
 
-        -- ==================== 完美的逃跑/返回逻辑 ====================
+        -- ==================== 真正的网络同步逃跑逻辑 ====================
         if _G.EscapeMode then
             if not hasTeleportedUp then
-                -- 1. 开启瞬间：存档并飞走
+                -- 1. 记录起飞前坐标
                 savedPosBeforeEscape = root.CFrame
-                root.Anchored = true
-                root.CFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
-                root.AssemblyLinearVelocity = Vector3.zero
+                
+                -- 2. 取消可能存在的旧动画
+                if escapeTween then escapeTween:Cancel() end
+                
+                -- 3. 【核心修复】：用0.05秒的极速Tween代替直接赋值，骗过服务器同步！
+                local goalCFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
+                local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
+                escapeTween = TweenService:Create(root, tweenInfo, {CFrame = goalCFrame})
+                escapeTween:Play()
+                
                 hasTeleportedUp = true
                 
                 if WindUI and WindUI.Notify then
-                    WindUI:Notify({ Title = "逃跑系统", Description = "已瞬移至太空！关闭开关可安全返回。", Duration = 3 })
+                    WindUI:Notify({ Title = "逃跑系统", Description = "已同步瞬移！别人已看不见你。", Duration = 3 })
                 end
+            else
+                -- 4. 飞上去之后，每帧死死钉在天上防止掉落（不再用Anchored，因为Anchored会阻断同步）
+                if root.Position.Y < 999999000 then
+                    root.CFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
+                end
+                root.AssemblyLinearVelocity = Vector3.zero
             end
-            return -- 飞走期间冻结一切其他逻辑
+            return 
         else
-            -- 2. 关闭瞬间：检测到飞走过，立刻拉回原位
+            -- 5. 关闭瞬间：用极速Tween拉回原地，确保服务器也把你拉回来
             if hasTeleportedUp then
+                if escapeTween then escapeTween:Cancel() end
+                
                 if savedPosBeforeEscape then
-                    root.CFrame = savedPosBeforeEscape
+                    -- 用0.05秒闪回原地
+                    local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
+                    escapeTween = TweenService:Create(root, tweenInfo, {CFrame = savedPosBeforeEscape})
+                    escapeTween:Play()
                 end
-                root.Anchored = false -- 解除定身
                 root.AssemblyLinearVelocity = Vector3.zero
                 
-                -- 彻底清理底层数据
                 savedPosBeforeEscape = nil
                 hasTeleportedUp = false 
                 
@@ -347,4 +361,4 @@ end
 
 enableFollow()
 
-print("跟随锁定玩家脚本已加载！(已修复关闭逃跑不回原地的Bug)")
+print("跟随锁定玩家脚本已加载！(已修复全服网络同步问题)")
