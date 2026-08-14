@@ -1,4 +1,4 @@
--- ==================== Blox Fruits 跟随锁定玩家 (整合新版自動裝備 + 隨機鎖人/死亡切換) ====================
+-- ==================== Blox Fruits 跟随锁定玩家 (整合新版自動裝備) ====================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -11,9 +11,6 @@ _G.TargetPlayerName = nil
 _G.FollowHeight = 90
 _G.FollowSpeed = 250
 _G.EscapeMode = false
-
--- 隨機鎖人全局變量
-_G.RandomTargetMode = false
 
 -- 自動裝備全局變量
 _G.AutoEquip_SelectedType = "Melee"
@@ -33,76 +30,6 @@ local function getPlayerNames()
     end
     return list
 end
-
--- ==================== 隨機鎖人邏輯 ====================
-local playerDropdown -- 預先宣告 Dropdown 變數供隨機切換時更新 UI
-
-local function selectRandomTarget()
-    local list = getPlayerNames()
-    if #list == 0 then
-        _G.TargetPlayerName = nil
-        return
-    end
-
-    local available = {}
-    for _, name in ipairs(list) do
-        if #list == 1 or name ~= _G.TargetPlayerName then
-            table.insert(available, name)
-        end
-    end
-
-    local chosen = available[math.random(1, #available)]
-    _G.TargetPlayerName = chosen
-
-    -- 同步更新 UI 下拉選單顯示
-    if playerDropdown then
-        pcall(function()
-            if playerDropdown.SetValue then
-                playerDropdown:SetValue(chosen)
-            elseif playerDropdown.Set then
-                playerDropdown:Set(chosen)
-            end
-        end)
-    end
-
-    if WindUI and WindUI.Notify then
-        WindUI:Notify({
-            Title = "随机锁定目标",
-            Description = "已自动切换为: " .. tostring(chosen),
-            Duration = 2
-        })
-    end
-end
-
--- 檢測目標死亡 / 離線並自動切換
-task.spawn(function()
-    while true do
-        task.wait(0.4)
-        if _G.RandomTargetMode and _G.FollowPlayer then
-            if not _G.TargetPlayerName or _G.TargetPlayerName == "" then
-                selectRandomTarget()
-            else
-                local target = Players:FindFirstChild(_G.TargetPlayerName)
-                if not target then
-                    -- 玩家離開遊戲
-                    selectRandomTarget()
-                else
-                    local char = target.Character
-                    if not char then
-                        -- 角色尚未加載 / 重置中
-                        selectRandomTarget()
-                    else
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        if not hum or hum.Health <= 0 then
-                            -- 玩家已死亡
-                            selectRandomTarget()
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
 
 -- ==================== 新版自動裝備邏輯 ====================
 local function equipByType(toolType)
@@ -172,7 +99,7 @@ local Window = WindUI:CreateWindow({
     Icon = "crosshair",
     Author = "kiyo",
     Folder = "WindUI_Follow",
-    Size = UDim2.fromOffset(450, 560), 
+    Size = UDim2.fromOffset(450, 520), 
     Transparent = true,
     Theme = "Dark",
     Acrylic = false,
@@ -184,7 +111,7 @@ local MainTab = Window:Tab({ Title = "跟随与装备", Icon = "user" })
 
 MainTab:Section({ Title = "目标设置" })
 
-playerDropdown = MainTab:Dropdown({
+local playerDropdown = MainTab:Dropdown({
     Title = "选择玩家",
     Values = getPlayerNames(),
     Value = "",
@@ -202,25 +129,6 @@ MainTab:Button({
         elseif playerDropdown.SetValues then
             playerDropdown:SetValues(list)
         end
-    end
-})
-
-MainTab:Toggle({
-    Title = "开启随机锁定模式",
-    Desc = "目标死亡/离线时自动切换到下一位玩家",
-    Value = _G.RandomTargetMode,
-    Callback = function(v)
-        _G.RandomTargetMode = v
-        if v then
-            selectRandomTarget()
-        end
-    end
-})
-
-MainTab:Button({
-    Title = "跳过当前目标 (手动切换)",
-    Callback = function()
-        selectRandomTarget()
     end
 })
 
@@ -485,4 +393,4 @@ end
 
 enableFollow()
 
-print("跟随锁定玩家脚本已加载！(已整合全新武器自動裝備、隨機鎖人與WindUI修復)")
+print("跟随锁定玩家脚本已加载！(已整合全新武器自動裝備與WindUI修復)")
