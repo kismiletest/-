@@ -1,0 +1,396 @@
+-- ==================== Blox Fruits 跟随锁定玩家 (整合新版自動裝備) ====================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- 全局變量
+_G.FollowPlayer = false
+_G.TargetPlayerName = nil
+_G.FollowHeight = 90
+_G.FollowSpeed = 250
+_G.EscapeMode = false
+
+-- 自動裝備全局變量
+_G.AutoEquip_SelectedType = "Melee"
+_G.AutoEquip_Enabled = false
+
+local savedPosBeforeEscape = nil
+local hasTeleportedUp = false 
+local escapeTween = nil -- 用于管理逃跑和返回的动画
+
+-- 获取当前服务器其他玩家列表
+local function getPlayerNames()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(list, p.Name)
+        end
+    end
+    return list
+end
+
+-- ==================== 新版自動裝備邏輯 ====================
+local function equipByType(toolType)
+    _G.AutoEquip_SelectedType = toolType -- 更新當前選擇的配置類型 
+    if not _G.AutoEquip_Enabled then return end -- 若未開啟自動裝備則不執行 
+    
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait() 
+    local hum  = char:FindFirstChildOfClass("Humanoid") 
+    if not hum then return end
+
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        -- 遍歷背包中的所有物品
+        for _, tool in ipairs(backpack:GetChildren()) do 
+            -- 比對 ToolTip 是否符合選擇的配置類型
+            if tool:IsA("Tool") and tool.ToolTip == toolType then 
+                hum:EquipTool(tool) -- 讓角色裝備該武器 
+                break 
+            end 
+        end
+    end
+end
+
+local function monitorCurrentTool()
+    task.spawn(function()
+        while true do
+            task.wait(0.1) -- 每 0.1 秒檢查一次 
+            if _G.AutoEquip_Enabled then 
+                
+                -- 【衝突優化】如果正在打鳥王且處於打樹狀態（需要使用靈魂吉他），則跳過當前自動裝備的檢查
+                if _G.AutoBird and _G.isHuntingBird and _G.HuntingType == "Tree" then
+                    continue
+                end
+                
+                local char = LocalPlayer.Character 
+                if char then 
+                    local hum = char:FindFirstChildOfClass("Humanoid") 
+                    if hum then 
+                        local tool = char:FindFirstChildOfClass("Tool") -- 取得當前手上拿著的武器 
+                        -- 如果手上沒拿武器，或者手上武器類型不等於所選配置，則重新執行裝備
+                        if not tool or tool.ToolTip ~= _G.AutoEquip_SelectedType then 
+                            equipByType(_G.AutoEquip_SelectedType) 
+                        end 
+                    end 
+                end 
+            end 
+        end 
+    end)
+end
+
+-- 啟動自動裝備後台監控
+monitorCurrentTool()
+
+-- ==================== WindUI 界面 ====================
+local WindUI
+pcall(function()
+    WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+end)
+
+if not WindUI then
+    warn("WindUI 加载失败！")
+    return
+end
+
+local Window = WindUI:CreateWindow({
+    Title = "跟随锁定玩家",
+    Icon = "crosshair",
+    Author = "kiyo",
+    Folder = "WindUI_Follow",
+    Size = UDim2.fromOffset(450, 520), 
+    Transparent = true,
+    Theme = "Dark",
+    Acrylic = false,
+    HideSearchBar = false,
+    ToggleKey = Enum.KeyCode.RightControl,
+})
+
+local MainTab = Window:Tab({ Title = "跟随与装备", Icon = "user" })
+
+MainTab:Section({ Title = "目标设置" })
+
+local playerDropdown = MainTab:Dropdown({
+    Title = "选择玩家",
+    Values = getPlayerNames(),
+    Value = "",
+    Callback = function(v)
+        _G.TargetPlayerName = v
+    end
+})
+
+MainTab:Button({
+    Title = "刷新玩家列表",
+    Callback = function()
+        local list = getPlayerNames()
+        if playerDropdown.Refresh then
+            playerDropdown:Refresh(list)
+        elseif playerDropdown.SetValues then
+            playerDropdown:SetValues(list)
+        end
+    end
+})
+
+MainTab:Section({ Title = "锁定与参数" })
+
+MainTab:Slider({
+    Title = "跟随速度",
+    Value = { Min = 50, Max = 1000, Default = 250 },
+    Callback = function(v)
+        _G.FollowSpeed = v
+    end
+})
+
+MainTab:Slider({
+    Title = "跟随高度",
+    Value = { Min = 10, Max = 300, Default = 90 },
+    Callback = function(v)
+        _G.FollowHeight = v
+    end
+})
+
+local followToggle = MainTab:Toggle({
+    Title = "开启锁定跟随",
+    Value = _G.FollowPlayer,
+    Callback = function(v)
+        _G.FollowPlayer = v
+    end
+})
+
+MainTab:Section({ Title = "武器自動裝備" })
+
+MainTab:Dropdown({ 
+    Title = "選擇配置", 
+    Values = { "Melee", "Blox Fruit", "Sword", "Gun" }, 
+    Value = _G.AutoEquip_SelectedType,
+    Callback = function(option)
+        _G.AutoEquip_SelectedType = option
+        if _G.AutoEquip_Enabled then 
+            equipByType(_G.AutoEquip_SelectedType) 
+        end
+    end
+})
+
+MainTab:Toggle({ 
+    Title = "自動裝備", 
+    Desc = "自動切換到選擇的配置", 
+    Value = _G.AutoEquip_Enabled,
+    Callback = function(state)
+        _G.AutoEquip_Enabled = state
+        if state then 
+            equipByType(_G.AutoEquip_SelectedType) 
+        end
+    end
+})
+
+MainTab:Section({ Title = "紧急逃生" })
+
+local escapeToggle = MainTab:Toggle({
+    Title = "自动逃跑 (网络同步瞬移)",
+    Value = _G.EscapeMode,
+    Callback = function(v)
+        _G.EscapeMode = v
+        if v and _G.FollowPlayer then
+            _G.FollowPlayer = false
+            pcall(function() followToggle:SetValue(false) end)
+        end
+    end
+})
+
+-- ==================== G键 快捷开关逻辑 ====================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.G then
+        _G.FollowPlayer = not _G.FollowPlayer
+        if followToggle and followToggle.SetValue then
+            pcall(function() followToggle:SetValue(_G.FollowPlayer) end)
+        end
+        local stateText = _G.FollowPlayer and "已开启" or "已关闭"
+        if WindUI and WindUI.Notify then
+            WindUI:Notify({
+                Title = "快捷键 [G]",
+                Description = "跟随锁定状态: " .. stateText,
+                Duration = 2
+            })
+        end
+    end
+end)
+
+-- ==================== 锁定与防掉落逻辑 ====================
+local noclipConnection
+local followConnection
+local platform
+
+local function createPlatform()
+    if not platform or not platform.Parent then
+        platform = Instance.new("Part")
+        platform.Name = "FollowPlatform_Kiyo"
+        platform.Size = Vector3.new(10, 1, 10)
+        platform.Transparency = 1
+        platform.Anchored = true
+        platform.CanCollide = true
+        platform.Parent = Workspace
+    end
+    return platform
+end
+
+local function enableFollow()
+    if noclipConnection then noclipConnection:Disconnect() end
+    if followConnection then followConnection:Disconnect() end
+    if platform then platform:Destroy() platform = nil end
+
+    local currentTween = nil
+    local lastTweenDest = nil
+    local recalcThreshold = 25
+
+    noclipConnection = RunService.Stepped:Connect(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        -- ==================== 真正的网络同步逃跑逻辑 ====================
+        if _G.EscapeMode then
+            if not hasTeleportedUp then
+                -- 1. 记录起飞前坐标
+                savedPosBeforeEscape = root.CFrame
+                
+                -- 2. 取消可能存在的旧动画
+                if escapeTween then escapeTween:Cancel() end
+                
+                -- 3. 用0.05秒的极速Tween代替直接赋值，骗过服务器同步！
+                local goalCFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
+                local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
+                escapeTween = TweenService:Create(root, tweenInfo, {CFrame = goalCFrame})
+                escapeTween:Play()
+                
+                hasTeleportedUp = true
+                
+                if WindUI and WindUI.Notify then
+                    WindUI:Notify({ Title = "逃跑系统", Description = "已同步瞬移！别人已看不见你。", Duration = 3 })
+                end
+            else
+                -- 4. 飞上去之后，每帧死死钉在天上防止掉落
+                if root.Position.Y < 999999000 then
+                    root.CFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
+                end
+                root.AssemblyLinearVelocity = Vector3.zero
+            end
+            return 
+        else
+            -- 5. 关闭瞬间：用极速Tween拉回原地
+            if hasTeleportedUp then
+                if escapeTween then escapeTween:Cancel() end
+                
+                if savedPosBeforeEscape then
+                    local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
+                    escapeTween = TweenService:Create(root, tweenInfo, {CFrame = savedPosBeforeEscape})
+                    escapeTween:Play()
+                end
+                root.AssemblyLinearVelocity = Vector3.zero
+                
+                savedPosBeforeEscape = nil
+                hasTeleportedUp = false 
+                
+                if WindUI and WindUI.Notify then
+                    WindUI:Notify({ Title = "逃跑系统", Description = "已安全返回原位置！", Duration = 2 })
+                end
+            end
+        end
+        -- ===============================================================
+
+        if _G.FollowPlayer and root then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.AutoRotate = false end
+            
+            if root.AssemblyLinearVelocity.Y < 0 then
+                root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+            end
+            
+            local currentTool = char:FindFirstChildOfClass("Tool")
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.CanCollide and v.Name ~= "FollowPlatform_Kiyo" then
+                    if not currentTool or not v:IsDescendantOf(currentTool) then
+                        v.CanCollide = false
+                    end
+                end
+            end
+        end
+    end)
+
+    followConnection = RunService.Heartbeat:Connect(function()
+        if _G.EscapeMode then return end 
+
+        if _G.FollowPlayer and _G.TargetPlayerName then
+            local target = Players:FindFirstChild(_G.TargetPlayerName)
+            if target and target.Character and target.Character:FindFirstChild("Head") then
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local headPos = target.Character.Head.Position
+                    local targetPos = headPos + Vector3.new(0, _G.FollowHeight, 0)
+                    
+                    local distToTarget = (targetPos - root.Position).Magnitude
+                    local distFromLastDest = lastTweenDest and (targetPos - lastTweenDest).Magnitude or math.huge
+                    
+                    local shouldCreateTween = false
+                    
+                    if distToTarget > 1 then
+                        if distFromLastDest > recalcThreshold then
+                            shouldCreateTween = true
+                        elseif not currentTween or not currentTween.Playing then
+                            shouldCreateTween = true
+                        end
+                    end
+                    
+                    if shouldCreateTween then
+                        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                        local duration = math.max(0.01, distToTarget / _G.FollowSpeed)
+                        local myRotation = root.CFrame.Rotation
+                        local goalCFrame = CFrame.new(targetPos) * myRotation
+                        
+                        if currentTween then currentTween:Cancel() end
+                        
+                        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+                        currentTween = TweenService:Create(root, tweenInfo, {CFrame = goalCFrame})
+                        
+                        currentTween.Completed:Connect(function(playbackState)
+                            if playbackState == Enum.PlaybackState.Completed then
+                                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                                root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                            end
+                        end)
+                        
+                        currentTween:Play()
+                        lastTweenDest = targetPos
+                    else
+                        if not currentTween or not currentTween.Playing then
+                            local myRotation = root.CFrame.Rotation
+                            root.CFrame = CFrame.new(targetPos) * myRotation
+                            root.AssemblyLinearVelocity = Vector3.zero
+                        end
+                    end
+                    
+                    local p = createPlatform()
+                    p.CFrame = CFrame.new(root.Position - Vector3.new(0, 3.2, 0))
+                end
+            end
+        else
+            if currentTween then currentTween:Cancel() currentTween = nil end
+            lastTweenDest = nil
+            
+            if platform then platform:Destroy() platform = nil end
+            
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then hum.AutoRotate = true end
+            end
+        end
+    end)
+end
+
+enableFollow()
+
+print("跟随锁定玩家脚本已加载！(已整合全新武器自動裝備與WindUI修復)")
