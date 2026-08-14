@@ -1,16 +1,20 @@
--- ==================== Blox Fruits 跟随锁定玩家 ====================
+-- ==================== Blox Fruits 跟随锁定玩家 (整合新版自動裝備) ====================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
+-- 全局變量
 _G.FollowPlayer = false
 _G.TargetPlayerName = nil
 _G.FollowHeight = 90
 _G.FollowSpeed = 250
-_G.AutoSword = false 
 _G.EscapeMode = false
+
+-- 自動裝備全局變量
+_G.AutoEquip_SelectedType = "Melee"
+_G.AutoEquip_Enabled = false
 
 local savedPosBeforeEscape = nil
 local hasTeleportedUp = false 
@@ -27,30 +31,57 @@ local function getPlayerNames()
     return list
 end
 
--- ==================== 工具函数：精准识别剑 ====================
-local function isSword(tool)
-    if not tool or not tool:IsA("Tool") then return false end
-    if tool.ToolTip and string.lower(tool.ToolTip):find("melee") then
-        return true
+-- ==================== 新版自動裝備邏輯 ====================
+local function equipByType(toolType)
+    _G.AutoEquip_SelectedType = toolType -- 更新當前選擇的配置類型 
+    if not _G.AutoEquip_Enabled then return end -- 若未開啟自動裝備則不執行 
+    
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait() 
+    local hum  = char:FindFirstChildOfClass("Humanoid") 
+    if not hum then return end
+
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        -- 遍歷背包中的所有物品
+        for _, tool in ipairs(backpack:GetChildren()) do 
+            -- 比對 ToolTip 是否符合選擇的配置類型
+            if tool:IsA("Tool") and tool.ToolTip == toolType then 
+                hum:EquipTool(tool) -- 讓角色裝備該武器 
+                break 
+            end 
+        end
     end
-    return false
 end
 
-local function findSword()
-    local char = LocalPlayer.Character
-    local backpack = LocalPlayer.Backpack
-    if backpack then
-        for _, v in ipairs(backpack:GetChildren()) do
-            if isSword(v) then return v end
-        end
-    end
-    if char then
-        for _, v in ipairs(char:GetChildren()) do
-            if isSword(v) then return v end
-        end
-    end
-    return nil
+local function monitorCurrentTool()
+    task.spawn(function()
+        while true do
+            task.wait(0.1) -- 每 0.1 秒檢查一次 
+            if _G.AutoEquip_Enabled then 
+                
+                -- 【衝突優化】如果正在打鳥王且處於打樹狀態（需要使用靈魂吉他），則跳過當前自動裝備的檢查
+                if _G.AutoBird and _G.isHuntingBird and _G.HuntingType == "Tree" then
+                    continue
+                end
+                
+                local char = LocalPlayer.Character 
+                if char then 
+                    local hum = char:FindFirstChildOfClass("Humanoid") 
+                    if hum then 
+                        local tool = char:FindFirstChildOfClass("Tool") -- 取得當前手上拿著的武器 
+                        -- 如果手上沒拿武器，或者手上武器類型不等於所選配置，則重新執行裝備
+                        if not tool or tool.ToolTip ~= _G.AutoEquip_SelectedType then 
+                            equipByType(_G.AutoEquip_SelectedType) 
+                        end 
+                    end 
+                end 
+            end 
+        end 
+    end)
 end
+
+-- 啟動自動裝備後台監控
+monitorCurrentTool()
 
 -- ==================== WindUI 界面 ====================
 local WindUI
@@ -68,7 +99,7 @@ local Window = WindUI:CreateWindow({
     Icon = "crosshair",
     Author = "kiyo",
     Folder = "WindUI_Follow",
-    Size = UDim2.fromOffset(450, 460), 
+    Size = UDim2.fromOffset(450, 520), 
     Transparent = true,
     Theme = "Dark",
     Acrylic = false,
@@ -76,7 +107,7 @@ local Window = WindUI:CreateWindow({
     ToggleKey = Enum.KeyCode.RightControl,
 })
 
-local MainTab = Window:Tab({ Title = "跟随控制", Icon = "user" })
+local MainTab = Window:Tab({ Title = "跟随与装备", Icon = "user" })
 
 MainTab:Section({ Title = "目标设置" })
 
@@ -92,11 +123,16 @@ local playerDropdown = MainTab:Dropdown({
 MainTab:Button({
     Title = "刷新玩家列表",
     Callback = function()
-        playerDropdown:Refresh(getPlayerNames())
+        local list = getPlayerNames()
+        if playerDropdown.Refresh then
+            playerDropdown:Refresh(list)
+        elseif playerDropdown.SetValues then
+            playerDropdown:SetValues(list)
+        end
     end
 })
 
-MainTab:Section({ Title = "锁定与武器设置" })
+MainTab:Section({ Title = "锁定与参数" })
 
 MainTab:Slider({
     Title = "跟随速度",
@@ -122,11 +158,29 @@ local followToggle = MainTab:Toggle({
     end
 })
 
-local autoSwordToggle = MainTab:Toggle({
-    Title = "跟随时自动拿剑",
-    Value = _G.AutoSword,
-    Callback = function(v)
-        _G.AutoSword = v
+MainTab:Section({ Title = "武器自動裝備" })
+
+MainTab:Dropdown({ 
+    Title = "選擇配置", 
+    Values = { "Melee", "Blox Fruit", "Sword", "Gun" }, 
+    Value = _G.AutoEquip_SelectedType,
+    Callback = function(option)
+        _G.AutoEquip_SelectedType = option
+        if _G.AutoEquip_Enabled then 
+            equipByType(_G.AutoEquip_SelectedType) 
+        end
+    end
+})
+
+MainTab:Toggle({ 
+    Title = "自動裝備", 
+    Desc = "自動切換到選擇的配置", 
+    Value = _G.AutoEquip_Enabled,
+    Callback = function(state)
+        _G.AutoEquip_Enabled = state
+        if state then 
+            equipByType(_G.AutoEquip_SelectedType) 
+        end
     end
 })
 
@@ -189,7 +243,6 @@ local function enableFollow()
     local currentTween = nil
     local lastTweenDest = nil
     local recalcThreshold = 25
-    local lastSwordCheckTime = 0 
 
     noclipConnection = RunService.Stepped:Connect(function()
         local char = LocalPlayer.Character
@@ -206,7 +259,7 @@ local function enableFollow()
                 -- 2. 取消可能存在的旧动画
                 if escapeTween then escapeTween:Cancel() end
                 
-                -- 3. 【核心修复】：用0.05秒的极速Tween代替直接赋值，骗过服务器同步！
+                -- 3. 用0.05秒的极速Tween代替直接赋值，骗过服务器同步！
                 local goalCFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
                 local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
                 escapeTween = TweenService:Create(root, tweenInfo, {CFrame = goalCFrame})
@@ -218,7 +271,7 @@ local function enableFollow()
                     WindUI:Notify({ Title = "逃跑系统", Description = "已同步瞬移！别人已看不见你。", Duration = 3 })
                 end
             else
-                -- 4. 飞上去之后，每帧死死钉在天上防止掉落（不再用Anchored，因为Anchored会阻断同步）
+                -- 4. 飞上去之后，每帧死死钉在天上防止掉落
                 if root.Position.Y < 999999000 then
                     root.CFrame = CFrame.new(root.Position.X, 999999999, root.Position.Z) * root.CFrame.Rotation
                 end
@@ -226,12 +279,11 @@ local function enableFollow()
             end
             return 
         else
-            -- 5. 关闭瞬间：用极速Tween拉回原地，确保服务器也把你拉回来
+            -- 5. 关闭瞬间：用极速Tween拉回原地
             if hasTeleportedUp then
                 if escapeTween then escapeTween:Cancel() end
                 
                 if savedPosBeforeEscape then
-                    -- 用0.05秒闪回原地
                     local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
                     escapeTween = TweenService:Create(root, tweenInfo, {CFrame = savedPosBeforeEscape})
                     escapeTween:Play()
@@ -269,26 +321,6 @@ local function enableFollow()
 
     followConnection = RunService.Heartbeat:Connect(function()
         if _G.EscapeMode then return end 
-
-        -- ==================== 自动拿剑逻辑 ====================
-        if _G.FollowPlayer and _G.AutoSword then
-            local currentTime = tick()
-            if currentTime - lastSwordCheckTime > 0.3 then
-                local char = LocalPlayer.Character
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
-                if hum then
-                    local currentTool = char:FindFirstChildOfClass("Tool")
-                    if not currentTool or not isSword(currentTool) then
-                        local sword = findSword()
-                        if sword then
-                            pcall(function() hum:EquipTool(sword) end)
-                        end
-                    end
-                end
-                lastSwordCheckTime = currentTime
-            end
-        end
-        -- =======================================================
 
         if _G.FollowPlayer and _G.TargetPlayerName then
             local target = Players:FindFirstChild(_G.TargetPlayerName)
@@ -361,4 +393,4 @@ end
 
 enableFollow()
 
-print("跟随锁定玩家脚本已加载！(已修复全服网络同步问题)")
+print("跟随锁定玩家脚本已加载！(已整合全新武器自動裝備與WindUI修復)")
