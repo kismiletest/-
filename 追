@@ -184,10 +184,10 @@ MainTab:Toggle({
     end
 })
 
-MainTab:Section({ Title = "紧急逃生" })
+MainTab:Section({ Title = "超级无敌假的自动逃跑" })
 
 local escapeToggle = MainTab:Toggle({
-    Title = "自动逃跑 (网络同步瞬移)",
+    Title = "自动逃跑（假的）",
     Value = _G.EscapeMode,
     Callback = function(v)
         _G.EscapeMode = v
