@@ -1,0 +1,412 @@
+-- Blox Fruits 击杀记录脚本（删除定时刷新版）
+-- 掉赏自动记录 + 可疑击杀（No reward from ...）立即记录
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+
+local SAVE_FILE = "BloxFruits_KillLog.json"
+local MAX_RECORDS = 150
+
+local KillRecords = {}
+local lastBounty = 0
+local recentDeadPlayers = {}
+local lastRecordTime = 0
+local recordedKeys = {}
+
+-- 工具函数
+local function formatNumber(n)
+    if not n or type(n) ~= "number" then return "0" end
+    if n >= 1e6 then return string.format("%.2fM", n / 1e6)
+    elseif n >= 1e3 then return string.format("%.1fK", n / 1e3)
+    else return tostring(math.floor(n)) end
+end
+
+local function getTimeString()
+    local t = os.date("*t")
+    return string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
+end
+
+local function getLocalBounty()
+    local success, value = pcall(function()
+        local data = LocalPlayer:FindFirstChild("Data")
+        if data then
+            if data:FindFirstChild("Bounty") then return data.Bounty.Value end
+            if data:FindFirstChild("Honor") then return data.Honor.Value end
+        end
+        local ls = LocalPlayer:FindFirstChild("leaderstats")
+        if ls then
+            if ls:FindFirstChild("Bounty") then return ls.Bounty.Value end
+            if ls:FindFirstChild("Honor") then return ls.Honor.Value end
+        end
+        return LocalPlayer:GetAttribute("Bounty") or LocalPlayer:GetAttribute("Honor") or 0
+    end)
+    return success and (value or 0) or 0
+end
+
+-- 保存 / 加载
+local function saveRecords()
+    if writefile then
+        pcall(function()
+            writefile(SAVE_FILE, HttpService:JSONEncode(KillRecords))
+        end)
+    end
+end
+
+local function loadRecords()
+    if isfile and isfile(SAVE_FILE) and readfile then
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(readfile(SAVE_FILE))
+        end)
+        if success and type(data) == "table" then
+            KillRecords = data
+            return true
+        end
+    end
+    return false
+end
+
+-- ========== UI ==========
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BloxFruitsKillLog"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+for _, v in pairs(game:GetService("CoreGui"):GetChildren()) do
+    if v.Name == "BloxFruitsKillLog" and v ~= ScreenGui then
+        v:Destroy()
+    end
+end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 350, 0, 450)
+MainFrame.Position = UDim2.new(0, 20, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+local stroke = Instance.new("UIStroke", MainFrame)
+stroke.Color = Color3.fromRGB(70, 70, 110)
+stroke.Thickness = 1.5
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 38)
+TitleBar.BackgroundColor3 = Color3.fromRGB(32, 32, 48)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
+
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0, 16)
+TitleFix.Position = UDim2.new(0, 0, 1, -16)
+TitleFix.BackgroundColor3 = Color3.fromRGB(32, 32, 48)
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -90, 1, 0)
+TitleLabel.Position = UDim2.new(0, 12, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "击杀记录 (掉赏 + 可疑击杀)"
+TitleLabel.TextColor3 = Color3.fromRGB(230, 230, 255)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 15
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -34, 0, 4)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 45, 45)
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 18
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(1, -20, 0, 22)
+InfoLabel.Position = UDim2.new(0, 10, 0, 44)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Text = "共 0 次击杀 | 当前赏金: 0"
+InfoLabel.TextColor3 = Color3.fromRGB(160, 160, 190)
+InfoLabel.Font = Enum.Font.Gotham
+InfoLabel.TextSize = 13
+InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+InfoLabel.Parent = MainFrame
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, -20, 1, -125)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 70)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.ScrollBarThickness = 5
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(90, 90, 130)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollFrame.Parent = MainFrame
+Instance.new("UICorner", ScrollFrame).CornerRadius = UDim.new(0, 6)
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Padding = UDim.new(0, 5)
+ListLayout.Parent = ScrollFrame
+
+local ButtonFrame = Instance.new("Frame")
+ButtonFrame.Size = UDim2.new(1, -20, 0, 36)
+ButtonFrame.Position = UDim2.new(0, 10, 1, -48)
+ButtonFrame.BackgroundTransparency = 1
+ButtonFrame.Parent = MainFrame
+
+local function makeBtn(text, x, color)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, 74, 1, 0)
+    b.Position = UDim2.new(0, x, 0, 0)
+    b.BackgroundColor3 = color
+    b.Text = text
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 12
+    b.Parent = ButtonFrame
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    return b
+end
+
+local ClearBtn = makeBtn("清空", 0, Color3.fromRGB(160, 45, 45))
+local SaveBtn  = makeBtn("保存", 82, Color3.fromRGB(45, 130, 80))
+local LoadBtn  = makeBtn("加载", 164, Color3.fromRGB(45, 90, 160))
+local HideBtn  = makeBtn("隐藏", 246, Color3.fromRGB(70, 70, 95))
+
+-- 刷新 UI
+local function refreshUI()
+    for _, c in ipairs(ScrollFrame:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+
+    local currentBounty = getLocalBounty()
+    InfoLabel.Text = string.format("共 %d 次击杀 | 当前赏金: %s", #KillRecords, formatNumber(currentBounty))
+
+    for i, rec in ipairs(KillRecords) do
+        local item = Instance.new("Frame")
+        item.Size = UDim2.new(1, -10, 0, 54)
+        item.BackgroundColor3 = rec.suspicious and Color3.fromRGB(55, 30, 30) or Color3.fromRGB(28, 28, 40)
+        item.BorderSizePixel = 0
+        item.LayoutOrder = i
+        item.Parent = ScrollFrame
+        Instance.new("UICorner", item).CornerRadius = UDim.new(0, 6)
+
+        local nameL = Instance.new("TextLabel")
+        nameL.Size = UDim2.new(1, -12, 0, 20)
+        nameL.Position = UDim2.new(0, 8, 0, 5)
+        nameL.BackgroundTransparency = 1
+        nameL.Text = rec.name or "未知"
+        nameL.TextColor3 = rec.suspicious and Color3.fromRGB(255, 120, 120) or Color3.fromRGB(255, 215, 80)
+        nameL.Font = Enum.Font.GothamBold
+        nameL.TextSize = 14
+        nameL.TextXAlignment = Enum.TextXAlignment.Left
+        nameL.Parent = item
+
+        local bountyL = Instance.new("TextLabel")
+        bountyL.Size = UDim2.new(0.6, 0, 0, 18)
+        bountyL.Position = UDim2.new(0, 8, 0, 28)
+        bountyL.BackgroundTransparency = 1
+        if rec.suspicious then
+            bountyL.Text = "可疑击杀 (无赏金)"
+            bountyL.TextColor3 = Color3.fromRGB(255, 100, 100)
+        else
+            bountyL.Text = "获得: +" .. formatNumber(rec.gained or 0)
+            bountyL.TextColor3 = Color3.fromRGB(80, 255, 140)
+        end
+        bountyL.Font = Enum.Font.Gotham
+        bountyL.TextSize = 12
+        bountyL.TextXAlignment = Enum.TextXAlignment.Left
+        bountyL.Parent = item
+
+        local timeL = Instance.new("TextLabel")
+        timeL.Size = UDim2.new(0.35, -8, 0, 18)
+        timeL.Position = UDim2.new(0.62, 0, 0, 28)
+        timeL.BackgroundTransparency = 1
+        timeL.Text = rec.time or ""
+        timeL.TextColor3 = Color3.fromRGB(150, 150, 175)
+        timeL.Font = Enum.Font.Gotham
+        timeL.TextSize = 12
+        timeL.TextXAlignment = Enum.TextXAlignment.Right
+        timeL.Parent = item
+    end
+
+    task.wait()
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 10)
+end
+
+-- 添加记录
+local function addKillRecord(playerName, gainedAmount, isSuspicious)
+    if not playerName or playerName == "" then return end
+    if tick() - lastRecordTime < 0.8 then return end
+
+    local key = playerName .. "_" .. math.floor(tick() / 2)
+    if recordedKeys[key] then return end
+    recordedKeys[key] = true
+
+    local record = {
+        name = playerName,
+        gained = gainedAmount or 0,
+        suspicious = isSuspicious or false,
+        time = getTimeString(),
+        timestamp = os.time()
+    }
+
+    table.insert(KillRecords, 1, record)
+    while #KillRecords > MAX_RECORDS do
+        table.remove(KillRecords)
+    end
+
+    lastRecordTime = tick()
+    refreshUI()
+    saveRecords()
+
+    if isSuspicious then
+        print("[击杀记录] 可疑击杀 → " .. playerName)
+    else
+        print("[击杀记录] " .. playerName .. " | 获得 +" .. formatNumber(gainedAmount))
+    end
+end
+
+-- 拖动
+local dragging, dragStart, startPos
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+TitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- 按钮
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+ClearBtn.MouseButton1Click:Connect(function()
+    KillRecords = {}
+    recordedKeys = {}
+    refreshUI()
+    saveRecords()
+end)
+SaveBtn.MouseButton1Click:Connect(saveRecords)
+LoadBtn.MouseButton1Click:Connect(function()
+    if loadRecords() then refreshUI() end
+end)
+
+local uiVisible = true
+HideBtn.MouseButton1Click:Connect(function()
+    uiVisible = not uiVisible
+    MainFrame.Visible = uiVisible
+    HideBtn.Text = uiVisible and "隐藏" or "显示"
+end)
+
+-- ========== 核心检测（无定时扫描） ==========
+
+-- 玩家死亡缓存
+local function onPlayerDied(player)
+    if player == LocalPlayer then return end
+    table.insert(recentDeadPlayers, 1, {player = player, time = tick()})
+    while #recentDeadPlayers > 0 and tick() - recentDeadPlayers[#recentDeadPlayers].time > 8 do
+        table.remove(recentDeadPlayers)
+    end
+end
+
+local function setupPlayer(player)
+    if player == LocalPlayer then return end
+    local function charAdded(char)
+        local hum = char:WaitForChild("Humanoid", 8)
+        if hum then
+            hum.Died:Connect(function()
+                onPlayerDied(player)
+            end)
+        end
+    end
+    if player.Character then charAdded(player.Character) end
+    player.CharacterAdded:Connect(charAdded)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do setupPlayer(p) end
+Players.PlayerAdded:Connect(setupPlayer)
+
+-- 掉赏检测
+task.spawn(function()
+    lastBounty = getLocalBounty()
+    while task.wait(0.35) do
+        local current = getLocalBounty()
+        if current > lastBounty + 80 then
+            local gained = current - lastBounty
+            lastBounty = current
+
+            local bestTarget = nil
+            for _, dead in ipairs(recentDeadPlayers) do
+                if dead.player and dead.player.Parent and tick() - dead.time < 6 then
+                    bestTarget = dead.player
+                    break
+                end
+            end
+
+            if bestTarget then
+                addKillRecord(bestTarget.Name, gained, false)
+            end
+        elseif current < lastBounty then
+            lastBounty = current
+        end
+    end
+end)
+
+-- 可疑击杀检测（仅事件监听，无定时刷新）
+local function checkSuspiciousMessage(text)
+    if not text or type(text) ~= "string" then return end
+
+    local name = text:match("No reward from%s+([^,]+),%s*suspicious kill")
+    if not name then
+        name = text:match("No reward from%s+([^%s,]+)")
+    end
+
+    if name and name ~= "" then
+        name = name:gsub("^%s+", ""):gsub("%s+$", "")
+        addKillRecord(name, 0, true)
+    end
+end
+
+local function watchGui(parent)
+    parent.DescendantAdded:Connect(function(desc)
+        if desc:IsA("TextLabel") or desc:IsA("TextButton") then
+            task.defer(function()
+                checkSuspiciousMessage(desc.Text)
+            end)
+            desc:GetPropertyChangedSignal("Text"):Connect(function()
+                checkSuspiciousMessage(desc.Text)
+            end)
+        end
+    end)
+end
+
+pcall(function() watchGui(LocalPlayer:WaitForChild("PlayerGui")) end)
+pcall(function() watchGui(game:GetService("CoreGui")) end)
+
+-- 启动
+loadRecords()
+refreshUI()
+print("========================================")
+print("击杀记录脚本已加载（已删除定时刷新）")
+print("掉赏 + 可疑击杀 即时检测")
+print("========================================")
