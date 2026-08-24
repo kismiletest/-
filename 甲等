@@ -4,7 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
--- [ 預設追蹤玩家名單 ] --
+-- [ 嘉登の管理员狙击List ] --
 local targetUsers = {
     "NoctisAUS", "giozvq", "NovaExility", "MollaAmar", "ZeroZero_Two", "Abso_Delete", "SirReis", "kyt0kyt0",
     "Mertlcle", "Daigrock", "Axiore", "BluxxyGaming", "dethsmurf", "CJ_Oyer", "mrheffner_gg", "vidsmurf",
@@ -37,14 +37,14 @@ local targetUsers = {
     "brqod", "sisterton", "0MARIKENZ0", "norperz", "EIRodoIfo", "sarcxsm"
 }
 
--- [ 輔助函數：簡化 UI 創建 ] --
+-- [ 辅助函数：简化 UI 创建 ] --
 local function Create(className, properties)
     local instance = Instance.new(className)
     for k, v in pairs(properties) do instance[k] = v end
     return instance
 end
 
--- [ 重置舊 GUI (兼容 gethui) ] --
+-- [ 重置旧 GUI (兼容 gethui) ] --
 local parentContainer = gethui and gethui() or CoreGui
 local oldGui = parentContainer:FindFirstChild("XuPlayerTracker")
 if oldGui then oldGui:Destroy() end
@@ -56,7 +56,7 @@ local ScreenGui = Create("ScreenGui", {
     Parent = parentContainer
 })
 
--- 主視窗 (增加高度至300以容納掃描按鈕)
+-- 主视窗 (增加高度至300以容纳扫描按钮)
 local MainFrame = Create("Frame", {
     Name = "MainFrame",
     Size = UDim2.new(0, 520, 0, 300), 
@@ -67,7 +67,7 @@ local MainFrame = Create("Frame", {
 })
 Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = MainFrame})
 
--- 頂部標題列
+-- 顶部标题列
 local TitleBar = Create("Frame", {
     Size = UDim2.new(1, 0, 0, 35),
     BackgroundColor3 = Color3.fromRGB(45, 45, 45),
@@ -87,7 +87,7 @@ local TitleLabel = Create("TextLabel", {
     Size = UDim2.new(1, -40, 1, 0),
     Position = UDim2.new(0, 12, 0, 0),
     BackgroundTransparency = 1,
-    Text = "🛡️ 玩家狀態追蹤器",
+    Text = "🛡️ 嘉登狙击人神器 09x-Sniper",
     TextColor3 = Color3.fromRGB(255, 255, 255),
     Font = Enum.Font.GothamBold,
     TextSize = 14,
@@ -106,13 +106,13 @@ local CloseButton = Create("TextButton", {
     Parent = TitleBar
 })
 
--- [ 左側：輸入與動作按鈕 ] --
+-- [ 左侧：输入与动作按钮 ] --
 local InputBox = Create("TextBox", {
     Size = UDim2.new(0, 316, 0, 35),
     Position = UDim2.new(0, 12, 0, 48),
     BackgroundColor3 = Color3.fromRGB(45, 45, 45),
     TextColor3 = Color3.fromRGB(255, 255, 255),
-    PlaceholderText = "輸入玩家名稱或 UserId...",
+    PlaceholderText = "输入玩家名称或 UserId...",
     PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
     Font = Enum.Font.Gotham,
     TextSize = 13,
@@ -126,7 +126,7 @@ local CheckBtn = Create("TextButton", {
     Position = UDim2.new(0, 12, 0, 90),
     BackgroundColor3 = Color3.fromRGB(70, 130, 180),
     TextColor3 = Color3.fromRGB(255, 255, 255),
-    Text = "檢查狀態",
+    Text = "检查状态",
     Font = Enum.Font.GothamBold,
     TextSize = 13,
     Parent = MainFrame
@@ -145,7 +145,7 @@ local JoinBtn = Create("TextButton", {
 })
 Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = JoinBtn})
 
--- [ 左側：結果顯示區卡片 ] --
+-- [ 左侧：结果显示区卡片 ] --
 local ResultCard = Create("Frame", {
     Size = UDim2.new(0, 316, 0, 115),
     Position = UDim2.new(0, 12, 0, 130),
@@ -158,7 +158,7 @@ local S_NameLabel = Create("TextLabel", {
     Size = UDim2.new(1, -20, 0, 24),
     Position = UDim2.new(0, 10, 0, 8),
     BackgroundTransparency = 1,
-    Text = "玩家: 尚未查詢",
+    Text = "玩家: 尚未查询",
     TextColor3 = Color3.fromRGB(255, 255, 255),
     Font = Enum.Font.GothamBold,
     TextSize = 14,
@@ -182,7 +182,7 @@ local S_StatusLabel = Create("TextLabel", {
     Size = UDim2.new(1, -20, 0, 24),
     Position = UDim2.new(0, 10, 0, 54),
     BackgroundTransparency = 1,
-    Text = "狀態: 閒置中",
+    Text = "状态: 闲置中",
     TextColor3 = Color3.fromRGB(200, 200, 200),
     Font = Enum.Font.GothamBold,
     TextSize = 13,
@@ -194,7 +194,7 @@ local S_JoinSettingLabel = Create("TextLabel", {
     Size = UDim2.new(1, -20, 0, 24),
     Position = UDim2.new(0, 10, 0, 78),
     BackgroundTransparency = 1,
-    Text = "加入權限: -",
+    Text = "加入权限: -",
     TextColor3 = Color3.fromRGB(180, 180, 180),
     Font = Enum.Font.GothamBold,
     TextSize = 13,
@@ -202,13 +202,13 @@ local S_JoinSettingLabel = Create("TextLabel", {
     Parent = ResultCard
 })
 
--- [ 左側：快速掃描按鈕 (新增) ] --
+-- [ 左侧：快速扫描按钮 (新增) ] --
 local ScanBtn = Create("TextButton", {
     Size = UDim2.new(0, 316, 0, 32),
     Position = UDim2.new(0, 12, 0, 255),
     BackgroundColor3 = Color3.fromRGB(138, 43, 226), 
     TextColor3 = Color3.fromRGB(255, 255, 255),
-    Text = "🚀 一鍵掃描名單在線狀態",
+    Text = "🚀 一键扫描名单在线状态",
     Font = Enum.Font.GothamBold,
     TextSize = 13,
     Parent = MainFrame
@@ -216,7 +216,7 @@ local ScanBtn = Create("TextButton", {
 Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = ScanBtn})
 
 
--- [ 右側：玩家選單與 Everyone 紀錄分頁區塊 ] --
+-- [ 右侧：玩家选单与 Everyone 纪录分页区块 ] --
 local ListFrame = Create("Frame", {
     Size = UDim2.new(0, 168, 0, 239), 
     Position = UDim2.new(0, 340, 0, 48),
@@ -226,7 +226,7 @@ local ListFrame = Create("Frame", {
 })
 Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = ListFrame})
 
--- 分頁按鈕區域
+-- 分页按钮区域
 local TabBar = Create("Frame", {
     Size = UDim2.new(1, -8, 0, 24),
     Position = UDim2.new(0, 4, 0, 4),
@@ -258,7 +258,7 @@ local TabRecordBtn = Create("TextButton", {
 })
 Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = TabRecordBtn})
 
--- 1. 快捷選單容器
+-- 1. 快捷选单容器
 local ListContainer = Create("ScrollingFrame", {
     Size = UDim2.new(1, -8, 1, -34),
     Position = UDim2.new(0, 4, 0, 30),
@@ -279,7 +279,7 @@ ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     ListContainer.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 6)
 end)
 
--- 2. Everyone 紀錄容器
+-- 2. Everyone 记录容器
 local RecordContainer = Create("ScrollingFrame", {
     Size = UDim2.new(1, -8, 1, -34),
     Position = UDim2.new(0, 4, 0, 30),
@@ -300,7 +300,7 @@ RecordLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     RecordContainer.CanvasSize = UDim2.new(0, 0, 0, RecordLayout.AbsoluteContentSize.Y + 6)
 end)
 
--- 切換分頁邏輯
+-- 切换分页逻辑
 TabListBtn.MouseButton1Click:Connect(function()
     ListContainer.Visible = true
     RecordContainer.Visible = false
@@ -319,7 +319,7 @@ TabRecordBtn.MouseButton1Click:Connect(function()
     TabListBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
 end)
 
--- [ 邏輯處理區 (核心邏輯封裝) ] --
+-- [ 逻辑处理区 (核心逻辑封装) ] --
 local userIdCache = {}
 local isBusy = false
 local isScanning = false
@@ -328,7 +328,7 @@ local everyoneRecords = {}
 local everyoneCount = 0
 local listButtonsMap = {} -- 記錄快捷按鈕實例，方便掃描時更改顏色
 
--- 高亮選中的按鈕
+-- 高亮选中的按钮
 local function setSelectedButton(btn)
     if selectedButton and selectedButton ~= btn then
         selectedButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -339,7 +339,7 @@ local function setSelectedButton(btn)
     end
 end
 
--- 依名稱尋找按鈕並高亮（手動輸入或檢查時觸發）
+-- 依名称寻找按钮并高亮（手动输入或检查时触发）
 local function highlightByName(name)
     local lowerName = string.lower(name)
     for _, child in ipairs(ListContainer:GetChildren()) do
@@ -363,7 +363,7 @@ local function highlightByName(name)
     setSelectedButton(nil)
 end
 
--- 自動新增紀錄至 Everyone 列表
+-- 自动新增记录至 Everyone 列表
 local function addEveryoneRecord(userName, userId)
     if everyoneRecords[userId] then return end 
 
@@ -389,7 +389,7 @@ local function addEveryoneRecord(userName, userId)
     end)
 end
 
--- UI 拖拽邏輯
+-- UI 拖拽逻辑
 local dragging, dragInput, dragStart, startPos
 
 TitleBar.InputBegan:Connect(function(input)
@@ -423,7 +423,7 @@ CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- 獲取 UserId (帶空白處理與快取)
+-- 获取 UserId (带空白处理与快取)
 local function getUserId(inputString)
     local cleanedInput = string.gsub(inputString, "^%s*(.-)%s*$", "%1")
     if cleanedInput == "" then return nil end
@@ -445,7 +445,7 @@ local function getUserId(inputString)
     return nil
 end
 
--- 解析 Online 數據
+-- 解析 Online 数据
 local function checkOnlineData(data)
     if type(data) == "table" then
         return data.Online or data.IsOnline or (data.Server ~= nil) or false
@@ -455,7 +455,7 @@ local function checkOnlineData(data)
     return false
 end
 
--- 發送加入 Remote 請求
+-- 发送加入 Remote 请求
 local function fireJoinRequest(id)
     pcall(function()
         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
@@ -465,7 +465,7 @@ local function fireJoinRequest(id)
     end)
 end
 
--- [ 執行狀態檢查的主函數 ] --
+-- [ 执行状态检查的主函数 ] --
 function performCheck()
     if isBusy then return end
     
@@ -480,30 +480,30 @@ function performCheck()
 
     isBusy = true
     S_NameLabel.Text = "玩家: " .. inputStr
-    S_StatusLabel.Text = "🔄 獲取 ID 中..."
+    S_StatusLabel.Text = "🔄 获取 ID 中..."
     S_StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    S_JoinSettingLabel.Text = "加入權限: 查詢中..."
+    S_JoinSettingLabel.Text = "加入权限: 查询中..."
     S_JoinSettingLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 
     task.spawn(function()
         local targetId = getUserId(inputStr)
         if not targetId then
-            S_IDLabel.Text = "ID: 錯誤"
-            S_StatusLabel.Text = "❌ 找不到該玩家"
+            S_IDLabel.Text = "ID: 错误"
+            S_StatusLabel.Text = "❌ 找不到该玩家"
             S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            S_JoinSettingLabel.Text = "加入權限: -"
+            S_JoinSettingLabel.Text = "加入权限: -"
             isBusy = false
             return
         end
 
         S_IDLabel.Text = "ID: " .. targetId
-        S_StatusLabel.Text = "🔄 查詢狀態中..."
+        S_StatusLabel.Text = "🔄 查询状态中..."
 
         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
         local getRemote = remotes and remotes:FindFirstChild("GetPlayerProfileData")
         
         if not getRemote then
-            S_StatusLabel.Text = "❌ 遊戲中找不到 Remote 服務"
+            S_StatusLabel.Text = "❌ 游戏中找不到 Remote 服务"
             S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
             isBusy = false
             return
@@ -515,7 +515,7 @@ function performCheck()
         
         if success then
             if data and checkOnlineData(data) then
-                S_StatusLabel.Text = "🟢 狀態: 在線 (Online)"
+                S_StatusLabel.Text = "🟢 状态: 在线 (Online)"
                 S_StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
                 
                 if listButtonsMap[inputStr] then
@@ -523,7 +523,7 @@ function performCheck()
                     listButtonsMap[inputStr].Text = "🟢 " .. inputStr
                 end
             else
-                S_StatusLabel.Text = "🔴 狀態: 離線 (Offline)"
+                S_StatusLabel.Text = "🔴 状态: 离线 (Offline)"
                 S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
             end
             
@@ -533,23 +533,23 @@ function performCheck()
             end
             
             if joinServerSetting == "Everyone" then
-                S_JoinSettingLabel.Text = "🔓 權限: 所有人 (Everyone)"
+                S_JoinSettingLabel.Text = "🔓 权限: 所有人 (Everyone)"
                 S_JoinSettingLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
                 addEveryoneRecord(inputStr, targetId)
             elseif joinServerSetting == "FriendsOnly" then
-                S_JoinSettingLabel.Text = "👥 權限: 僅限好友 (FriendsOnly)"
+                S_JoinSettingLabel.Text = "👥 权限: 仅限好友 (FriendsOnly)"
                 S_JoinSettingLabel.TextColor3 = Color3.fromRGB(255, 170, 0)
             elseif joinServerSetting == "Nobody" then
-                S_JoinSettingLabel.Text = "🔒 權限: 關閉 (Nobody)"
+                S_JoinSettingLabel.Text = "🔒 权限: 关闭 (Nobody)"
                 S_JoinSettingLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
             else
-                S_JoinSettingLabel.Text = "❓ 權限: 未知/隱藏"
+                S_JoinSettingLabel.Text = "❓ 權限: 未知/隐藏"
                 S_JoinSettingLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
             end
         else
-            S_StatusLabel.Text = "❌ 查詢失敗 (無法獲取資料)"
+            S_StatusLabel.Text = "❌ 查询失敗 (无法获取资料)"
             S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            S_JoinSettingLabel.Text = "權限: 讀取失敗"
+            S_JoinSettingLabel.Text = "权限: 读取失败"
             S_JoinSettingLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         end
         
@@ -557,7 +557,7 @@ function performCheck()
     end)
 end
 
--- 動態創建快捷選單按鈕
+-- 动态创建快捷选单按钮
 for _, userName in ipairs(targetUsers) do
     if userName ~= "" then
         local UserBtn = Create("TextButton", {
@@ -581,7 +581,7 @@ for _, userName in ipairs(targetUsers) do
     end
 end
 
--- [ 按鈕點擊事件 ] --
+-- [ 按钮点击事件 ] --
 CheckBtn.MouseButton1Click:Connect(performCheck)
 
 JoinBtn.MouseButton1Click:Connect(function()
@@ -591,22 +591,22 @@ JoinBtn.MouseButton1Click:Connect(function()
     task.spawn(function()
         local targetId = getUserId(inputStr)
         if targetId then
-            S_StatusLabel.Text = "🚀 嘗試發送加入請求..."
+            S_StatusLabel.Text = "🚀 尝试发送加入请求..."
             S_StatusLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
             fireJoinRequest(targetId)
         else
-            S_StatusLabel.Text = "❌ 無效玩家，無法加入"
+            S_StatusLabel.Text = "❌ 无效玩家，无法加入"
             S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         end
     end)
 end)
 
--- [ 新增：快速掃描功能邏輯 (修復 Rate Limit 誤判) ] --
+-- [ 新增：快速扫描功能逻辑 (修复 Rate Limit 误判) ] --
 ScanBtn.MouseButton1Click:Connect(function()
     if isScanning then return end
     isScanning = true
 
-    -- 計算有效玩家數量，避免含有空白字串時導致無法完成掃描
+    -- 计算有效玩家数量，避免含有空白字串时导致无法完成扫描
     local validPlayers = {}
     for _, userName in ipairs(targetUsers) do
         if userName ~= "" then table.insert(validPlayers, userName) end
@@ -615,19 +615,19 @@ ScanBtn.MouseButton1Click:Connect(function()
     local totalPlayers = #validPlayers
     local processed = 0
     local onlineCount = 0
-    local isFinished = false -- 防抖標記，避免同時多線程觸發完成邏輯
+    local isFinished = false -- 防抖标记，避免同时多线程触发完成逻辑
 
-    ScanBtn.Text = "🔄 掃描中... 0 / " .. totalPlayers
+    ScanBtn.Text = "🔄 扫描中... 0 / " .. totalPlayers
     ScanBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 
     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
     local getRemote = remotes and remotes:FindFirstChild("GetPlayerProfileData")
 
     if not getRemote then
-        ScanBtn.Text = "❌ 找不到 Remote 服務"
+        ScanBtn.Text = "❌ 找不到 Remote 服务"
         ScanBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
         task.wait(2)
-        ScanBtn.Text = "🚀 一鍵掃描名單在線狀態"
+        ScanBtn.Text = "🚀 一键扫描名单在线状态"
         ScanBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
         isScanning = false
         return
@@ -642,8 +642,8 @@ ScanBtn.MouseButton1Click:Connect(function()
                         return getRemote:InvokeServer(targetId)
                     end)
 
-                    -- 【重點修正】：只有在請求確實成功 (success == true) 的情況下，才去變更按鈕狀態
-                    -- 如果 success == false，代表被 Roblox 限制請求 (Rate Limit)，此時不做任何變更，保留原本狀態！
+                    -- 【重点修正】：只有在请求确实成功 (success == true) 的情況下，才去变更按钮状态
+                    -- 如果 success == false，代表被 Roblox 限制请求 (Rate Limit)，此时不做任何变更，保留原本状态！
                     if success then
                         if data and checkOnlineData(data) then
                             onlineCount = onlineCount + 1
@@ -657,7 +657,7 @@ ScanBtn.MouseButton1Click:Connect(function()
                                 addEveryoneRecord(userName, targetId)
                             end
                         else
-                            -- 確實獲取到資料，且玩家不在線，才變為灰色
+                            -- 确实获取到资料，且玩家不在线，才变为灰色
                             if listButtonsMap[userName] then
                                 listButtonsMap[userName].TextColor3 = Color3.fromRGB(150, 150, 150)
                                 listButtonsMap[userName].Text = userName
@@ -668,18 +668,18 @@ ScanBtn.MouseButton1Click:Connect(function()
 
                 processed = processed + 1
                 
-                -- 更新進度 (只在尚未結束時更新，避免 UI 閃爍)
+                -- 更新进度 (只在尚未结束时更新，避免 UI 闪烁)
                 if not isFinished then
-                    ScanBtn.Text = string.format("🔄 掃描中... %d / %d (發現 %d 人在線)", processed, totalPlayers, onlineCount)
+                    ScanBtn.Text = string.format("🔄 扫描中... %d / %d (发现 %d 人在线)", processed, totalPlayers, onlineCount)
                 end
 
                 -- 掃描完成處理
                 if processed >= totalPlayers and not isFinished then
                     isFinished = true
-                    ScanBtn.Text = string.format("✅ 掃描完成！共 %d 人在線上", onlineCount)
+                    ScanBtn.Text = string.format("✅ 扫描完成！共 %d 人在线上", onlineCount)
                     ScanBtn.BackgroundColor3 = Color3.fromRGB(60, 179, 113)
                     task.wait(3)
-                    ScanBtn.Text = "🚀 一鍵掃描名單在線狀態"
+                    ScanBtn.Text = "🚀 一键扫描名单在线状态"
                     ScanBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
                     isScanning = false
                 end
