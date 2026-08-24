@@ -1,0 +1,690 @@
+-- [ Services ] --
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+-- [ 預設追蹤玩家名單 ] --
+local targetUsers = {
+    "NoctisAUS", "giozvq", "NovaExility", "MollaAmar", "ZeroZero_Two", "Abso_Delete", "SirReis", "kyt0kyt0",
+    "Mertlcle", "Daigrock", "Axiore", "BluxxyGaming", "dethsmurf", "CJ_Oyer", "mrheffner_gg", "vidsmurf",
+    "0BCLIFETIME", "orkoal", "Tacomura", "rip_indra", "Experimic", "arowe", "Uzi_London", "Guashiem",
+    "torrtoise", "ShafiDev", "SylentAsura", "ElG8T", "my6thlife", "AznWay", "uranium_devil", "Nat_7517",
+    "Krossful", "Majestic_Queena", "FindMotion", "rip_bac0nha", "arlthmetic", "rip_fud", "wenlocktoad",
+    "RealmKisame", "mygame43", "OGTeranas", "testprem0", "mkivtt", "xonae", "iSekai_iSekai", "Uzoth",
+    "Zioles", "numberskull999", "imLockGod", "KatakuriKloudz", "Kaidozyuh", "Rajo_END", "KoopekulYT",
+    "MagicbusYT", "Senmarine", "jet5ss", "CRBoneMillion", "starcode_kitt", "oofficialnoobie", "JCDoesGaming_YT",
+    "TheRealFoltyn", "TheGreatAced", "StarCode_fer", "Jujujutv1", "MouseTheBoi", "slat_real2", "EnyuZee",
+    "NoobWithKitsunee", "MeteoricRBLX", "kyriemiles8", "Sai_JinWoo", "BloxyDRoblox", "geladobiel",
+    "DefinitelyNotBaxtrix", "WoozerBloxYT", "divingintea", "Heorua", "HyperJay06_Official", "Smythsterr",
+    "TyePHX", "Lunoven", "sappVFX", "RealYurl", "Generic_ult", "P4CKSTABBER", "MoraIins", "FallenER0S",
+    "OutOfDinos", "nopatrol", "TobersDaArtisto", "thienbaokhang1", "Kuroxity", "fl8mey", "Bredddo",
+    "Jurillianio", "EstheKing", "baswbaswbasw", "PuddingBumby", "Disard0", "Bread_Doppio", "MuG3ED",
+    "tushai", "Korwiaa", "N4Animation", "jers_e", "r_Forbidden", "UnrioChief1", "deadninjstar87",
+    "LegendOfKio", "SirZareli", "Plokster", "Marubravery", "Artszy", "TrucBiduleur100", "AYoungPhienix",
+    "FriedLemonsLoL", "SandiestSandy", "iPrefectSoul", "InfinityExtended", "Adcium", "DaylightSparkIe",
+    "Poifilion", "xZenbrook", "TrayDonce", "khongco789", "dutbooot", "ExtremeBlastSS", "alexoi20",
+    "wMadara_X", "Glitch1ng12", "Rusta_92", "tolovemnice", "IrohaIgarashiBaller", "thesilliestminty",
+    "spiritualsound", "PringleCanKid", "truonked", "corina1234x", "icelandic123", "corazonqr",
+    "rip_russiachat", "vanxing", "WELOVETOKYO", "truownk", "iIlillnickjenkinsill", "DragonDojoOwner",
+    "fr33dim", "ProtoValence", "cooljustint1229", "SkhypeXD", "c0lbl0cks", "CorvusCoraxx", "APandaPoet",
+    "catchymelodies", "lowendisekaialt", "ignotuscaligo", "MangoBytz", "vqanxx", "TretaTbh", "0Krvs",
+    "rigtoni09", "DevForumOps", "BisoBlitz", "eternallav", "DevNexusCore", "b0bbber", "StalwartWarden",
+    "devils21091", "Blotnik", "kablowert", "1OmniJelly1", "RayBloxSunshine", "newtonmetre", "MrChickenRocket",
+    "golden_shellfish", "Doonkahn", "TB_Glitch", "NoDankMemesAllowed", "captainbramble", "CosmoSloth",
+    "EGOTISMS", "Felku", "undercover_admin23", "Arkesium", "RosesAreBlueish", "Suizei", "Wrathsong",
+    "Quasiduck", "Azarth", "NOT_CRYTICAL", "BachaBlox", "drip_mama", "wenloco", "Phoeating", "vgmsgame",
+    "brqod", "sisterton", "0MARIKENZ0", "norperz", "EIRodoIfo", "sarcxsm"
+}
+
+-- [ 輔助函數：簡化 UI 創建 ] --
+local function Create(className, properties)
+    local instance = Instance.new(className)
+    for k, v in pairs(properties) do instance[k] = v end
+    return instance
+end
+
+-- [ 重置舊 GUI (兼容 gethui) ] --
+local parentContainer = gethui and gethui() or CoreGui
+local oldGui = parentContainer:FindFirstChild("XuPlayerTracker")
+if oldGui then oldGui:Destroy() end
+
+-- [ 初始化 ScreenGui ] --
+local ScreenGui = Create("ScreenGui", {
+    Name = "XuPlayerTracker",
+    ResetOnSpawn = false,
+    Parent = parentContainer
+})
+
+-- 主視窗 (增加高度至300以容納掃描按鈕)
+local MainFrame = Create("Frame", {
+    Name = "MainFrame",
+    Size = UDim2.new(0, 520, 0, 300), 
+    Position = UDim2.new(0.5, -260, 0.5, -150),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+    BorderSizePixel = 0,
+    Parent = ScreenGui
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = MainFrame})
+
+-- 頂部標題列
+local TitleBar = Create("Frame", {
+    Size = UDim2.new(1, 0, 0, 35),
+    BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+    BorderSizePixel = 0,
+    Parent = MainFrame
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = TitleBar})
+Create("Frame", {
+    Size = UDim2.new(1, 0, 0, 10),
+    Position = UDim2.new(0, 0, 1, -10),
+    BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+    BorderSizePixel = 0,
+    Parent = TitleBar
+})
+
+local TitleLabel = Create("TextLabel", {
+    Size = UDim2.new(1, -40, 1, 0),
+    Position = UDim2.new(0, 12, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "🛡️ 玩家狀態追蹤器",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = TitleBar
+})
+
+local CloseButton = Create("TextButton", {
+    Size = UDim2.new(0, 35, 0, 35),
+    Position = UDim2.new(1, -35, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "x",
+    TextColor3 = Color3.fromRGB(255, 80, 80),
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    Parent = TitleBar
+})
+
+-- [ 左側：輸入與動作按鈕 ] --
+local InputBox = Create("TextBox", {
+    Size = UDim2.new(0, 316, 0, 35),
+    Position = UDim2.new(0, 12, 0, 48),
+    BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    PlaceholderText = "輸入玩家名稱或 UserId...",
+    PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
+    Font = Enum.Font.Gotham,
+    TextSize = 13,
+    ClearTextOnFocus = false,
+    Parent = MainFrame
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = InputBox})
+
+local CheckBtn = Create("TextButton", {
+    Size = UDim2.new(0, 152, 0, 32),
+    Position = UDim2.new(0, 12, 0, 90),
+    BackgroundColor3 = Color3.fromRGB(70, 130, 180),
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Text = "檢查狀態",
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    Parent = MainFrame
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = CheckBtn})
+
+local JoinBtn = Create("TextButton", {
+    Size = UDim2.new(0, 152, 0, 32),
+    Position = UDim2.new(0, 176, 0, 90),
+    BackgroundColor3 = Color3.fromRGB(60, 179, 113),
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Text = "加入玩家",
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    Parent = MainFrame
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = JoinBtn})
+
+-- [ 左側：結果顯示區卡片 ] --
+local ResultCard = Create("Frame", {
+    Size = UDim2.new(0, 316, 0, 115),
+    Position = UDim2.new(0, 12, 0, 130),
+    BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+    Parent = MainFrame
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = ResultCard})
+
+local S_NameLabel = Create("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 24),
+    Position = UDim2.new(0, 10, 0, 8),
+    BackgroundTransparency = 1,
+    Text = "玩家: 尚未查詢",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = ResultCard
+})
+
+local S_IDLabel = Create("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 22),
+    Position = UDim2.new(0, 10, 0, 32),
+    BackgroundTransparency = 1,
+    Text = "ID: -",
+    TextColor3 = Color3.fromRGB(180, 180, 180),
+    Font = Enum.Font.Gotham,
+    TextSize = 13,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = ResultCard
+})
+
+local S_StatusLabel = Create("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 24),
+    Position = UDim2.new(0, 10, 0, 54),
+    BackgroundTransparency = 1,
+    Text = "狀態: 閒置中",
+    TextColor3 = Color3.fromRGB(200, 200, 200),
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = ResultCard
+})
+
+local S_JoinSettingLabel = Create("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 24),
+    Position = UDim2.new(0, 10, 0, 78),
+    BackgroundTransparency = 1,
+    Text = "加入權限: -",
+    TextColor3 = Color3.fromRGB(180, 180, 180),
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = ResultCard
+})
+
+-- [ 左側：快速掃描按鈕 (新增) ] --
+local ScanBtn = Create("TextButton", {
+    Size = UDim2.new(0, 316, 0, 32),
+    Position = UDim2.new(0, 12, 0, 255),
+    BackgroundColor3 = Color3.fromRGB(138, 43, 226), 
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Text = "🚀 一鍵掃描名單在線狀態",
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    Parent = MainFrame
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = ScanBtn})
+
+
+-- [ 右側：玩家選單與 Everyone 紀錄分頁區塊 ] --
+local ListFrame = Create("Frame", {
+    Size = UDim2.new(0, 168, 0, 239), 
+    Position = UDim2.new(0, 340, 0, 48),
+    BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+    BorderSizePixel = 0,
+    Parent = MainFrame
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = ListFrame})
+
+-- 分頁按鈕區域
+local TabBar = Create("Frame", {
+    Size = UDim2.new(1, -8, 0, 24),
+    Position = UDim2.new(0, 4, 0, 4),
+    BackgroundTransparency = 1,
+    Parent = ListFrame
+})
+
+local TabListBtn = Create("TextButton", {
+    Size = UDim2.new(0.48, 0, 1, 0),
+    Position = UDim2.new(0, 0, 0, 0),
+    BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Text = "📋 快捷",
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    Parent = TabBar
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = TabListBtn})
+
+local TabRecordBtn = Create("TextButton", {
+    Size = UDim2.new(0.5, 0, 1, 0),
+    Position = UDim2.new(0.5, 0, 0, 0),
+    BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+    TextColor3 = Color3.fromRGB(180, 180, 180),
+    Text = "🔓 Everyone (0)",
+    Font = Enum.Font.GothamBold,
+    TextSize = 10,
+    Parent = TabBar
+})
+Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = TabRecordBtn})
+
+-- 1. 快捷選單容器
+local ListContainer = Create("ScrollingFrame", {
+    Size = UDim2.new(1, -8, 1, -34),
+    Position = UDim2.new(0, 4, 0, 30),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 4,
+    ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100),
+    Visible = true,
+    Parent = ListFrame
+})
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Padding = UDim.new(0, 4)
+ListLayout.Parent = ListContainer
+
+ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ListContainer.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 6)
+end)
+
+-- 2. Everyone 紀錄容器
+local RecordContainer = Create("ScrollingFrame", {
+    Size = UDim2.new(1, -8, 1, -34),
+    Position = UDim2.new(0, 4, 0, 30),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 4,
+    ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100),
+    Visible = false,
+    Parent = ListFrame
+})
+
+local RecordLayout = Instance.new("UIListLayout")
+RecordLayout.SortOrder = Enum.SortOrder.LayoutOrder
+RecordLayout.Padding = UDim.new(0, 4)
+RecordLayout.Parent = RecordContainer
+
+RecordLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    RecordContainer.CanvasSize = UDim2.new(0, 0, 0, RecordLayout.AbsoluteContentSize.Y + 6)
+end)
+
+-- 切換分頁邏輯
+TabListBtn.MouseButton1Click:Connect(function()
+    ListContainer.Visible = true
+    RecordContainer.Visible = false
+    TabListBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    TabListBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TabRecordBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    TabRecordBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+end)
+
+TabRecordBtn.MouseButton1Click:Connect(function()
+    ListContainer.Visible = false
+    RecordContainer.Visible = true
+    TabRecordBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    TabRecordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TabListBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    TabListBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+end)
+
+-- [ 邏輯處理區 (核心邏輯封裝) ] --
+local userIdCache = {}
+local isBusy = false
+local isScanning = false
+local selectedButton = nil
+local everyoneRecords = {}
+local everyoneCount = 0
+local listButtonsMap = {} -- 記錄快捷按鈕實例，方便掃描時更改顏色
+
+-- 高亮選中的按鈕
+local function setSelectedButton(btn)
+    if selectedButton and selectedButton ~= btn then
+        selectedButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    end
+    selectedButton = btn
+    if selectedButton then
+        selectedButton.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
+    end
+end
+
+-- 依名稱尋找按鈕並高亮（手動輸入或檢查時觸發）
+local function highlightByName(name)
+    local lowerName = string.lower(name)
+    for _, child in ipairs(ListContainer:GetChildren()) do
+        if child:IsA("TextButton") then
+            local cleanText = string.gsub(child.Text, "^🟢%s*", "")
+            if string.lower(cleanText) == lowerName then
+                setSelectedButton(child)
+                return
+            end
+        end
+    end
+    for _, child in ipairs(RecordContainer:GetChildren()) do
+        if child:IsA("TextButton") then
+            local cleanText = string.gsub(child.Text, "^🔓%s*", "")
+            if string.lower(cleanText) == lowerName then
+                setSelectedButton(child)
+                return
+            end
+        end
+    end
+    setSelectedButton(nil)
+end
+
+-- 自動新增紀錄至 Everyone 列表
+local function addEveryoneRecord(userName, userId)
+    if everyoneRecords[userId] then return end 
+
+    everyoneCount = everyoneCount + 1
+    everyoneRecords[userId] = true
+    TabRecordBtn.Text = "🔓 Everyone (" .. everyoneCount .. ")"
+
+    local RecordBtn = Create("TextButton", {
+        Size = UDim2.new(1, -6, 0, 24),
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+        TextColor3 = Color3.fromRGB(100, 255, 100),
+        Text = "🔓 " .. userName,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        Parent = RecordContainer
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = RecordBtn})
+
+    RecordBtn.MouseButton1Click:Connect(function()
+        InputBox.Text = userName
+        setSelectedButton(RecordBtn)
+        performCheck()
+    end)
+end
+
+-- UI 拖拽邏輯
+local dragging, dragInput, dragStart, startPos
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- 獲取 UserId (帶空白處理與快取)
+local function getUserId(inputString)
+    local cleanedInput = string.gsub(inputString, "^%s*(.-)%s*$", "%1")
+    if cleanedInput == "" then return nil end
+    
+    local id = tonumber(cleanedInput)
+    if id then return id end
+    
+    local lowerName = string.lower(cleanedInput)
+    if userIdCache[lowerName] then return userIdCache[lowerName] end
+    
+    local success, result = pcall(function()
+        return Players:GetUserIdFromNameAsync(cleanedInput)
+    end)
+    
+    if success and result then 
+        userIdCache[lowerName] = result
+        return result 
+    end
+    return nil
+end
+
+-- 解析 Online 數據
+local function checkOnlineData(data)
+    if type(data) == "table" then
+        return data.Online or data.IsOnline or (data.Server ~= nil) or false
+    elseif data == true then
+        return true
+    end
+    return false
+end
+
+-- 發送加入 Remote 請求
+local function fireJoinRequest(id)
+    pcall(function()
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes and remotes:FindFirstChild("JoinPlayerFromProfile") then
+            remotes.JoinPlayerFromProfile:FireServer(id)
+        end
+    end)
+end
+
+-- [ 執行狀態檢查的主函數 ] --
+function performCheck()
+    if isBusy then return end
+    
+    local inputStr = InputBox.Text
+    if inputStr == "" then
+        S_StatusLabel.Text = "⚠️ 請輸入玩家名稱或 ID"
+        S_StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+        return
+    end
+
+    highlightByName(inputStr)
+
+    isBusy = true
+    S_NameLabel.Text = "玩家: " .. inputStr
+    S_StatusLabel.Text = "🔄 獲取 ID 中..."
+    S_StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    S_JoinSettingLabel.Text = "加入權限: 查詢中..."
+    S_JoinSettingLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+
+    task.spawn(function()
+        local targetId = getUserId(inputStr)
+        if not targetId then
+            S_IDLabel.Text = "ID: 錯誤"
+            S_StatusLabel.Text = "❌ 找不到該玩家"
+            S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            S_JoinSettingLabel.Text = "加入權限: -"
+            isBusy = false
+            return
+        end
+
+        S_IDLabel.Text = "ID: " .. targetId
+        S_StatusLabel.Text = "🔄 查詢狀態中..."
+
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        local getRemote = remotes and remotes:FindFirstChild("GetPlayerProfileData")
+        
+        if not getRemote then
+            S_StatusLabel.Text = "❌ 遊戲中找不到 Remote 服務"
+            S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            isBusy = false
+            return
+        end
+
+        local success, data = pcall(function()
+            return getRemote:InvokeServer(targetId)
+        end)
+        
+        if success then
+            if data and checkOnlineData(data) then
+                S_StatusLabel.Text = "🟢 狀態: 在線 (Online)"
+                S_StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                
+                if listButtonsMap[inputStr] then
+                    listButtonsMap[inputStr].TextColor3 = Color3.fromRGB(100, 255, 100)
+                    listButtonsMap[inputStr].Text = "🟢 " .. inputStr
+                end
+            else
+                S_StatusLabel.Text = "🔴 狀態: 離線 (Offline)"
+                S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            end
+            
+            local joinServerSetting = "Unknown"
+            if type(data) == "table" and data.Settings and data.Settings.JoinServer then
+                joinServerSetting = data.Settings.JoinServer
+            end
+            
+            if joinServerSetting == "Everyone" then
+                S_JoinSettingLabel.Text = "🔓 權限: 所有人 (Everyone)"
+                S_JoinSettingLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                addEveryoneRecord(inputStr, targetId)
+            elseif joinServerSetting == "FriendsOnly" then
+                S_JoinSettingLabel.Text = "👥 權限: 僅限好友 (FriendsOnly)"
+                S_JoinSettingLabel.TextColor3 = Color3.fromRGB(255, 170, 0)
+            elseif joinServerSetting == "Nobody" then
+                S_JoinSettingLabel.Text = "🔒 權限: 關閉 (Nobody)"
+                S_JoinSettingLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            else
+                S_JoinSettingLabel.Text = "❓ 權限: 未知/隱藏"
+                S_JoinSettingLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+            end
+        else
+            S_StatusLabel.Text = "❌ 查詢失敗 (無法獲取資料)"
+            S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            S_JoinSettingLabel.Text = "權限: 讀取失敗"
+            S_JoinSettingLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+        
+        isBusy = false
+    end)
+end
+
+-- 動態創建快捷選單按鈕
+for _, userName in ipairs(targetUsers) do
+    if userName ~= "" then
+        local UserBtn = Create("TextButton", {
+            Size = UDim2.new(1, -6, 0, 24),
+            BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+            TextColor3 = Color3.fromRGB(230, 230, 230),
+            Text = userName,
+            Font = Enum.Font.Gotham,
+            TextSize = 11,
+            Parent = ListContainer
+        })
+        Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = UserBtn})
+
+        listButtonsMap[userName] = UserBtn
+
+        UserBtn.MouseButton1Click:Connect(function()
+            InputBox.Text = userName
+            setSelectedButton(UserBtn)
+            performCheck()
+        end)
+    end
+end
+
+-- [ 按鈕點擊事件 ] --
+CheckBtn.MouseButton1Click:Connect(performCheck)
+
+JoinBtn.MouseButton1Click:Connect(function()
+    local inputStr = InputBox.Text
+    if inputStr == "" then return end
+    
+    task.spawn(function()
+        local targetId = getUserId(inputStr)
+        if targetId then
+            S_StatusLabel.Text = "🚀 嘗試發送加入請求..."
+            S_StatusLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+            fireJoinRequest(targetId)
+        else
+            S_StatusLabel.Text = "❌ 無效玩家，無法加入"
+            S_StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    end)
+end)
+
+-- [ 新增：快速掃描功能邏輯 (修復 Rate Limit 誤判) ] --
+ScanBtn.MouseButton1Click:Connect(function()
+    if isScanning then return end
+    isScanning = true
+
+    -- 計算有效玩家數量，避免含有空白字串時導致無法完成掃描
+    local validPlayers = {}
+    for _, userName in ipairs(targetUsers) do
+        if userName ~= "" then table.insert(validPlayers, userName) end
+    end
+
+    local totalPlayers = #validPlayers
+    local processed = 0
+    local onlineCount = 0
+    local isFinished = false -- 防抖標記，避免同時多線程觸發完成邏輯
+
+    ScanBtn.Text = "🔄 掃描中... 0 / " .. totalPlayers
+    ScanBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local getRemote = remotes and remotes:FindFirstChild("GetPlayerProfileData")
+
+    if not getRemote then
+        ScanBtn.Text = "❌ 找不到 Remote 服務"
+        ScanBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        task.wait(2)
+        ScanBtn.Text = "🚀 一鍵掃描名單在線狀態"
+        ScanBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+        isScanning = false
+        return
+    end
+
+    task.spawn(function()
+        for _, userName in ipairs(validPlayers) do
+            task.spawn(function()
+                local targetId = getUserId(userName)
+                if targetId then
+                    local success, data = pcall(function()
+                        return getRemote:InvokeServer(targetId)
+                    end)
+
+                    -- 【重點修正】：只有在請求確實成功 (success == true) 的情況下，才去變更按鈕狀態
+                    -- 如果 success == false，代表被 Roblox 限制請求 (Rate Limit)，此時不做任何變更，保留原本狀態！
+                    if success then
+                        if data and checkOnlineData(data) then
+                            onlineCount = onlineCount + 1
+                            if listButtonsMap[userName] then
+                                listButtonsMap[userName].TextColor3 = Color3.fromRGB(100, 255, 100)
+                                listButtonsMap[userName].Text = "🟢 " .. userName
+                            end
+
+                            local joinServerSetting = type(data) == "table" and data.Settings and data.Settings.JoinServer
+                            if joinServerSetting == "Everyone" then
+                                addEveryoneRecord(userName, targetId)
+                            end
+                        else
+                            -- 確實獲取到資料，且玩家不在線，才變為灰色
+                            if listButtonsMap[userName] then
+                                listButtonsMap[userName].TextColor3 = Color3.fromRGB(150, 150, 150)
+                                listButtonsMap[userName].Text = userName
+                            end
+                        end
+                    end
+                end
+
+                processed = processed + 1
+                
+                -- 更新進度 (只在尚未結束時更新，避免 UI 閃爍)
+                if not isFinished then
+                    ScanBtn.Text = string.format("🔄 掃描中... %d / %d (發現 %d 人在線)", processed, totalPlayers, onlineCount)
+                end
+
+                -- 掃描完成處理
+                if processed >= totalPlayers and not isFinished then
+                    isFinished = true
+                    ScanBtn.Text = string.format("✅ 掃描完成！共 %d 人在線上", onlineCount)
+                    ScanBtn.BackgroundColor3 = Color3.fromRGB(60, 179, 113)
+                    task.wait(3)
+                    ScanBtn.Text = "🚀 一鍵掃描名單在線狀態"
+                    ScanBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+                    isScanning = false
+                end
+            end)
+            task.wait(0.05) 
+        end
+    end)
+end)
