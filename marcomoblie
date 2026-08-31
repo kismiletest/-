@@ -140,13 +140,7 @@ task.spawn(function()
 
 		local cd = getCooldownPercent()
 		if cd >= 0.95 then
-			-- 方法1: CommF 发包 (标准入口)
-			pcall(function()
-				local commF = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
-				if commF then
-					commF:InvokeServer("Soru")
-				end
-			end)
+			
 
 			-- 方法2: VirtualInputManager 按X
 			pcall(function()
