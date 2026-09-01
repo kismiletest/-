@@ -8,8 +8,8 @@ old = hookmetamethod(game:GetService("StarterGui"), "__namecall", newcclosure(fu
         if method == "SetCore" and args[1] == "SendNotification" then
             local options = args[2]
             if type(options) == "table" and 
-               tostring(options.Title) == "Xsyy" and 
-               tostring(options.Text) == "then制作" 
+               tostring(options.Title) == "abyss" and 
+               tostring(options.Text) == "abyss制作" 
             then
                 local modifiedOptions = table.clone(options)
                 modifiedOptions.Text = "1"
@@ -31,8 +31,8 @@ main.Start = returnnil
 
 
 game:GetService("StarterGui"):SetCore("SendNotification",{
-	Title = "猪挤猪脚本",
-	Text = "then制作",
+	Title = "abyss脚本",
+	Text = "abyss制作",
 	Duration = 5;
 })
 wait(0.1)
@@ -52,8 +52,8 @@ local UITab5 = win:Tab("传送",'7734068321')
 
 local about = UITab1:section("公告",true)
 
-about:Label("then制作")
-about:Label("Ree是你爸爸")
+about:Label("abyss")
+about:Label("sb")
 local about = UITab2:section("脚本",true)
 about:Slider("视角缩放距离", "Slider",  128, 128, 10000, false, function(Value)
     game:GetService("Players").LocalPlayer.CameraMaxZoomDistance = Value
