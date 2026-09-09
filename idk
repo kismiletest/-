@@ -1,40 +1,55 @@
--- 每秒强制保持 300 FPS
+-- Auto FPS Lock for Sanguine Art Z (with Toggle UI)
+-- 强制提高 FPS 到 600
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local RunService = game:GetService("RunService")
 
 -- ==================== 状态 ====================
-local isEnabled = false
-local keepTask = nil
+local isEnabled = false -- 总开关
+local isLocked = false
+local currentTask = nil
+local forceConnection = nil
 
--- ==================== 强制保持函数 ====================
-local function startKeep300()
-	if keepTask then return end
-	keepTask = task.spawn(function()
-		while isEnabled do
-			if setfpscap then
-				setfpscap(300) -- 每秒强制设为 300
-			end
-			task.wait(1) -- 每秒执行一次
+-- ==================== FPS 控制函数 ====================
+local function lockFps()
+	if not isEnabled then return end
+	if not isLocked and setfpscap then
+		isLocked = true
+		setfpscap(600) -- 强制设为 600
+
+		-- 持续强制保持 600（防止被其他脚本改掉）
+		if forceConnection then
+			forceConnection:Disconnect()
 		end
-		keepTask = nil
-	end)
+		forceConnection = RunService.Heartbeat:Connect(function()
+			if isLocked and isEnabled and setfpscap then
+				setfpscap(600)
+			end
+		end)
+	end
 end
 
-local function stopKeep300()
-	isEnabled = false
-	if keepTask then
-		task.cancel(keepTask)
-		keepTask = nil
-	end
-	if setfpscap then
-		setfpscap(0) -- 关闭后恢复无限制
+local function unlockFpsWithDelay()
+	if isLocked and not currentTask then
+		currentTask = task.spawn(function()
+			task.wait(0.3)
+			if forceConnection then
+				forceConnection:Disconnect()
+				forceConnection = nil
+			end
+			if setfpscap then
+				setfpscap(0) -- 恢复无限制
+			end
+			isLocked = false
+			currentTask = nil
+		end)
 	end
 end
 
 -- ==================== 创建 UI ====================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Keep300FPS"
+ScreenGui.Name = "AutoFpsLockUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = PlayerGui
@@ -62,7 +77,7 @@ Title.Name = "Title"
 Title.Size = UDim2.new(1, -20, 0, 28)
 Title.Position = UDim2.new(0, 10, 0, 6)
 Title.BackgroundTransparency = 1
-Title.Text = "Keep 300 FPS"
+Title.Text = "Sanguine Z FPS Lock"
 Title.TextColor3 = Color3.fromRGB(220, 220, 230)
 Title.TextSize = 14
 Title.Font = Enum.Font.GothamBold
@@ -105,16 +120,28 @@ local function updateUI()
 		ToggleBtn.Text = "ON"
 		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
 		ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-		StatusLabel.Text = "保持 300"
+		StatusLabel.Text = "已开启"
 		StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
-		startKeep300()
 	else
 		ToggleBtn.Text = "OFF"
 		ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
 		ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 		StatusLabel.Text = "已关闭"
 		StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 170)
-		stopKeep300()
+
+		-- 关闭时强制解锁
+		if currentTask then
+			task.cancel(currentTask)
+			currentTask = nil
+		end
+		if forceConnection then
+			forceConnection:Disconnect()
+			forceConnection = nil
+		end
+		if isLocked and setfpscap then
+			setfpscap(0)
+			isLocked = false
+		end
 	end
 end
 
@@ -153,4 +180,49 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
 	end
 end)
 
-print("[Keep 300 FPS] UI 已加载，默认关闭 | 每秒强制保持 300 FPS")
+-- ==================== 核心检测循环 ====================
+task.spawn(function()
+	while task.wait(0.5) do
+		if not isEnabled then continue end
+		pcall(function()
+			local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+			if not playerGui then return end
+			local main = playerGui:FindFirstChild("Main")
+			if not main then return end
+			local skills = main:FindFirstChild("Skills")
+			if not skills then return end
+			local sanguine = skills:FindFirstChild("Sanguine Art")
+			if not sanguine then return end
+			local zSkill = sanguine:FindFirstChild("Z")
+			if not zSkill then return end
+			local cooldown = zSkill:FindFirstChild("Cooldown")
+			if not cooldown then return end
+
+			if not cooldown:GetAttribute("AutoFpsBound") then
+				cooldown:SetAttribute("AutoFpsBound", true)
+				local fullCdSize = UDim2.new(1, 0, 1, -1)
+
+				if cooldown.Size == fullCdSize then
+					lockFps()
+				else
+					unlockFpsWithDelay()
+				end
+
+				cooldown:GetPropertyChangedSignal("Size"):Connect(function()
+					if not isEnabled then return end
+					if cooldown.Size == fullCdSize then
+						if currentTask then
+							task.cancel(currentTask)
+							currentTask = nil
+						end
+						lockFps()
+					else
+						unlockFpsWithDelay()
+					end
+				end)
+			end
+		end)
+	end
+end)
+
+print("[Auto FPS Lock] UI 已加载，默认关闭 | 强制提高 FPS 到 600")
