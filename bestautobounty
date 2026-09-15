@@ -269,6 +269,389 @@ local function rejoinServer()
 	return ok
 end
 
+-- ==================== 移除岩浆 / 水上行走 (移植自 WindUI) ====================
+-- 这两个「全程开启」：每次加载强制打开，且不写入存档，不受任何开关联动
+_G.G_RemoveLava = true
+_G.G_WalkOnWater = true
+
+local function CheckAndDestroyLava(v)
+	if not v then return end
+	local name = v.Name
+	if name == "Lava" then
+		pcall(function() v:Destroy() end)
+	elseif name == "LavaParts" then
+		local parent = v.Parent
+		if parent then
+			local pName = parent.Name
+			if pName == "CircleIsland" or pName == "GhostShipInterior" then
+				local grandParent = parent.Parent
+				if grandParent and grandParent.Name == "Map" then
+					pcall(function() v:Destroy() end)
+				end
+			end
+		end
+	end
+end
+
+-- 一次性扫描，把岩浆清掉（客户端本地，需重进恢复）
+-- 放到 task.spawn 里分片执行，避免开局卡住主线程导致界面出不来
+local function StartRemoveLava()
+	task.spawn(function()
+		pcall(function()
+			local count = 0
+			for _, v in pairs(Workspace:GetDescendants()) do
+				CheckAndDestroyLava(v)
+				count = count + 1
+				if count % 500 == 0 then task.wait() end
+			end
+			for _, v in pairs(ReplicatedStorage:GetDescendants()) do
+				CheckAndDestroyLava(v)
+				count = count + 1
+				if count % 500 == 0 then task.wait() end
+			end
+		end)
+		print("[猎赏] 已移除岩浆 (需重进恢复)")
+	end)
+end
+
+-- 水上行走：把海平面拉高，人就能在水上跑
+local walkOnWaterRunning = false
+local function StartWalkOnWater()
+	if walkOnWaterRunning then return end
+	walkOnWaterRunning = true
+	task.spawn(function()
+		while task.wait(0.2) do
+			if not _G.G_WalkOnWater then break end
+			pcall(function()
+				local waterBase = Workspace:FindFirstChild("Map") and Workspace.Map:FindFirstChild("WaterBase-Plane")
+				if waterBase then
+					waterBase.Size = Vector3.new(1000, 112, 1000)
+				end
+			end)
+		end
+		walkOnWaterRunning = false
+	end)
+end
+
+local function StopWalkOnWater()
+	_G.G_WalkOnWater = false
+	pcall(function()
+		local waterBase = Workspace:FindFirstChild("Map") and Workspace.Map:FindFirstChild("WaterBase-Plane")
+		if waterBase then
+			waterBase.Size = Vector3.new(1000, 80, 1000)
+		end
+	end)
+end
+
+-- 加载即生效
+StartRemoveLava()
+StartWalkOnWater()
+
+-- ==================== 减画质 (移植自 WindUI) ====================
+-- 「全程开启」：每次加载强制应用，不写入存档
+_G.G_LowGraphics = true
+
+local function ApplyLowGraphicsTo(obj)
+	if obj:IsA("Part") or obj:IsA("Union") or obj:IsA("CornerWedgePart") or obj:IsA("TrussPart") then
+		obj.Material = "Plastic"
+		obj.Reflectance = 0
+	elseif obj:IsA("Decal") or obj:IsA("Texture") then
+		obj.Transparency = 1
+	elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
+		obj.Lifetime = NumberRange.new(0)
+	elseif obj:IsA("Explosion") then
+		obj.BlastPressure = 1
+		obj.BlastRadius = 1
+	elseif obj:IsA("Fire") or obj:IsA("SpotLight") or obj:IsA("Smoke") then
+		obj.Enabled = false
+	end
+end
+
+-- 同样分片执行，开局不卡主线程
+local function ApplyLowGraphics()
+	task.spawn(function()
+		pcall(function()
+			local count = 0
+			for _, descendant in pairs(game:GetDescendants()) do
+				ApplyLowGraphicsTo(descendant)
+				count = count + 1
+				if count % 500 == 0 then task.wait() end
+			end
+		end)
+		print("[猎赏] 减画质: 已完成全图处理")
+	end)
+end
+
+ApplyLowGraphics()
+-- 保持开启：新加载进来的物件也一起压
+Workspace.DescendantAdded:Connect(function(obj)
+	if _G.G_LowGraphics then
+		pcall(ApplyLowGraphicsTo, obj)
+	end
+end)
+
+-- ==================== Anti-AFK (防挂机被踢) ====================
+-- 全程开启：收到 Idled（约 20 分钟无输入）就模拟一次鼠标点击，重置挂机计时
+pcall(function()
+	local VirtualUser = game:GetService("VirtualUser")
+	LocalPlayer.Idled:Connect(function()
+		pcall(function()
+			VirtualUser:Button2Down(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
+			task.wait(1)
+			VirtualUser:Button2Up(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
+		end)
+		print("[猎赏] Anti-AFK: 已模拟鼠标输入，避免被踢出")
+	end)
+end)
+
+-- ==================== 杀戮光环 / 快速攻击 (移植自 WindUI) ====================
+-- 「全程开启」：每次加载强制打开，不写入存档
+_G.G_FastAttack = true
+_G.G_FastAttackMode = "模式2(部分账号失效用)"
+_G.G_AttackMobs = true
+_G.G_AttackPlayers = true
+
+local AURA_RANGE = 5000 -- WindUI Settings.Range
+
+local function modelAlive(model)
+	if not model then return false end
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	return humanoid and humanoid.Health and humanoid.Health > 0
+end
+
+local function GetRandomValidPart(target)
+	if not target then return nil end
+	local hrp = target:FindFirstChild("HumanoidRootPart")
+	if not hrp then return nil end
+	local parts = { target:FindFirstChild("Head"), target:FindFirstChild("UpperTorso"), target:FindFirstChild("LowerTorso"), target:FindFirstChild("Torso"), hrp }
+	local validParts = {}
+	for _, p in ipairs(parts) do
+		if p and p:IsA("BasePart") then table.insert(validParts, p) end
+	end
+	if #validParts > 0 then return validParts[math.random(1, #validParts)] end
+	return hrp
+end
+
+local M1_State = { consecutiveFailures = 0, maxConsecutiveFailures = 5, Remotes = nil, Net = nil, RegisterAttack = nil, RegisterHit = nil, Enemies = nil }
+
+local function M1_CheckAndGetCoreComponents()
+	if M1_State.Remotes and M1_State.Net and M1_State.RegisterAttack and M1_State.RegisterHit and M1_State.Enemies then
+		return M1_State.Remotes, M1_State.Net, M1_State.RegisterAttack, M1_State.RegisterHit, M1_State.Enemies
+	end
+	local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	local Modules = ReplicatedStorage:FindFirstChild("Modules")
+	local Net = Modules and Modules:FindFirstChild("Net")
+	local RegisterAttack = Net and (Net:FindFirstChild("RE/RegisterAttack") or Net:FindFirstChild("RegisterAttack"))
+	local RegisterHit = Net and (Net:FindFirstChild("RE/RegisterHit") or Net:FindFirstChild("RegisterHit"))
+	local Enemies = Workspace:FindFirstChild("Enemies") or Workspace:FindFirstChild("NPCs")
+	if Remotes and Modules and Net and RegisterAttack and RegisterHit and Enemies then
+		M1_State.Remotes = Remotes
+		M1_State.Net = Net
+		M1_State.RegisterAttack = RegisterAttack
+		M1_State.RegisterHit = RegisterHit
+		M1_State.Enemies = Enemies
+		return Remotes, Net, RegisterAttack, RegisterHit, Enemies
+	end
+	return nil, nil, nil, nil, nil
+end
+
+local function M1_ProcessEnemies(OthersEnemies, Folder)
+	if not Folder or not _G.G_AttackMobs then return nil end
+	local BasePart = nil
+	local myPos = LocalPlayer.Character and LocalPlayer.Character.PrimaryPart and LocalPlayer.Character.PrimaryPart.Position
+	if not myPos then return nil end
+	for _, Enemy in ipairs(Folder:GetChildren()) do
+		if Enemy == LocalPlayer.Character or not modelAlive(Enemy) then continue end
+		local enemyRoot = Enemy:FindFirstChild("HumanoidRootPart")
+		if not enemyRoot then continue end
+		if (enemyRoot.Position - myPos).Magnitude < 500 then
+			local foundPart = GetRandomValidPart(Enemy)
+			if foundPart then
+				table.insert(OthersEnemies, { Enemy, foundPart })
+				BasePart = foundPart
+			end
+		end
+	end
+	return BasePart
+end
+
+local function M1_ProcessRealPlayers(OthersEnemies)
+	if not _G.G_AttackPlayers then return nil end
+	local BasePart = nil
+	local myPos = LocalPlayer.Character and LocalPlayer.Character.PrimaryPart and LocalPlayer.Character.PrimaryPart.Position
+	if not myPos then return nil end
+	for _, OtherPlayer in ipairs(Players:GetPlayers()) do
+		if OtherPlayer == LocalPlayer then continue end
+		local OtherChar = OtherPlayer.Character
+		if not modelAlive(OtherChar) then continue end
+		local foundPart = GetRandomValidPart(OtherChar)
+		if foundPart and LocalPlayer:DistanceFromCharacter(foundPart.Position) < 500 then
+			table.insert(OthersEnemies, { OtherChar, foundPart })
+			BasePart = foundPart
+		end
+	end
+	return BasePart
+end
+
+local function M1_Attack(BasePart, OthersEnemies)
+	local _, _, temp_RegisterAttack, temp_RegisterHit = M1_CheckAndGetCoreComponents()
+	if not (BasePart and OthersEnemies and #OthersEnemies > 0 and temp_RegisterAttack and temp_RegisterHit) then
+		M1_State.consecutiveFailures = M1_State.consecutiveFailures + 1
+		if M1_State.consecutiveFailures >= M1_State.maxConsecutiveFailures then
+			M1_State.Remotes = nil
+			M1_State.Net = nil
+			M1_State.RegisterAttack = nil
+			M1_State.RegisterHit = nil
+			M1_State.Enemies = nil
+			M1_State.consecutiveFailures = 0
+		end
+		return
+	end
+	M1_State.consecutiveFailures = 0
+	local success = pcall(function()
+		temp_RegisterAttack:FireServer(0.3)
+		temp_RegisterHit:FireServer(BasePart, OthersEnemies)
+	end)
+	if not success then
+		M1_State.RegisterAttack = nil
+		M1_State.RegisterHit = nil
+	end
+end
+
+local function PerformAttackMode1()
+	local _, _, _, _, Enemies = M1_CheckAndGetCoreComponents()
+	if not Enemies then
+		M1_State.Enemies = nil
+		return
+	end
+	local OthersEnemies = {}
+	local Part1 = M1_ProcessEnemies(OthersEnemies, Enemies)
+	local Part2 = M1_ProcessRealPlayers(OthersEnemies)
+	if #OthersEnemies > 0 then M1_Attack(Part1 or Part2, OthersEnemies) end
+end
+
+-- 带 Id 属性的 RemoteEvent（模式2 的加密通道用）
+local AuraRemote = { Found = nil, Id = nil }
+
+local function scanAuraRemote(child)
+	if child:IsA("RemoteEvent") and child:GetAttribute("Id") then
+		AuraRemote.Id = child:GetAttribute("Id")
+		AuraRemote.Found = child
+	end
+end
+
+task.spawn(function()
+	local folders = {
+		ReplicatedStorage:FindFirstChild("Util"),
+		ReplicatedStorage:FindFirstChild("Common"),
+		ReplicatedStorage:FindFirstChild("Remotes"),
+		ReplicatedStorage:FindFirstChild("Assets"),
+		ReplicatedStorage:FindFirstChild("FX"),
+	}
+	for _, folder in ipairs(folders) do
+		if folder then
+			for _, child in ipairs(folder:GetChildren()) do scanAuraRemote(child) end
+			folder.ChildAdded:Connect(scanAuraRemote)
+		end
+	end
+end)
+
+local function getAuraTargets()
+	local char = LocalPlayer.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not root then return {} end
+	local targets = {}
+	local myPos = root.Position
+	local folders = { Workspace:FindFirstChild("Enemies"), Workspace:FindFirstChild("Characters") }
+	for _, folder in ipairs(folders) do
+		if folder then
+			for _, model in ipairs(folder:GetChildren()) do
+				if model ~= char then
+					local tRoot = model:FindFirstChild("HumanoidRootPart")
+					local tHum = model:FindFirstChild("Humanoid")
+					if tRoot and tHum and tHum.Health > 0 then
+						if (tRoot.Position - myPos).Magnitude <= AURA_RANGE then
+							table.insert(targets, { Model = model, Root = tRoot, Head = model:FindFirstChild("Head") or tRoot })
+						end
+					end
+				end
+			end
+		end
+	end
+	return targets
+end
+
+local function PerformAttackMode2()
+	local char = LocalPlayer.Character
+	if not char then return end
+	local hasTool = char:FindFirstChildOfClass("Tool") or char:FindFirstChild("EquippedWeapon")
+	if not hasTool then return end
+
+	local targets = getAuraTargets()
+	if #targets == 0 then return end
+
+	local modules = ReplicatedStorage:FindFirstChild("Modules")
+	local net = modules and modules:FindFirstChild("Net")
+	local RA = net and (net:FindFirstChild("RE/RegisterAttack") or net:FindFirstChild("RegisterAttack"))
+	local RH = net and (net:FindFirstChild("RE/RegisterHit") or net:FindFirstChild("RegisterHit"))
+	if not RA or not RH then return end
+
+	local mainTarget = targets[1]
+	local hitList = {}
+	for _, target in ipairs(targets) do
+		table.insert(hitList, { target.Model, target.Root })
+	end
+
+	RA:FireServer()
+	local fakeHash = tostring(LocalPlayer.UserId):sub(2, 4) .. tostring(math.random(10000, 99999))
+	pcall(function()
+		RH:FireServer(mainTarget.Head, hitList, {}, fakeHash)
+	end)
+
+	if AuraRemote.Found and AuraRemote.Id then
+		pcall(function()
+			local seedRemote = net:FindFirstChild("seed")
+			local seedValue = seedRemote and seedRemote:InvokeServer() or 1
+			local encryptedId = bit32.bxor(AuraRemote.Id + 909090, seedValue * 2)
+			local rawName = "RE/RegisterHit"
+			local timestamp = math.floor(Workspace:GetServerTimeNow() / 10 % 10) + 1
+			local encryptedName = string.gsub(rawName, ".", function(c)
+				return string.char(bit32.bxor(string.byte(c), timestamp))
+			end)
+			AuraRemote.Found:FireServer(encryptedName, encryptedId, mainTarget.Head, hitList)
+		end)
+	end
+end
+
+local function PerformAttack()
+	if not _G.G_FastAttack then return end
+	if _G.G_FastAttackMode == "模式1" then
+		local Character = LocalPlayer.Character
+		local Equipped = Character and modelAlive(Character) and Character:FindFirstChildOfClass("Tool")
+		if not Equipped or Equipped.ToolTip == "Gun" then return end
+		PerformAttackMode1()
+	else
+		PerformAttackMode2()
+	end
+end
+
+task.spawn(function()
+	while true do
+		if not _G.G_FastAttack then
+			task.wait(0.3)
+			continue
+		end
+		local startTime = tick()
+		pcall(PerformAttack)
+		if _G.G_FastAttackMode == "模式1" then
+			task.wait(0.3)
+		else
+			local elapsed = tick() - startTime
+			task.wait(math.max(0.05 - elapsed, 0.001))
+		end
+	end
+end)
+
 -- 前置声明（UI 按钮要用到）
 local triggerSoru
 local findSoruButton
@@ -278,8 +661,30 @@ local getBackpackTools
 local applyTeam
 
 -- ==================== WindUI ====================
+-- 库有 1.3MB 左右，手机执行器拉取+编译要几秒，所以打进度；并且多源兜底
+local WINDUI_URLS = {
+	"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua",
+	"https://cdn.jsdelivr.net/gh/Footagesus/WindUI@main/dist/main.lua",
+}
+
 local WindUI
-pcall(function() WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))() end)
+print("[猎赏] 正在加载界面库 WindUI (约 1.3MB，请稍等) ...")
+for i, url in ipairs(WINDUI_URLS) do
+	local ok, res = pcall(function()
+		local src = game:HttpGet(url)
+		if not src or src == "" then error("返回内容为空") end
+		return loadstring(src)()
+	end)
+	if ok and res ~= nil then
+		WindUI = res
+		print("[猎赏] 界面库加载成功 (第 " .. i .. " 个源)")
+		break
+	end
+	warn("[猎赏] 界面库加载失败 (第 " .. i .. " 个源): " .. tostring(url) .. " -> " .. tostring(res))
+end
+if not WindUI then
+	warn("[猎赏] 界面库全部失败，界面不会出现；自动猎赏等其它功能照常运行")
+end
 
 local playerDropdown
 if WindUI then
@@ -288,7 +693,15 @@ if WindUI then
 		Size = UDim2.fromOffset(460, 400), Transparent = true, Theme = "Dark",
 		Acrylic = false, HideSearchBar = false, SideBarWidth = 170, ToggleKey = Enum.KeyCode.G,
 	})
-	local Tab = Window:Tab({ Title = "猎赏", Icon = "crosshair" })
+	-- 分页（按侧边栏顺序创建）
+	local TabMain = Window:Tab({ Title = "猎赏", Icon = "crosshair" })
+	local TabCombat = Window:Tab({ Title = "战斗", Icon = "sword" })
+	local TabAura = Window:Tab({ Title = "杀戮光环", Icon = "zap" })
+	local TabMove = Window:Tab({ Title = "移动", Icon = "wind" })
+	local TabEnv = Window:Tab({ Title = "环境", Icon = "monitor" })
+	local TabServer = Window:Tab({ Title = "服务器", Icon = "server" })
+	local TabConfig = Window:Tab({ Title = "设置", Icon = "settings" })
+	local Tab = TabMain
 
 	-- 统一管理开关，方便「自动执行」同步 UI 状态
 	local uiToggles = {}
@@ -372,6 +785,8 @@ if WindUI then
 	Tab:Toggle({ Title = "排除海军盟友", Value = _G.Hunt_NoMarineAlly, Callback = function(v) _G.Hunt_NoMarineAlly = v end })
 	Tab:Slider({ Title = "换人距离 (米)", Value = { Min = 500, Max = 50000, Default = _G.Hunt_MaxDist }, Callback = function(v) _G.Hunt_MaxDist = v end })
 
+	-- ===== Tab: 战斗 =====
+	Tab = TabCombat
 	Tab:Section({ Title = "瞬步（限龙族" })
 	uiToggles.Hunt_AutoSoru = Tab:Toggle({ Title = "自动瞬步", Value = _G.Hunt_AutoSoru, Callback = function(v) _G.Hunt_AutoSoru = v end })
 	Tab:Slider({ Title = "瞬步间隔 (秒)", Value = { Min = 1, Max = 60, Default = _G.Hunt_SoruInterval }, Callback = function(v) _G.Hunt_SoruInterval = v end })
@@ -421,10 +836,57 @@ if WindUI then
 		end
 	end
 
+	-- ===== Tab: 移动 =====
+	Tab = TabMove
 	Tab:Section({ Title = "飞行" })
 	Tab:Slider({ Title = "飞行速度", Value = { Min = 50, Max = 600, Default = _G.Hunt_FlySpeed }, Callback = function(v) _G.Hunt_FlySpeed = v end })
 	Tab:Slider({ Title = "停靠距离", Value = { Min = 2, Max = 40, Default = _G.Hunt_StopDist }, Callback = function(v) _G.Hunt_StopDist = v end })
 
+	-- ===== Tab: 环境 =====
+	Tab = TabEnv
+	Tab:Section({ Title = "环境" })
+	Tab:Toggle({
+		Title = "移除岩浆 (需重进恢复)",
+		Value = _G.G_RemoveLava,
+		Callback = function(v)
+			_G.G_RemoveLava = v
+			if v then StartRemoveLava() end
+		end
+	})
+	Tab:Toggle({
+		Title = "水上行走",
+		Value = _G.G_WalkOnWater,
+		Callback = function(v)
+			_G.G_WalkOnWater = v
+			if v then StartWalkOnWater() else StopWalkOnWater() end
+		end
+	})
+
+	Tab:Section({ Title = "画质" })
+	Tab:Toggle({
+		Title = "减画质 (持续开启)",
+		Value = _G.G_LowGraphics,
+		Callback = function(v)
+			_G.G_LowGraphics = v
+			if v then ApplyLowGraphics() end
+		end
+	})
+
+	-- ===== Tab: 杀戮光环 =====
+	Tab = TabAura
+	Tab:Section({ Title = "快速攻击" })
+	Tab:Toggle({ Title = "开启快速攻击", Value = _G.G_FastAttack, Callback = function(v) _G.G_FastAttack = v end })
+	Tab:Dropdown({
+		Title = "快速攻击模式",
+		Values = { "模式1", "模式2(部分账号失效用)" },
+		Value = _G.G_FastAttackMode,
+		Callback = function(v) _G.G_FastAttackMode = v end
+	})
+	Tab:Toggle({ Title = "攻击怪物", Value = _G.G_AttackMobs, Callback = function(v) _G.G_AttackMobs = v end })
+	Tab:Toggle({ Title = "攻击玩家", Value = _G.G_AttackPlayers, Callback = function(v) _G.G_AttackPlayers = v end })
+
+	-- ===== Tab: 服务器 =====
+	Tab = TabServer
 	Tab:Section({ Title = "服务器" })
 	uiToggles.Hunt_AutoHop = Tab:Toggle({ Title = "自动跳服务器", Value = _G.Hunt_AutoHop, Callback = function(v) _G.Hunt_AutoHop = v end })
 	Tab:Slider({ Title = "跳服间隔 (秒)", Value = { Min = 60, Max = 1200, Default = _G.Hunt_HopInterval }, Callback = function(v) _G.Hunt_HopInterval = v end })
@@ -473,6 +935,8 @@ if WindUI then
 	})
 	Tab:Button({ Title = "立即切换阵营", Callback = function() applyTeam(true) end })
 
+	-- ===== Tab: 猎赏（手动指定目标） =====
+	Tab = TabMain
 	Tab:Section({ Title = "手动指定目标" })
 	local function buildPlayerList()
 		local list = {}
@@ -507,6 +971,8 @@ if WindUI then
 		end
 	})
 
+	-- ===== Tab: 设置 =====
+	Tab = TabConfig
 	Tab:Section({ Title = "配置" })
 	Tab:Toggle({
 		Title = "自动保存配置",
@@ -544,6 +1010,8 @@ if WindUI then
 	if _G.AutoExecute then
 		applyAutoRun(true)
 	end
+
+	print("[猎赏] 界面已创建 (猎赏/战斗/杀戮光环/移动/环境/服务器/设置) | 按 G 开关界面")
 end
 
 -- ==================== 玩家数据 ====================
@@ -1685,5 +2153,10 @@ print("  武器轮换: " .. (_G.Hunt_RotateWeapon and "技能放完自动换下�
 print("  跳服重跑: " .. (_G.Hunt_ReExec and "开 (换服后自动重跑并自动执行)" or "关"))
 print("  空服跳服: " .. (_G.Hunt_HopIfEmpty and ("连续 " .. _G.Hunt_EmptyWait .. " 秒无可猎目标就跳") or "关"))
 print("  阵营: " .. _G.Hunt_Team .. (TEAM_MAP[_G.Hunt_Team] and " (换服后自动选)" or ""))
+print("  环境: " .. ((_G.G_RemoveLava or _G.G_WalkOnWater)
+	and ((_G.G_RemoveLava and "移除岩浆 " or "") .. (_G.G_WalkOnWater and "水上行走" or "")) or "关"))
+print("  杀戮光环: " .. (_G.G_FastAttack and ("开 " .. _G.G_FastAttackMode) or "关")
+	.. " | 怪物: " .. (_G.G_AttackMobs and "打" or "不打") .. " | 玩家: " .. (_G.G_AttackPlayers and "打" or "不打")
+	.. " | 减画质: " .. (_G.G_LowGraphics and "开" or "关"))
 print("  低血逃生: " .. (_G.Hunt_AutoFlee and ("血量<" .. _G.Hunt_FleeHP .. "% 上飞 " .. _G.Hunt_FleeHeight .. " 米，恢复到 " .. _G.Hunt_FleeRecover .. "% 继续猎赏") or "关"))
 
