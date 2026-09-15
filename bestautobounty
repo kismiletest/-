@@ -18,7 +18,7 @@ local CONFIG_KEYS = {
 	"Hunt_FlySpeed", "Hunt_StopDist",
 	"Hunt_AutoSoru", "Hunt_SoruInterval",
 	"Hunt_AutoSkill", "Hunt_SkillInterval",
-	"Hunt_AutoHop", "Hunt_HopInterval", "Hunt_ReExec",
+	"Hunt_AutoHop", "Hunt_HopInterval",
 	"Hunt_HopIfEmpty", "Hunt_EmptyWait", "Hunt_Team", "Hunt_HopWaitCombat",
 	"G_ServerRegion", "G_HopPlayerRange", "G_HopBountyRange",
 	"Hunt_AutoAttack", "Hunt_AutoEquip", "Hunt_Weapons",
@@ -137,7 +137,6 @@ _G.Hunt_TypeSkills = {
 }
 _G.Hunt_AutoHop = true
 _G.Hunt_HopInterval = 300
-_G.Hunt_ReExec = true      -- 跳服后自动重跑脚本（配合自动执行 = 换服后自动开始）
 _G.Hunt_HopIfEmpty = true  -- 服务器里没有开战斗模式的人就跳服
 _G.Hunt_EmptyWait = 15     -- 上述情况要持续多少秒才真的跳
 _G.Hunt_HopWaitCombat = true -- 自动跳服前先等这场战斗打完（关掉=到点就跳）
@@ -149,14 +148,19 @@ _G.Hunt_Weapons = { ["果实"] = true, ["拳法"] = true, ["剑"] = true, ["枪"
 _G.Hunt_SkillAim = true    -- 技能自瞄
 _G.Hunt_SoruAim = true     -- 瞬步自瞄
 _G.Hunt_RotateWeapon = true -- 技能放完自动换下一把武器
-_G.Hunt_RotateIndex = 1    -- 运行时：轮换到第几把
 -- 低血逃生
 _G.Hunt_AutoFlee = true    -- 血量过低自动往天上飞
 _G.Hunt_FleeHP = 30        -- 触发血量 (%)
 _G.Hunt_FleeHeight = 3500  -- 逃生上升高度 (米)
 _G.Hunt_FleeRecover = 100  -- 恢复到该血量 (%) 才结束逃生并继续猎赏
 _G.Hunt_FleeMaxTime = 30   -- 逃生最多持续多少秒（到时间且血量高于触发线就强制恢复猎赏，防止一直挂在天上）
-_G.Hunt_Fleeing = false    -- 运行时状态：是否正在逃生
+-- ===== 运行时状态复位：每次加载（包括执行器自动执行重跑）都清一遍 =====
+-- 不清的话会继承上一份脚本残留的状态，典型症状就是「换服后一直放不出技能」（Hunt_Fleeing 卡在 true）
+_G.Hunt_Fleeing = false          -- 逃生中
+_G.Hunt_ForceHop = false         -- 「立即跳服务器」请求
+_G.Hunt_HopTimer = nil           -- 跳服计时
+_G.Hunt_RotateIndex = 1          -- 武器轮换进度
+pcall(function() getgenv().IsServerHopping = false end) -- 跳服进行中标记
 -- 以下三个「全程开启」：每次加载强制打开，且不写入存档，不受任何开关联动
 _G.Hunt_AutoHaki = true   -- 自动武装色 (Buso)
 _G.Hunt_AutoV3 = true     -- 自动种族 V3
@@ -886,7 +890,6 @@ if WindUI then
 	})
 	Tab:Button({ Title = "立即跳服务器", Callback = function() _G.Hunt_ForceHop = true end })
 	Tab:Button({ Title = "重进服务器", Callback = function() rejoinServer() end })
-	Tab:Toggle({ Title = "跳服后自动重跑脚本", Value = _G.Hunt_ReExec, Callback = function(v) _G.Hunt_ReExec = v end })
 	Tab:Toggle({ Title = "等战斗结束再跳服", Value = _G.Hunt_HopWaitCombat, Callback = function(v) _G.Hunt_HopWaitCombat = v end })
 	Tab:Toggle({ Title = "没人开战斗模式就跳服", Value = _G.Hunt_HopIfEmpty, Callback = function(v) _G.Hunt_HopIfEmpty = v end })
 	Tab:Slider({ Title = "空服判定时长 (秒)", Value = { Min = 5, Max = 120, Default = _G.Hunt_EmptyWait }, Callback = function(v) _G.Hunt_EmptyWait = v end })
@@ -1935,61 +1938,6 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
--- ==================== 跳服后自动重跑脚本 ====================
--- 找到本脚本文件 -> 用 queue_on_teleport 排一个极短 loader，
--- 换服后执行器会自动重新跑脚本；再配合存档里的「自动执行」= 换服后自动开始
-local function findSelfFile()
-	local ok, info = pcall(debug.getinfo, 1, "s")
-	if ok and info and type(info.source) == "string" and info.source:sub(1, 1) == "@" then
-		local p = info.source:sub(2)
-		local ok2, exists = pcall(function() return isfile(p) end)
-		if ok2 and exists then return p end
-	end
-	-- 兜底：试几个常见路径
-	for _, p in ipairs({ "BF_AutoBounty.lua", "scripts/BF_AutoBounty.lua", "Scripts/BF_AutoBounty.lua" }) do
-		local ok2, exists = pcall(function() return isfile(p) end)
-		if ok2 and exists then return p end
-	end
-	return nil
-end
-
-local function queueSelf()
-	if not _G.Hunt_ReExec then return end
-	if not hasFileAPI then
-		print("[猎赏] 跳服后自动重跑: 执行器不支持文件读写，无法定位脚本")
-		return
-	end
-
-	local path = findSelfFile()
-	if not path then
-		print("[猎赏] 跳服后自动重跑: 找不到脚本文件。把脚本放进执行器的 autoexec 文件夹，或从文件执行本脚本")
-		return
-	end
-
-	-- 换服后执行的 loader：直接把脚本重跑一遍
-	local ScriptLoadstring = ([[loadstring(readfile("%s"))()]]):format(path)
-
-	-- 先编译一次：语法有问题当场报出来，别等换完服才发现
-	local success, err = loadstring(ScriptLoadstring)
-	if not success then
-		warn("[猎赏] 跳服 loader 语法错误: " .. tostring(err))
-		return
-	end
-
-	local queue_on_teleport = queue_on_teleport or (syn and syn.queue_on_teleport)
-	if not queue_on_teleport then
-		print("[猎赏] 执行器不支持 queue_on_teleport，跳服后请手动重新执行")
-		return
-	end
-
-	local ok = pcall(function() queue_on_teleport(ScriptLoadstring) end)
-	if ok then
-		print("[猎赏] 已设置跳服后自动重跑: " .. path)
-	else
-		print("[猎赏] queue_on_teleport 执行失败，跳服后请手动重新执行")
-	end
-end
-
 -- ==================== 自动跳服务器 (1:1 移植自 WindUI 的服务器浏览器扫描) ====================
 -- 真正的扫描逻辑：任何一步报错都由外层 serverHop 兜住，不会把 IsServerHopping 卡死
 local function doServerHop()
@@ -2090,10 +2038,8 @@ local function doServerHop()
 	return false
 end
 
--- 外层包装：先排好「换服后重跑」，再用 pcall 包住扫描，异常也不会把跳服功能卡死
+-- 外层包装：用 pcall 包住扫描，异常也不会把跳服功能卡死（换服后由执行器的自动执行重跑脚本）
 local function serverHop()
-	queueSelf()
-
 	local ok, result = pcall(doServerHop)
 	getgenv().IsServerHopping = false -- 无论成功还是报错都清掉，否则以后都跳不了服
 	if not ok then
@@ -2219,7 +2165,6 @@ print("  自动装备: " .. (_G.Hunt_AutoEquip and "开" or "关") .. " | 武器
 print("  霸气/种族: " .. (_G.Hunt_AutoHaki and "武装色 " or "") .. (_G.Hunt_AutoV3 and "V3 " or "") .. (_G.Hunt_AutoV4 and "V4" or "") .. " (全程开启)")
 print("  自瞄: " .. (_G.Hunt_SkillAim and "技能 " or "") .. (_G.Hunt_SoruAim and "瞬步" or "") .. " -> 只瞄锁定目标")
 print("  武器轮换: " .. (_G.Hunt_RotateWeapon and "技能放完自动换下一把" or "关"))
-print("  跳服重跑: " .. (_G.Hunt_ReExec and "开 (换服后自动重跑并自动执行)" or "关"))
 print("  空服跳服: " .. (_G.Hunt_HopIfEmpty and ("连续 " .. _G.Hunt_EmptyWait .. " 秒无可猎目标就跳") or "关"))
 print("  阵营: " .. _G.Hunt_Team .. (TEAM_MAP[_G.Hunt_Team] and " (换服后自动选)" or ""))
 print("  环境: " .. ((_G.G_RemoveLava or _G.G_WalkOnWater)
