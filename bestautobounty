@@ -24,7 +24,7 @@ local CONFIG_KEYS = {
 	"Hunt_AutoAttack", "Hunt_AutoEquip", "Hunt_Weapons",
 	"Hunt_SkillAim", "Hunt_SoruAim", "Hunt_RotateWeapon",
 	"Hunt_AutoFlee", "Hunt_FleeHP", "Hunt_FleeHeight", "Hunt_FleeRecover", "Hunt_AutoStand",
-	"Hunt_HopSkyUp", "Hunt_HopSkyHeight",
+	"Hunt_HopSkyUp", "Hunt_HopSkyHeight", "Hunt_KillHop", "Hunt_KillHopCount", "Hunt_NoKilledEnough",
 	"G_FastAttack", "G_FastAttackMode", "G_AttackMobs", "G_AttackPlayers",
 	"Hunt_AutoSave",
 }
@@ -161,6 +161,9 @@ _G.Hunt_FleeMaxTime = 30   -- 逃生最多持续多少秒（到时间且血量�
 _G.Hunt_AutoStand = true   -- 坐在椅子/座位上时自动站起来（站起来会顺带跳一下）
 _G.Hunt_HopSkyUp = true         -- 准备跳服时先飞到天上等（躲开战斗，等这场架打完再跳）
 _G.Hunt_HopSkyHeight = 3500     -- 上述跳服前上升的高度 (米)
+_G.Hunt_KillHop = true          -- 同一个玩家打死 N 次就自动换服
+_G.Hunt_KillHopCount = 3        -- 上述次数 N
+_G.Hunt_NoKilledEnough = true   -- 过滤掉本服务器里已经被我们打死 N 次的人
 -- ===== 运行时状态复位：每次加载（包括执行器自动执行重跑）都清一遍 =====
 -- 不清的话会继承上一份脚本残留的状态，典型症状就是「换服后一直放不出技能」（Hunt_Fleeing 卡在 true）
 _G.Hunt_Fleeing = false          -- 逃生中
@@ -946,6 +949,11 @@ if WindUI then
 	Tab:Toggle({ Title = "跳服前先飞到天上等", Value = _G.Hunt_HopSkyUp, Callback = function(v) _G.Hunt_HopSkyUp = v end })
 	Tab:Slider({ Title = "跳服前飞天高度 (米)", Value = { Min = 200, Max = 10000, Default = _G.Hunt_HopSkyHeight }, Callback = function(v) _G.Hunt_HopSkyHeight = v end })
 
+	Tab:Section({ Title = "击杀换服" })
+	Tab:Toggle({ Title = "同一个玩家打死 N 次就跳服", Value = _G.Hunt_KillHop, Callback = function(v) _G.Hunt_KillHop = v end })
+	Tab:Slider({ Title = "击杀次数 N", Value = { Min = 1, Max = 10, Default = _G.Hunt_KillHopCount }, Callback = function(v) _G.Hunt_KillHopCount = v end })
+	Tab:Toggle({ Title = "过滤已打死 N 次的玩家", Value = _G.Hunt_NoKilledEnough, Callback = function(v) _G.Hunt_NoKilledEnough = v end })
+
 	Tab:Section({ Title = "阵营 (换服后自动选)" })
 	Tab:Dropdown({
 		Title = "阵营",
@@ -1071,6 +1079,11 @@ local currentTargetName = nil
 -- 对手跑进安全区 / 被临时过滤掉时，不至于被当成「没目标」而提前跳服丢掉赏金
 local recentFoes = {}
 local RECENT_FOE_TIME = 30
+
+-- 本服务器内打死同一个人的次数（供「打死 N 次就换服」和「过滤已打死 N 次的玩家」使用）
+-- 只存局部变量、不写 _G：换服重跑后自动归零
+local killAlive = {}  -- 名字 -> 上次看到时是否活着（用来识别「活着 -> 死了」这个瞬间）
+local killCounts = {} -- 名字 -> 已打死次数
 
 -- ==================== 安全区检测 ====================
 -- 优先读游戏属性；属性读不到时，靠「攻击目标被提示无法在安全区攻击」来临时拉黑
@@ -1236,7 +1249,13 @@ local function passFilter(plr)
 	-- 3. 排除在竞技场(Colosseum)里的人
 	if _G.Hunt_NoArena and isArenaBlocked(plr) then return false end
 
-	-- 4. 排除海军盟友（自己是海军时，不打其他海军）
+	-- 4. 排除本服务器里已经被我们打死 N 次的人（再打收益很低）
+	if _G.Hunt_NoKilledEnough then
+		local c = killCounts[plr.Name]
+		if c and c >= (_G.Hunt_KillHopCount or 3) then return false end
+	end
+
+	-- 5. 排除海军盟友（自己是海军时，不打其他海军）
 	if _G.Hunt_NoMarineAlly then
 		local myTeam = LocalPlayer.Team
 		local tTeam = plr.Team
@@ -1245,7 +1264,7 @@ local function passFilter(plr)
 		end
 	end
 
-	-- 5. 等级过滤
+	-- 6. 等级过滤
 	if not _G.Hunt_UseLevel then return true end
 	local lv = getLevel(plr)
 	if not lv then return _G.Hunt_AllowUnknown end
@@ -1274,14 +1293,61 @@ local function tooFar(plr)
 end
 
 -- ==================== 目标选择 ====================
+-- 锁定的目标只要还活着、没超距就继续锁着，不因为「别人更近」或「过滤抖了一下」中途换人。
+-- 只有临时性原因（超距 / 过滤被挡）才给 LOCK_GRACE 秒缓冲，避免把锁定断掉。
+local LOCK_GRACE = 3
+local lockGraceSince = nil
+
+-- 目标还能不能继续打：返回 (是否可用, 原因)
+-- 原因 gone=不在服务器 dead=死了 far=超距 filter=被过滤挡下
+local function targetUsable(plr)
+	if not plr or not plr.Parent then return false, "gone" end
+	local char = plr.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then return false, "dead" end
+	if tooFar(plr) then return false, "far" end
+	if not passFilter(plr) then return false, "filter" end
+	return true
+end
+
+-- 临时原因：先保持锁定缓冲一下，超过 LOCK_GRACE 秒才真的放弃
+local function keepLockGrace()
+	if not lockGraceSince then lockGraceSince = tick() end
+	return tick() - lockGraceSince < LOCK_GRACE
+end
+
 local function resolveTarget()
-	-- 1. 手动指定优先；指定的人不在/死了/超距就自动切回自动选择
+	-- 1. 手动指定的人优先；只要不是「人没了/死了」，中途被挡也先锁着
 	if _G.Hunt_Target and _G.Hunt_Target ~= "" then
 		local plr = Players:FindFirstChild(_G.Hunt_Target)
-		if plr and plr ~= LocalPlayer and isAlive(plr) and not tooFar(plr) then return plr, 1 end
+		if plr and plr ~= LocalPlayer then
+			local ok, why = targetUsable(plr)
+			if ok then
+				lockGraceSince = nil
+				return plr, 1
+			end
+			if why ~= "gone" and why ~= "dead" and keepLockGrace() then return plr, 1 end
+			lockGraceSince = nil
+		end
 	end
 
-	-- 2. 自动选择：过滤后最近的玩家（超过换人距离的直接跳过）
+	-- 2. 已经锁定的目标：还有效就继续锁着，不因为别人更近就中途换人
+	--（关掉「自动选择玩家」时不再续锁，行为和以前一样立刻放开）
+	if _G.Hunt_AutoSelect and currentTarget and currentTarget ~= LocalPlayer then
+		local ok, why = targetUsable(currentTarget)
+		if ok then
+			lockGraceSince = nil
+			return currentTarget, 1
+		end
+		if why ~= "gone" and why ~= "dead" and keepLockGrace() then return currentTarget, 1 end
+		lockGraceSince = nil
+		if why == "dead" or why == "gone" then
+			print("[猎赏] 目标 " .. currentTarget.Name .. (why == "dead" and " 已死亡" or " 已离开")
+				.. " -> 解除锁定，换下一个")
+		end
+	end
+
+	-- 3. 自动选择：过滤后最近的玩家（超过换人距离的直接跳过）
 	if not _G.Hunt_AutoSelect then return nil, 0 end
 	local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 	if not myRoot then return nil, 0 end
@@ -1310,7 +1376,7 @@ local function diagnose()
 	if tick() - lastDiag < 10 then return end
 	lastDiag = tick()
 
-	local total, alive, noRoot, pvpBlocked, safeBlocked, arenaBlocked, marineBlocked, levelBlocked, farBlocked = 0, 0, 0, 0, 0, 0, 0, 0, 0
+	local total, alive, noRoot, pvpBlocked, safeBlocked, arenaBlocked, killedBlocked, marineBlocked, levelBlocked, farBlocked = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer then
 			total = total + 1
@@ -1324,6 +1390,8 @@ local function diagnose()
 					safeBlocked = safeBlocked + 1
 				elseif _G.Hunt_NoArena and isArenaBlocked(plr) then
 					arenaBlocked = arenaBlocked + 1
+				elseif _G.Hunt_NoKilledEnough and (killCounts[plr.Name] or 0) >= (_G.Hunt_KillHopCount or 3) then
+					killedBlocked = killedBlocked + 1
 				elseif _G.Hunt_NoMarineAlly and LocalPlayer.Team and plr.Team
 					and LocalPlayer.Team.Name == "Marines" and plr.Team.Name == "Marines" then
 					marineBlocked = marineBlocked + 1
@@ -1342,8 +1410,8 @@ local function diagnose()
 			end
 		end
 	end
-	print(string.format("[猎赏] 排查 -> 其他玩家:%d 存活:%d | 无角色:%d PvP挡:%d 安全区挡:%d 竞技场挡:%d 海军挡:%d 等级挡:%d 超距挡:%d",
-		total, alive, noRoot, pvpBlocked, safeBlocked, arenaBlocked, marineBlocked, levelBlocked, farBlocked))
+	print(string.format("[猎赏] 排查 -> 其他玩家:%d 存活:%d | 无角色:%d PvP挡:%d 安全区挡:%d 竞技场挡:%d 打死过挡:%d 海军挡:%d 等级挡:%d 超距挡:%d",
+		total, alive, noRoot, pvpBlocked, safeBlocked, arenaBlocked, killedBlocked, marineBlocked, levelBlocked, farBlocked))
 end
 
 local lastTargetName = nil
@@ -2114,6 +2182,38 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
+-- ==================== 同一个玩家打死 N 次 -> 自动换服 / 过滤 ====================
+-- 反复打同一个人收益会越来越低（他身上的赏金已经掉光了），所以打死 N 次就换服找新目标；
+-- 同时这种人也会被目标过滤跳过（见 passFilter）。
+task.spawn(function()
+	while task.wait(0.5) do
+		local now = tick()
+		for name, t in pairs(recentFoes) do
+			if now - t <= 10 then -- 10 秒内交过手，他死了就算我们打死的
+				local plr = Players:FindFirstChild(name)
+				local char = plr and plr.Character
+				local hum = char and char:FindFirstChildOfClass("Humanoid")
+				local alive = hum ~= nil and hum.Health > 0
+
+				if killAlive[name] == true and not alive then
+					killAlive[name] = false
+					killCounts[name] = (killCounts[name] or 0) + 1
+					print("[猎赏] 已打死 " .. name .. " " .. killCounts[name] .. " 次")
+
+					if _G.Hunt_KillHop and killCounts[name] >= _G.Hunt_KillHopCount then
+						killCounts[name] = 0 -- 归零，避免重复触发
+						print("[猎赏] " .. name .. " 已打死 " .. _G.Hunt_KillHopCount
+							.. " 次（赏金收益变低）-> 自动换服务器")
+						_G.Hunt_ForceHop = true
+					end
+				else
+					killAlive[name] = alive
+				end
+			end
+		end
+	end
+end)
+
 -- ==================== 自动跳服务器 (1:1 移植自 WindUI 的服务器浏览器扫描) ====================
 -- 真正的扫描逻辑：任何一步报错都由外层 serverHop 兜住，不会把 IsServerHopping 卡死
 local function doServerHop()
@@ -2399,7 +2499,7 @@ print("  配置: " .. (not hasFileAPI and "执行器不支持文件读写(无法
 	.. (_G.Hunt_AutoSave and " | 自动保存: 开" or " | 自动保存: 关"))
 print("  自动执行(一键全开): " .. (_G.Hunt_AutoRun and "开" or "关"))
 print("  等级过滤: " .. (_G.Hunt_UseLevel and (">= " .. _G.Hunt_MinLevel) or "关闭"))
-print("  过滤: " .. (_G.Hunt_NoSafe and "排除安全区 " or "") .. (_G.Hunt_NoArena and "排除竞技场 " or "") .. "只猎开战斗模式(强制) " .. (_G.Hunt_NoMarineAlly and "排除海军盟友 " or "") .. "| 换人距离: " .. _G.Hunt_MaxDist .. " 米")
+print("  过滤: " .. (_G.Hunt_NoSafe and "排除安全区 " or "") .. (_G.Hunt_NoArena and "排除竞技场 " or "") .. (_G.Hunt_NoKilledEnough and ("排除已打死 " .. _G.Hunt_KillHopCount .. " 次的 " ) or "") .. "只猎开战斗模式(强制) " .. (_G.Hunt_NoMarineAlly and "排除海军盟友 " or "") .. "| 换人距离: " .. _G.Hunt_MaxDist .. " 米")
 print("  瞬步: CommE 发包(冲向锁定目标) 每 " .. _G.Hunt_SoruInterval .. " 秒")
 print("  技能: " .. enabledSkillText() .. " | 间隔 " .. _G.Hunt_SkillInterval .. " 秒")
 print("  飞行: " .. _G.Hunt_FlySpeed .. " | 跳服: 每 " .. _G.Hunt_HopInterval .. " 秒 (ServerBrowser 扫描)"
