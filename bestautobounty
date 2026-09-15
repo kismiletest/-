@@ -11,16 +11,15 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- ==================== 配置 (自动保存/读取) ====================
 local CONFIG_FILE = "BF_AutoBounty_Config.json"
-local AUTO_EXEC_FILE = "AutoBounty.file" -- 自动执行开关单独存这个文件，内容 "true" / "false"
 local CONFIG_KEYS = {
-	"Hunt_Auto", "Hunt_AutoSelect",
+	"Hunt_Auto", "Hunt_AutoRun", "Hunt_AutoSelect",
 	"Hunt_UseLevel", "Hunt_MinLevel", "Hunt_AllowUnknown",
-	"Hunt_NoSafe", "Hunt_NoPvp", "Hunt_NoMarineAlly", "Hunt_MaxDist",
+	"Hunt_NoSafe", "Hunt_NoMarineAlly", "Hunt_MaxDist",
 	"Hunt_FlySpeed", "Hunt_StopDist",
 	"Hunt_AutoSoru", "Hunt_SoruInterval",
 	"Hunt_AutoSkill", "Hunt_SkillInterval",
 	"Hunt_AutoHop", "Hunt_HopInterval", "Hunt_ReExec",
-	"Hunt_HopIfEmpty", "Hunt_EmptyWait", "Hunt_Team",
+	"Hunt_HopIfEmpty", "Hunt_EmptyWait", "Hunt_Team", "Hunt_HopWaitCombat",
 	"G_ServerRegion", "G_HopPlayerRange", "G_HopBountyRange",
 	"Hunt_AutoAttack", "Hunt_AutoEquip", "Hunt_Weapons",
 	"Hunt_SkillAim", "Hunt_SoruAim", "Hunt_RotateWeapon",
@@ -36,12 +35,6 @@ local TYPE_SKILL_KEYS = {
 	["果实"] = { "Z", "X", "C", "V", "F" },
 }
 local hasFileAPI = (writefile ~= nil and readfile ~= nil and isfile ~= nil)
-
--- ==================== 自动执行开关 (AutoBounty.file) ====================
-local function writeAutoExecute(v)
-	if not hasFileAPI then return false end
-	return (pcall(function() writefile(AUTO_EXEC_FILE, v and "true" or "false") end))
-end
 
 local function configToTable()
 	local t = {}
@@ -126,7 +119,7 @@ _G.Hunt_UseLevel = true
 _G.Hunt_MinLevel = 2100
 _G.Hunt_AllowUnknown = true
 _G.Hunt_NoSafe = true
-_G.Hunt_NoPvp = true
+_G.Hunt_NoPvp = true -- 强制只猎开了战斗模式(PvP)的玩家，不写入存档
 _G.Hunt_NoMarineAlly = true -- 排除海军盟友（自己是海军时，不打其他海军）
 _G.Hunt_MaxDist = 10000    -- 目标距离超过这个值就自动换下一个玩家
 _G.Hunt_FlySpeed = 160
@@ -147,6 +140,7 @@ _G.Hunt_HopInterval = 300
 _G.Hunt_ReExec = true      -- 跳服后自动重跑脚本（配合自动执行 = 换服后自动开始）
 _G.Hunt_HopIfEmpty = true  -- 服务器里没有开战斗模式的人就跳服
 _G.Hunt_EmptyWait = 15     -- 上述情况要持续多少秒才真的跳
+_G.Hunt_HopWaitCombat = true -- 自动跳服前先等这场战斗打完（关掉=到点就跳）
 _G.Hunt_Team = "不切换"     -- 阵营：不切换 / 海盗 / 海军（换服后自动选）
 _G.Hunt_AutoAttack = true
 _G.Hunt_AutoEquip = true  -- 自动装备（手上没东西时自动装一个，保证能放技能）
@@ -159,21 +153,15 @@ _G.Hunt_RotateIndex = 1    -- 运行时：轮换到第几把
 -- 低血逃生
 _G.Hunt_AutoFlee = true    -- 血量过低自动往天上飞
 _G.Hunt_FleeHP = 30        -- 触发血量 (%)
-_G.Hunt_FleeHeight = 300   -- 逃生上升高度 (studs)
+_G.Hunt_FleeHeight = 3500  -- 逃生上升高度 (米)
 _G.Hunt_FleeRecover = 100  -- 恢复到该血量 (%) 才结束逃生并继续猎赏
+_G.Hunt_FleeMaxTime = 30   -- 逃生最多持续多少秒（到时间且血量高于触发线就强制恢复猎赏，防止一直挂在天上）
 _G.Hunt_Fleeing = false    -- 运行时状态：是否正在逃生
 -- 以下三个「全程开启」：每次加载强制打开，且不写入存档，不受任何开关联动
 _G.Hunt_AutoHaki = true   -- 自动武装色 (Buso)
 _G.Hunt_AutoV3 = true     -- 自动种族 V3
 _G.Hunt_AutoV4 = true     -- 自动种族 V4
--- 自动执行脚本（一键全开）：状态存在 AutoBounty.file，文件不存在时默认开
-if isfile and isfile(AUTO_EXEC_FILE) then
-	local success, content = pcall(function() return readfile(AUTO_EXEC_FILE) end)
-	_G.AutoExecute = (success and content == "true")
-else
-	_G.AutoExecute = true
-end
-_G.Hunt_AutoRun = _G.AutoExecute
+_G.Hunt_AutoRun = true    -- 自动执行脚本（一键全开）：默认开，换服重跑后自动继续猎赏
 _G.Hunt_AutoSave = true   -- 自动保存配置
 
 -- 读取上次保存的配置（覆盖默认值）
@@ -660,6 +648,34 @@ local ensureEquipped
 local getBackpackTools
 local applyTeam
 
+-- 统一管理开关，方便「一键全开」同步 UI 状态（界面没加载出来也能用，只是没有 UI 对象可同步）
+local uiToggles = {}
+local function setUI(flag, v)
+	local obj = uiToggles[flag]
+	if obj then pcall(function() obj:Set(v) end) end
+end
+
+-- 自动执行：一键把主要功能全部打开/关闭
+local function applyAutoRun(on)
+	_G.Hunt_Auto = on
+	_G.Hunt_AutoSoru = on
+	_G.Hunt_AutoSkill = on
+	_G.Hunt_AutoAttack = on
+	_G.Hunt_AutoEquip = on
+	_G.Hunt_SkillAim = on
+	_G.Hunt_SoruAim = on
+	_G.Hunt_AutoHop = on
+	setUI("Hunt_Auto", on)
+	setUI("Hunt_AutoSoru", on)
+	setUI("Hunt_AutoSkill", on)
+	setUI("Hunt_AutoAttack", on)
+	setUI("Hunt_AutoEquip", on)
+	setUI("Hunt_SkillAim", on)
+	setUI("Hunt_SoruAim", on)
+	setUI("Hunt_AutoHop", on)
+	print("[猎赏] 自动执行: " .. (on and "已开启，全部功能已打开" or "已关闭"))
+end
+
 -- ==================== WindUI ====================
 -- 库有 1.3MB 左右，手机执行器拉取+编译要几秒，所以打进度；并且多源兜底
 local WINDUI_URLS = {
@@ -703,62 +719,13 @@ if WindUI then
 	local TabConfig = Window:Tab({ Title = "设置", Icon = "settings" })
 	local Tab = TabMain
 
-	-- 统一管理开关，方便「自动执行」同步 UI 状态
-	local uiToggles = {}
-	local function setUI(flag, v)
-		local obj = uiToggles[flag]
-		if obj then pcall(function() obj:Set(v) end) end
-	end
-
-	-- 自动执行：一键把主要功能全部打开/关闭
-	local function applyAutoRun(on)
-		_G.Hunt_Auto = on
-		_G.Hunt_AutoSoru = on
-		_G.Hunt_AutoSkill = on
-		_G.Hunt_AutoAttack = on
-		_G.Hunt_AutoEquip = on
-		_G.Hunt_SkillAim = on
-		_G.Hunt_SoruAim = on
-		_G.Hunt_AutoHop = on
-		setUI("Hunt_Auto", on)
-		setUI("Hunt_AutoSoru", on)
-		setUI("Hunt_AutoSkill", on)
-		setUI("Hunt_AutoAttack", on)
-		setUI("Hunt_AutoEquip", on)
-		setUI("Hunt_SkillAim", on)
-		setUI("Hunt_SoruAim", on)
-		setUI("Hunt_AutoHop", on)
-		print("[猎赏] 自动执行: " .. (on and "已开启，全部功能已打开" or "已关闭"))
-	end
-
 	Tab:Section({ Title = "总控" })
 	Tab:Toggle({
 		Title = "自动执行脚本 (一键全开)",
 		Value = _G.Hunt_AutoRun,
 		Callback = function(v)
 			_G.Hunt_AutoRun = v
-			_G.AutoExecute = v
-			local ok = writeAutoExecute(v)
-			if ok then
-				print("[猎赏] 自动执行 -> " .. AUTO_EXEC_FILE .. " = " .. (v and "true" or "false"))
-			else
-				warn("[猎赏] 写 " .. AUTO_EXEC_FILE .. " 失败（执行器不支持文件读写），跳服后不会自动执行")
-			end
 			applyAutoRun(v)
-		end
-	})
-	-- 只控制 AutoBounty.file：下次加载 / 换服后是否自动重跑并自动开始，不联动其它功能
-	Tab:Toggle({
-		Title = "自动执行脚本 (换服/重载后自动开始)",
-		Value = _G.AutoExecute,
-		Callback = function(v)
-			_G.AutoExecute = v
-			local ok = writeAutoExecute(v)
-			if ok then
-				print("[猎赏] 自动执行 -> " .. AUTO_EXEC_FILE .. " = " .. (v and "true" or "false"))
-			else
-				warn("[猎赏] 写 " .. AUTO_EXEC_FILE .. " 失败（执行器不支持文件读写），跳服后不会自动执行")
-			end
 		end
 	})
 
@@ -781,7 +748,7 @@ if WindUI then
 
 	Tab:Section({ Title = "目标过滤" })
 	Tab:Toggle({ Title = "排除安全区的人", Value = _G.Hunt_NoSafe, Callback = function(v) _G.Hunt_NoSafe = v end })
-	Tab:Toggle({ Title = "排除没开PvP的人", Value = _G.Hunt_NoPvp, Callback = function(v) _G.Hunt_NoPvp = v end })
+	Tab:Paragraph({ Title = "只猎开战斗模式(PvP)的玩家", Desc = "强制开启，不受开关和存档影响" })
 	Tab:Toggle({ Title = "排除海军盟友", Value = _G.Hunt_NoMarineAlly, Callback = function(v) _G.Hunt_NoMarineAlly = v end })
 	Tab:Slider({ Title = "换人距离 (米)", Value = { Min = 500, Max = 50000, Default = _G.Hunt_MaxDist }, Callback = function(v) _G.Hunt_MaxDist = v end })
 
@@ -808,7 +775,7 @@ if WindUI then
 	Tab:Section({ Title = "低血逃生" })
 	uiToggles.Hunt_AutoFlee = Tab:Toggle({ Title = "低血自动往天上飞", Value = _G.Hunt_AutoFlee, Callback = function(v) _G.Hunt_AutoFlee = v end })
 	Tab:Slider({ Title = "触发血量 (%)", Value = { Min = 5, Max = 90, Default = _G.Hunt_FleeHP }, Callback = function(v) _G.Hunt_FleeHP = v end })
-	Tab:Slider({ Title = "上升高度 (米)", Value = { Min = 50, Max = 1500, Default = _G.Hunt_FleeHeight }, Callback = function(v) _G.Hunt_FleeHeight = v end })
+	Tab:Slider({ Title = "上升高度 (米)", Value = { Min = 200, Max = 10000, Default = _G.Hunt_FleeHeight }, Callback = function(v) _G.Hunt_FleeHeight = v end })
 	Tab:Slider({ Title = "恢复猎赏血量 (%)", Value = { Min = 30, Max = 100, Default = _G.Hunt_FleeRecover }, Callback = function(v) _G.Hunt_FleeRecover = v end })
 
 	Tab:Section({ Title = "技能释放 (可多选)" })
@@ -920,6 +887,7 @@ if WindUI then
 	Tab:Button({ Title = "立即跳服务器", Callback = function() _G.Hunt_ForceHop = true end })
 	Tab:Button({ Title = "重进服务器", Callback = function() rejoinServer() end })
 	Tab:Toggle({ Title = "跳服后自动重跑脚本", Value = _G.Hunt_ReExec, Callback = function(v) _G.Hunt_ReExec = v end })
+	Tab:Toggle({ Title = "等战斗结束再跳服", Value = _G.Hunt_HopWaitCombat, Callback = function(v) _G.Hunt_HopWaitCombat = v end })
 	Tab:Toggle({ Title = "没人开战斗模式就跳服", Value = _G.Hunt_HopIfEmpty, Callback = function(v) _G.Hunt_HopIfEmpty = v end })
 	Tab:Slider({ Title = "空服判定时长 (秒)", Value = { Min = 5, Max = 120, Default = _G.Hunt_EmptyWait }, Callback = function(v) _G.Hunt_EmptyWait = v end })
 
@@ -1006,12 +974,12 @@ if WindUI then
 		end
 	})
 
-	-- AutoBounty.file 里记着「自动执行」开着（或文件不存在时的默认值），加载后直接跑起来
-	if _G.AutoExecute then
-		applyAutoRun(true)
-	end
-
 	print("[猎赏] 界面已创建 (猎赏/战斗/杀戮光环/移动/环境/服务器/设置) | 按 G 开关界面")
+end
+
+-- 「一键全开」开着的话，加载/换服重跑后直接继续猎赏（不依赖界面是否加载成功）
+if _G.Hunt_AutoRun then
+	applyAutoRun(true)
 end
 
 -- ==================== 玩家数据 ====================
@@ -1095,12 +1063,28 @@ task.spawn(function()
 	end
 end)
 
-local function passFilter(plr)
-	-- 1. 排除没开 PvP 的人
-	if _G.Hunt_NoPvp then
-		local ok, disabled = pcall(function() return plr:GetAttribute("PvpDisabled") end)
-		if ok and disabled == true then return false end
+-- 战斗模式(PvP)状态：玩家本身和角色上都找一遍，读不到返回 nil
+local function pvpDisabled(plr)
+	local objs = { plr, plr.Character }
+	for _, obj in ipairs(objs) do
+		if obj then
+			local ok, v = pcall(function() return obj:GetAttribute("PvpDisabled") end)
+			if ok and v ~= nil then return v end
+		end
 	end
+	return nil
+end
+
+-- 强制只猎「开了战斗模式」的玩家
+local function hasPvpOn(plr)
+	local d = pvpDisabled(plr)
+	if d == nil then return true end -- 属性读不到时放行，避免把所有人筛掉
+	return d == false               -- 明确为 false = 开了战斗模式
+end
+
+local function passFilter(plr)
+	-- 1. 强制只猎开了战斗模式(PvP)的玩家
+	if _G.Hunt_NoPvp and not hasPvpOn(plr) then return false end
 
 	-- 2. 排除安全区的人
 	if _G.Hunt_NoSafe and isSafeBlocked(plr) then return false end
@@ -1187,7 +1171,7 @@ local function diagnose()
 				alive = alive + 1
 				if not getRoot(plr) then
 					noRoot = noRoot + 1
-				elseif _G.Hunt_NoPvp and plr:GetAttribute("PvpDisabled") == true then
+				elseif _G.Hunt_NoPvp and not hasPvpOn(plr) then
 					pvpBlocked = pvpBlocked + 1
 				elseif _G.Hunt_NoSafe and isSafeBlocked(plr) then
 					safeBlocked = safeBlocked + 1
@@ -1246,6 +1230,21 @@ task.spawn(function()
 			currentTarget = nil
 			currentTargetName = nil
 			lastTargetName = nil
+		end
+	end
+end)
+
+-- ==================== 猎赏保活（一直猎，别中途停下） ====================
+-- 只要「一键全开」是开着的，就把猎赏必需项强制打开；停了会被这里拉回来
+task.spawn(function()
+	while task.wait(5) do
+		if _G.Hunt_AutoRun then
+			_G.Hunt_Auto = true
+			_G.Hunt_NoPvp = true -- 强制只猎开了战斗模式的玩家
+			-- 有手动指定目标时不动「自动选择」，其余情况强制自动选人
+			if not (_G.Hunt_Target and _G.Hunt_Target ~= "") then
+				_G.Hunt_AutoSelect = true
+			end
 		end
 	end
 end)
@@ -1835,6 +1834,7 @@ end
 -- ==================== 飞行 + 低血逃生 + 贴身瞬步 ====================
 local fleeing = false
 local fleeBaseY = 0
+local fleeStart = 0
 
 RunService.Heartbeat:Connect(function(dt)
 	local char = LocalPlayer.Character
@@ -1855,14 +1855,22 @@ RunService.Heartbeat:Connect(function(dt)
 			fleeing = true
 			_G.Hunt_Fleeing = true -- 广播给其他循环（瞬步/技能会暂停）
 			fleeBaseY = myRoot.Position.Y
-			print("[猎赏] 血量 " .. math.floor(hpPct) .. "% -> 向上逃生，暂停猎赏")
-		elseif fleeing and hpPct >= _G.Hunt_FleeRecover then
-			fleeing = false
-			_G.Hunt_Fleeing = false
-			print("[猎赏] 血量恢复到 " .. math.floor(hpPct) .. "% -> 结束逃生，自动恢复猎赏")
+			fleeStart = tick()
+			print("[猎赏] 血量 " .. math.floor(hpPct) .. "% -> 向上逃生 " .. _G.Hunt_FleeHeight .. " 米，暂停猎赏")
+		elseif fleeing then
+			local recovered = hpPct >= _G.Hunt_FleeRecover
+			-- 兜底：飞太久还没回满血，只要血量高于触发线就结束逃生，避免一直挂在天上不猎赏
+			local timeout = (tick() - fleeStart >= _G.Hunt_FleeMaxTime) and hpPct > _G.Hunt_FleeHP
+			if recovered or timeout then
+				fleeing = false
+				_G.Hunt_Fleeing = false
+				print("[猎赏] 血量 " .. math.floor(hpPct) .. "% -> "
+					.. (recovered and "已恢复，结束逃生，自动恢复猎赏" or "逃生超时，强制恢复猎赏"))
+			end
 		end
 
 		if fleeing then
+			-- 从触发点往上飞 Hunt_FleeHeight 米，到顶就悬停
 			local ceiling = fleeBaseY + _G.Hunt_FleeHeight
 			if myRoot.Position.Y < ceiling then
 				local rot = myRoot.CFrame - myRoot.Position
@@ -1937,12 +1945,8 @@ local function queueSelf()
 		return
 	end
 
-	-- 换服后执行的 loader：读 AutoBounty.file，为 "true" 才重跑脚本
-	local ScriptLoadstring = ([[if isfile("%s") then
-	if readfile("%s") == "true" then
-		loadstring(readfile("%s"))()
-	end
-end]]):format(AUTO_EXEC_FILE, AUTO_EXEC_FILE, path)
+	-- 换服后执行的 loader：直接把脚本重跑一遍
+	local ScriptLoadstring = ([[loadstring(readfile("%s"))()]]):format(path)
 
 	-- 先编译一次：语法有问题当场报出来，别等换完服才发现
 	local success, err = loadstring(ScriptLoadstring)
@@ -2067,12 +2071,25 @@ local function serverHop()
 	return false
 end
 
+-- 是否正在战斗中：正在逃生 / 锁定了够近的目标 / 5 秒内攻击过
+local function inCombat()
+	if _G.Hunt_Fleeing then return true end
+	if currentTarget and isAlive(currentTarget) then
+		local d = targetDistance(currentTarget)
+		if d and d <= (_G.Hunt_MaxDist or 10000) then return true end
+	end
+	if tick() - lastAttack < 5 then return true end
+	return false
+end
+
 task.spawn(function()
+	local waitingCombat = false
 	while task.wait(1) do
-		local hop = false
+		local hop, force = false, false
 		if _G.Hunt_ForceHop then
+			-- 手动点「立即跳服务器」不等待，直接跳
 			_G.Hunt_ForceHop = false
-			hop = true
+			hop, force = true, true
 		elseif _G.Hunt_AutoHop then
 			if not _G.Hunt_HopTimer then _G.Hunt_HopTimer = tick() end
 			if tick() - _G.Hunt_HopTimer >= _G.Hunt_HopInterval then hop = true end
@@ -2081,13 +2098,27 @@ task.spawn(function()
 		end
 
 		if hop then
-			print("[猎赏] 跳服务器中...")
-			if serverHop() then
-				_G.Hunt_HopTimer = tick()
+			if not force and _G.Hunt_HopWaitCombat and inCombat() then
+				-- 自动跳服：到点了也不跳，等这场架打完
+				if not waitingCombat then
+					waitingCombat = true
+					print("[猎赏] 跳服时间已到，但正在战斗中 -> 打完再跳")
+				end
 			else
-				-- 传送失败(含被服务器拒绝)就 20 秒后重试，不用再干等一个完整间隔
-				_G.Hunt_HopTimer = tick() - _G.Hunt_HopInterval + 20
+				if waitingCombat then
+					waitingCombat = false
+					print("[猎赏] 战斗结束 -> 开始跳服")
+				end
+				print("[猎赏] 跳服务器中...")
+				if serverHop() then
+					_G.Hunt_HopTimer = tick()
+				else
+					-- 传送失败(含被服务器拒绝)就 20 秒后重试，不用再干等一个完整间隔
+					_G.Hunt_HopTimer = tick() - _G.Hunt_HopInterval + 20
+				end
 			end
+		else
+			waitingCombat = false
 		end
 	end
 end)
@@ -2107,6 +2138,7 @@ end
 task.spawn(function()
 	task.wait(25) -- 等新服务器玩家列表加载完，别刚进来就跳走
 	local emptySince = nil
+	local emptyWaitCombat = false
 	while task.wait(2) do
 		if _G.Hunt_HopIfEmpty then
 			local n = countHuntable()
@@ -2115,19 +2147,30 @@ task.spawn(function()
 					emptySince = tick()
 					print("[猎赏] 服务器暂无开战斗模式的目标，开始计时 " .. _G.Hunt_EmptyWait .. " 秒")
 				elseif tick() - emptySince >= _G.Hunt_EmptyWait then
-					emptySince = nil
-					print("[猎赏] 持续 " .. _G.Hunt_EmptyWait .. " 秒无可猎目标 -> 切换服务器")
-					serverHop()
-					task.wait(30) -- 等传送完成，避免重复触发
+					if _G.Hunt_HopWaitCombat and inCombat() then
+						-- 判定到期但还在打，等这场架打完
+						if not emptyWaitCombat then
+							emptyWaitCombat = true
+							print("[猎赏] 空服判定到期，但正在战斗中 -> 打完再跳")
+						end
+					else
+						emptyWaitCombat = false
+						emptySince = nil
+						print("[猎赏] 持续 " .. _G.Hunt_EmptyWait .. " 秒无可猎目标 -> 切换服务器")
+						serverHop()
+						task.wait(30) -- 等传送完成，避免重复触发
+					end
 				end
 			else
 				if emptySince then
 					print("[猎赏] 发现 " .. n .. " 个可猎目标，取消跳服")
 				end
 				emptySince = nil
+				emptyWaitCombat = false
 			end
 		else
 			emptySince = nil
+			emptyWaitCombat = false
 		end
 	end
 end)
@@ -2137,13 +2180,13 @@ print("  自动猎赏 已加载")
 print("  配置: " .. (not hasFileAPI and "执行器不支持文件读写(无法保存)"
 	or (configLoaded and ("已读取 " .. CONFIG_FILE) or "无存档，使用默认值"))
 	.. (_G.Hunt_AutoSave and " | 自动保存: 开" or " | 自动保存: 关"))
-print("  自动执行: " .. (_G.AutoExecute and "开" or "关") .. " (" .. AUTO_EXEC_FILE .. ")"
-	.. (hasFileAPI and "" or " | 执行器不支持文件读写，开关无法保存"))
+print("  自动执行(一键全开): " .. (_G.Hunt_AutoRun and "开" or "关"))
 print("  等级过滤: " .. (_G.Hunt_UseLevel and (">= " .. _G.Hunt_MinLevel) or "关闭"))
-print("  过滤: " .. (_G.Hunt_NoSafe and "排除安全区 " or "") .. (_G.Hunt_NoPvp and "排除无PvP " or "") .. (_G.Hunt_NoMarineAlly and "排除海军盟友 " or "") .. "| 换人距离: " .. _G.Hunt_MaxDist .. " 米")
+print("  过滤: " .. (_G.Hunt_NoSafe and "排除安全区 " or "") .. "只猎开战斗模式(强制) " .. (_G.Hunt_NoMarineAlly and "排除海军盟友 " or "") .. "| 换人距离: " .. _G.Hunt_MaxDist .. " 米")
 print("  瞬步: CommE 发包(冲向锁定目标) 每 " .. _G.Hunt_SoruInterval .. " 秒")
 print("  技能: " .. enabledSkillText() .. " | 间隔 " .. _G.Hunt_SkillInterval .. " 秒")
-print("  飞行: " .. _G.Hunt_FlySpeed .. " | 跳服: 每 " .. _G.Hunt_HopInterval .. " 秒 (ServerBrowser 扫描)")
+print("  飞行: " .. _G.Hunt_FlySpeed .. " | 跳服: 每 " .. _G.Hunt_HopInterval .. " 秒 (ServerBrowser 扫描)"
+	.. " | " .. (_G.Hunt_HopWaitCombat and "等战斗结束才跳" or "到点就跳"))
 print("  跳服筛选: 区域 " .. _G.G_ServerRegion .. " | 人数 " .. _G.G_HopPlayerRange
 	.. " | 赏金 " .. _G.G_HopBountyRange .. " (" .. FormatNumber(_G.G_HopMinBounty) .. " - " .. FormatNumber(_G.G_HopMaxBounty) .. ")")
 print("  自动装备: " .. (_G.Hunt_AutoEquip and "开" or "关") .. " | 武器类型: " .. weaponTypeText() .. " | 背包工具数: " .. #getBackpackTools())
@@ -2158,5 +2201,5 @@ print("  环境: " .. ((_G.G_RemoveLava or _G.G_WalkOnWater)
 print("  杀戮光环: " .. (_G.G_FastAttack and ("开 " .. _G.G_FastAttackMode) or "关")
 	.. " | 怪物: " .. (_G.G_AttackMobs and "打" or "不打") .. " | 玩家: " .. (_G.G_AttackPlayers and "打" or "不打")
 	.. " | 减画质: " .. (_G.G_LowGraphics and "开" or "关"))
-print("  低血逃生: " .. (_G.Hunt_AutoFlee and ("血量<" .. _G.Hunt_FleeHP .. "% 上飞 " .. _G.Hunt_FleeHeight .. " 米，恢复到 " .. _G.Hunt_FleeRecover .. "% 继续猎赏") or "关"))
+print("  低血逃生: " .. (_G.Hunt_AutoFlee and ("血量<" .. _G.Hunt_FleeHP .. "% 上飞 " .. _G.Hunt_FleeHeight .. " 米，恢复到 " .. _G.Hunt_FleeRecover .. "% 继续猎赏（超 " .. _G.Hunt_FleeMaxTime .. " 秒强制恢复）") or "关"))
 
