@@ -1198,10 +1198,19 @@ local function diagnose()
 end
 
 local lastTargetName = nil
+local lastScanErr = 0
 task.spawn(function()
 	while task.wait(1) do
 		if _G.Hunt_Auto then
-			local t, count = resolveTarget()
+			-- 用 pcall 包住：选人时万一抛错，也不会把这个线程搞死导致以后永远不猎赏
+			local ok, t, count = pcall(resolveTarget)
+			if not ok then
+				if tick() - lastScanErr > 30 then
+					lastScanErr = tick()
+					print("[猎赏] 目标扫描异常(已自动继续): " .. tostring(t))
+				end
+				t, count = nil, 0
+			end
 
 			-- 上一个目标超距了：提示一下，本次会自动换成下一个
 			if currentTarget and currentTarget ~= t and tooFar(currentTarget) then
@@ -1224,7 +1233,7 @@ task.spawn(function()
 					lastTargetName = nil
 					print("[猎赏] 当前无可用目标 | 过滤后候选: 0")
 				end
-				diagnose()
+				pcall(diagnose)
 			end
 		else
 			currentTarget = nil
@@ -1752,12 +1761,17 @@ pressSkills = function(force)
 
 	local char = LocalPlayer.Character
 	local typeName = heldTypeName()
+	local held = char and char:FindFirstChildOfClass("Tool")
 	-- 只放「当前手里这把武器」的技能
 	local keys = keysForType(typeName)
 
+	-- 手上拿着东西但 ToolTip 没映射到（例如改版过的新武器）：退回按 Z/X，别完全不放技能
+	if #keys == 0 and typeName == nil and held then
+		keys = { "Z", "X" }
+	end
+
 	if tick() - lastSkillLog > 5 then
 		lastSkillLog = tick()
-		local held = char and char:FindFirstChildOfClass("Tool")
 		print("[猎赏] 释放技能: " .. (typeName or "未知类型") .. " -> " .. (#keys > 0 and table.concat(keys, "") or "无")
 			.. " | 手持: " .. (held and (held.Name .. " [" .. tostring(held.ToolTip) .. "]") or "空手"))
 	end
@@ -1858,14 +1872,17 @@ RunService.Heartbeat:Connect(function(dt)
 			fleeStart = tick()
 			print("[猎赏] 血量 " .. math.floor(hpPct) .. "% -> 向上逃生 " .. _G.Hunt_FleeHeight .. " 米，暂停猎赏")
 		elseif fleeing then
+			local elapsed = tick() - fleeStart
 			local recovered = hpPct >= _G.Hunt_FleeRecover
-			-- 兜底：飞太久还没回满血，只要血量高于触发线就结束逃生，避免一直挂在天上不猎赏
-			local timeout = (tick() - fleeStart >= _G.Hunt_FleeMaxTime) and hpPct > _G.Hunt_FleeHP
-			if recovered or timeout then
+			-- 兜底1：飞够时间且血量高于触发线 -> 恢复猎赏
+			local timeout = (elapsed >= _G.Hunt_FleeMaxTime) and hpPct > _G.Hunt_FleeHP
+			-- 兜底2：再久也强制恢复（血量一直不涨时会永远挂在天上站着不动）
+			local hardStop = elapsed >= _G.Hunt_FleeMaxTime * 3
+			if recovered or timeout or hardStop then
 				fleeing = false
 				_G.Hunt_Fleeing = false
-				print("[猎赏] 血量 " .. math.floor(hpPct) .. "% -> "
-					.. (recovered and "已恢复，结束逃生，自动恢复猎赏" or "逃生超时，强制恢复猎赏"))
+				print("[猎赏] 血量 " .. math.floor(hpPct) .. "% -> " .. (recovered and "已恢复，结束逃生，自动恢复猎赏"
+					or (timeout and "逃生超时，恢复猎赏" or "逃生过久强制恢复猎赏（血量一直没涨）")))
 			end
 		end
 
@@ -1906,11 +1923,15 @@ RunService.Heartbeat:Connect(function(dt)
 		myRoot.RotVelocity = Vector3.new(0, 0, 0)
 	end
 
-	-- 贴到身边了就瞬步 + 放技能 + 攻击
-	if dist <= _G.Hunt_StopDist + 6 then
-		triggerSoru()
+	-- 放技能/攻击的范围放宽一点：原来只在贴身 6 米内才放，追人途中经常一直不放技能
+	if dist <= _G.Hunt_StopDist + 20 then
 		pressSkills()
 		attackTarget(currentTarget)
+	end
+
+	-- 贴到身边了才瞬步
+	if dist <= _G.Hunt_StopDist + 6 then
+		triggerSoru()
 	end
 end)
 
@@ -1970,10 +1991,8 @@ local function queueSelf()
 end
 
 -- ==================== 自动跳服务器 (1:1 移植自 WindUI 的服务器浏览器扫描) ====================
-local function serverHop()
-	-- 跳之前先排好「换服后重跑」，否则新服务器里脚本就没了
-	queueSelf()
-
+-- 真正的扫描逻辑：任何一步报错都由外层 serverHop 兜住，不会把 IsServerHopping 卡死
+local function doServerHop()
 	if getgenv().IsServerHopping == true then return false end
 	getgenv().IsServerHopping = true
 
@@ -2071,6 +2090,19 @@ local function serverHop()
 	return false
 end
 
+-- 外层包装：先排好「换服后重跑」，再用 pcall 包住扫描，异常也不会把跳服功能卡死
+local function serverHop()
+	queueSelf()
+
+	local ok, result = pcall(doServerHop)
+	getgenv().IsServerHopping = false -- 无论成功还是报错都清掉，否则以后都跳不了服
+	if not ok then
+		print("[猎赏] 跳服异常: " .. tostring(result))
+		return false
+	end
+	return result == true
+end
+
 -- 是否正在战斗中：正在逃生 / 锁定了够近的目标 / 5 秒内攻击过
 local function inCombat()
 	if _G.Hunt_Fleeing then return true end
@@ -2123,52 +2155,46 @@ task.spawn(function()
 	end
 end)
 
--- ==================== 没人开战斗模式 -> 自动跳服 ====================
--- 统计服务器里「开了战斗模式(PvP) 且能通过其他过滤」的活人
-local function countHuntable()
-	local n = 0
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and isAlive(plr) and passFilter(plr) then
-			n = n + 1
-		end
-	end
-	return n
-end
-
+-- ==================== 没可猎目标 -> 自动跳服 ====================
+-- 判定方式改成「选不出目标」：没开战斗模式的人、全被过滤掉、全都太远，都算没得猎
 task.spawn(function()
 	task.wait(25) -- 等新服务器玩家列表加载完，别刚进来就跳走
 	local emptySince = nil
 	local emptyWaitCombat = false
 	while task.wait(2) do
-		if _G.Hunt_HopIfEmpty then
-			local n = countHuntable()
-			if n == 0 then
-				if not emptySince then
-					emptySince = tick()
-					print("[猎赏] 服务器暂无开战斗模式的目标，开始计时 " .. _G.Hunt_EmptyWait .. " 秒")
-				elseif tick() - emptySince >= _G.Hunt_EmptyWait then
-					if _G.Hunt_HopWaitCombat and inCombat() then
-						-- 判定到期但还在打，等这场架打完
-						if not emptyWaitCombat then
-							emptyWaitCombat = true
-							print("[猎赏] 空服判定到期，但正在战斗中 -> 打完再跳")
-						end
-					else
-						emptyWaitCombat = false
-						emptySince = nil
-						print("[猎赏] 持续 " .. _G.Hunt_EmptyWait .. " 秒无可猎目标 -> 切换服务器")
-						serverHop()
-						task.wait(30) -- 等传送完成，避免重复触发
+		local char = LocalPlayer.Character
+		local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local selfAlive = myRoot ~= nil and hum ~= nil and hum.Health > 0
+
+		local noTarget = false
+		if _G.Hunt_HopIfEmpty and _G.Hunt_Auto and selfAlive then
+			noTarget = (resolveTarget() == nil)
+		end
+
+		if noTarget then
+			if not emptySince then
+				emptySince = tick()
+				print("[猎赏] 服务器里没有可猎目标（没开战斗模式/全被过滤），开始计时 " .. _G.Hunt_EmptyWait .. " 秒")
+			elseif tick() - emptySince >= _G.Hunt_EmptyWait then
+				if _G.Hunt_HopWaitCombat and inCombat() then
+					-- 判定到期但还在打，等这场架打完
+					if not emptyWaitCombat then
+						emptyWaitCombat = true
+						print("[猎赏] 空服判定到期，但正在战斗中 -> 打完再跳")
 					end
+				else
+					emptyWaitCombat = false
+					emptySince = nil
+					print("[猎赏] 持续 " .. _G.Hunt_EmptyWait .. " 秒没有可猎目标 -> 切换服务器")
+					serverHop()
+					task.wait(30) -- 等传送完成，避免重复触发
 				end
-			else
-				if emptySince then
-					print("[猎赏] 发现 " .. n .. " 个可猎目标，取消跳服")
-				end
-				emptySince = nil
-				emptyWaitCombat = false
 			end
 		else
+			if emptySince then
+				print("[猎赏] 已经有可猎目标，取消跳服")
+			end
 			emptySince = nil
 			emptyWaitCombat = false
 		end
