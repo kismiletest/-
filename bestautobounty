@@ -1,0 +1,1689 @@
+-- ==================== Blox Fruits 自动猎赏 ====================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+-- ==================== 配置 (自动保存/读取) ====================
+local CONFIG_FILE = "BF_AutoBounty_Config.json"
+local AUTO_EXEC_FILE = "AutoBounty.file" -- 自动执行开关单独存这个文件，内容 "true" / "false"
+local CONFIG_KEYS = {
+	"Hunt_Auto", "Hunt_AutoSelect",
+	"Hunt_UseLevel", "Hunt_MinLevel", "Hunt_AllowUnknown",
+	"Hunt_NoSafe", "Hunt_NoPvp", "Hunt_NoMarineAlly", "Hunt_MaxDist",
+	"Hunt_FlySpeed", "Hunt_StopDist",
+	"Hunt_AutoSoru", "Hunt_SoruInterval",
+	"Hunt_AutoSkill", "Hunt_SkillInterval",
+	"Hunt_AutoHop", "Hunt_HopInterval", "Hunt_ReExec",
+	"Hunt_HopIfEmpty", "Hunt_EmptyWait", "Hunt_Team",
+	"G_ServerRegion", "G_HopPlayerRange", "G_HopBountyRange",
+	"Hunt_AutoAttack", "Hunt_AutoEquip", "Hunt_Weapons",
+	"Hunt_SkillAim", "Hunt_SoruAim", "Hunt_RotateWeapon",
+	"Hunt_AutoFlee", "Hunt_FleeHP", "Hunt_FleeHeight", "Hunt_FleeRecover",
+	"Hunt_AutoSave",
+}
+local WEAPON_TYPE_NAMES = { "果实", "拳法", "剑", "枪" }
+-- 每种武器类型的技能键（BF 实际：剑/枪 2 个，拳法 3 个，果实 5 个）
+local TYPE_SKILL_KEYS = {
+	["拳法"] = { "Z", "X", "C" },
+	["剑"] = { "Z", "X" },
+	["枪"] = { "Z", "X" },
+	["果实"] = { "Z", "X", "C", "V", "F" },
+}
+local hasFileAPI = (writefile ~= nil and readfile ~= nil and isfile ~= nil)
+
+-- ==================== 自动执行开关 (AutoBounty.file) ====================
+local function writeAutoExecute(v)
+	if not hasFileAPI then return false end
+	return (pcall(function() writefile(AUTO_EXEC_FILE, v and "true" or "false") end))
+end
+
+local function configToTable()
+	local t = {}
+	for _, k in ipairs(CONFIG_KEYS) do t[k] = _G[k] end
+	t.Hunt_TypeSkills = {}
+	for _, tn in ipairs(WEAPON_TYPE_NAMES) do
+		t.Hunt_TypeSkills[tn] = {}
+		for _, k in ipairs(TYPE_SKILL_KEYS[tn]) do
+			t.Hunt_TypeSkills[tn][k] = _G.Hunt_TypeSkills[tn][k] ~= false
+		end
+	end
+	t.Hunt_Weapons = {}
+	for _, n in ipairs(WEAPON_TYPE_NAMES) do
+		t.Hunt_Weapons[n] = _G.Hunt_Weapons[n] == true
+	end
+	return t
+end
+
+-- 序列化成字符串用于比对，键顺序固定，避免误判「有变化」
+local function serializeConfig()
+	local parts = {}
+	for _, k in ipairs(CONFIG_KEYS) do
+		table.insert(parts, k .. "=" .. tostring(_G[k]))
+	end
+	for _, tn in ipairs(WEAPON_TYPE_NAMES) do
+		for _, k in ipairs(TYPE_SKILL_KEYS[tn]) do
+			table.insert(parts, "Sk" .. tn .. k .. "=" .. tostring(_G.Hunt_TypeSkills[tn][k]))
+		end
+	end
+	for _, n in ipairs(WEAPON_TYPE_NAMES) do
+		table.insert(parts, "Weapon" .. n .. "=" .. tostring(_G.Hunt_Weapons[n]))
+	end
+	return table.concat(parts, "|")
+end
+
+local function saveConfig()
+	if not hasFileAPI then return false end
+	local ok = pcall(function()
+		writefile(CONFIG_FILE, HttpService:JSONEncode(configToTable()))
+	end)
+	return ok
+end
+
+local function loadConfig()
+	if not hasFileAPI then return false end
+	local raw
+	local ok = pcall(function()
+		if isfile(CONFIG_FILE) then raw = readfile(CONFIG_FILE) end
+	end)
+	if not ok or not raw or raw == "" then return false end
+
+	local data
+	ok = pcall(function() data = HttpService:JSONDecode(raw) end)
+	if not ok or type(data) ~= "table" then return false end
+
+	for _, k in ipairs(CONFIG_KEYS) do
+		if data[k] ~= nil then _G[k] = data[k] end
+	end
+	if type(data.Hunt_TypeSkills) == "table" then
+		for _, tn in ipairs(WEAPON_TYPE_NAMES) do
+			local saved = data.Hunt_TypeSkills[tn]
+			if type(saved) == "table" then
+				for _, k in ipairs(TYPE_SKILL_KEYS[tn]) do
+					_G.Hunt_TypeSkills[tn][k] = saved[k] ~= false
+				end
+			end
+		end
+	end
+	if type(data.Hunt_Weapons) == "table" then
+		for _, n in ipairs(WEAPON_TYPE_NAMES) do
+			_G.Hunt_Weapons[n] = data.Hunt_Weapons[n] == true
+		end
+	end
+	return true
+end
+
+-- ==================== 状态（默认值） ====================
+_G.Hunt_Auto = false
+_G.Hunt_AutoSelect = true
+_G.Hunt_Target = nil
+_G.Hunt_UseLevel = true
+_G.Hunt_MinLevel = 2100
+_G.Hunt_AllowUnknown = true
+_G.Hunt_NoSafe = true
+_G.Hunt_NoPvp = true
+_G.Hunt_NoMarineAlly = true -- 排除海军盟友（自己是海军时，不打其他海军）
+_G.Hunt_MaxDist = 10000    -- 目标距离超过这个值就自动换下一个玩家
+_G.Hunt_FlySpeed = 160
+_G.Hunt_StopDist = 6
+_G.Hunt_AutoSoru = true
+_G.Hunt_SoruInterval = 13
+_G.Hunt_AutoSkill = true
+_G.Hunt_SkillInterval = 1
+-- 每种武器类型的技能开关（默认按 BF 实际技能数全开）
+_G.Hunt_TypeSkills = {
+	["拳法"] = { Z = true, X = true, C = true },
+	["剑"] = { Z = true, X = true },
+	["枪"] = { Z = true, X = true },
+	["果实"] = { Z = true, X = true, C = true, V = true, F = true },
+}
+_G.Hunt_AutoHop = true
+_G.Hunt_HopInterval = 300
+_G.Hunt_ReExec = true      -- 跳服后自动重跑脚本（配合自动执行 = 换服后自动开始）
+_G.Hunt_HopIfEmpty = true  -- 服务器里没有开战斗模式的人就跳服
+_G.Hunt_EmptyWait = 15     -- 上述情况要持续多少秒才真的跳
+_G.Hunt_Team = "不切换"     -- 阵营：不切换 / 海盗 / 海军（换服后自动选）
+_G.Hunt_AutoAttack = true
+_G.Hunt_AutoEquip = true  -- 自动装备（手上没东西时自动装一个，保证能放技能）
+_G.Hunt_Weapons = { ["果实"] = true, ["拳法"] = true, ["剑"] = true, ["枪"] = true } -- 允许自动切换的武器类型（可多选，全关=随便）
+-- 自瞄（只瞄准锁定的那个玩家）
+_G.Hunt_SkillAim = true    -- 技能自瞄
+_G.Hunt_SoruAim = true     -- 瞬步自瞄
+_G.Hunt_RotateWeapon = true -- 技能放完自动换下一把武器
+_G.Hunt_RotateIndex = 1    -- 运行时：轮换到第几把
+-- 低血逃生
+_G.Hunt_AutoFlee = true    -- 血量过低自动往天上飞
+_G.Hunt_FleeHP = 30        -- 触发血量 (%)
+_G.Hunt_FleeHeight = 300   -- 逃生上升高度 (studs)
+_G.Hunt_FleeRecover = 100  -- 恢复到该血量 (%) 才结束逃生并继续猎赏
+_G.Hunt_Fleeing = false    -- 运行时状态：是否正在逃生
+-- 以下三个「全程开启」：每次加载强制打开，且不写入存档，不受任何开关联动
+_G.Hunt_AutoHaki = true   -- 自动武装色 (Buso)
+_G.Hunt_AutoV3 = true     -- 自动种族 V3
+_G.Hunt_AutoV4 = true     -- 自动种族 V4
+-- 自动执行脚本（一键全开）：状态存在 AutoBounty.file，文件不存在时默认开
+if isfile and isfile(AUTO_EXEC_FILE) then
+	local success, content = pcall(function() return readfile(AUTO_EXEC_FILE) end)
+	_G.AutoExecute = (success and content == "true")
+else
+	_G.AutoExecute = true
+end
+_G.Hunt_AutoRun = _G.AutoExecute
+_G.Hunt_AutoSave = true   -- 自动保存配置
+
+-- 读取上次保存的配置（覆盖默认值）
+local configLoaded = loadConfig()
+
+local lastSavedSnap = serializeConfig()
+-- 自动保存循环：每 2 秒检查一次，有变化才写盘
+task.spawn(function()
+	while task.wait(2) do
+		if _G.Hunt_AutoSave and hasFileAPI then
+			local snap = serializeConfig()
+			if snap ~= lastSavedSnap then
+				if saveConfig() then lastSavedSnap = snap end
+			end
+		end
+	end
+end)
+
+-- ==================== 跳服设置 (1:1 移植自 WindUI) ====================
+_G.G_ServerRegion = _G.G_ServerRegion or "Singapore"
+_G.G_HopPlayerRange = _G.G_HopPlayerRange or "1-12"
+_G.G_HopBountyRange = _G.G_HopBountyRange or "大于3m"
+_G.G_HopMinPlayers = _G.G_HopMinPlayers or 1
+_G.G_HopMaxPlayers = _G.G_HopMaxPlayers or 12
+_G.G_HopMinBounty = _G.G_HopMinBounty or 3000001
+_G.G_HopMaxBounty = _G.G_HopMaxBounty or 999999999
+
+local function FormatNumber(n)
+	local s = tostring(math.floor(tonumber(n) or 0))
+	local left, num, right = s:match("^([^%d]*%d)(%d*)(.-)$")
+	return left .. (num:reverse():gsub("(%d%d%d)", "%1,"):reverse()) .. right
+end
+
+local function ApplyPlayerRange(label)
+	_G.G_HopPlayerRange = label
+	local minPlayers, maxPlayers = label:match("(%d+)%-(%d+)")
+	if minPlayers and maxPlayers then
+		_G.G_HopMinPlayers = tonumber(minPlayers)
+		_G.G_HopMaxPlayers = tonumber(maxPlayers)
+		return
+	end
+	_G.G_HopMinPlayers = 1
+	_G.G_HopMaxPlayers = 12
+end
+
+local function ApplyBountyRange(label)
+	_G.G_HopBountyRange = label
+	local minOnly = label:match("大于([%d%.]+[Mm]?)")
+	if minOnly then
+		local num, unit = minOnly:match("([%d%.]+)([Mm]?)")
+		local value = tonumber(num) or 0
+		if unit and unit:lower() == "m" then value = value * 1000000 end
+		_G.G_HopMinBounty = value + 1
+		_G.G_HopMaxBounty = 999999999
+		return
+	end
+	_G.G_HopMinBounty = 0
+	_G.G_HopMaxBounty = 999999999
+end
+
+-- 服务器条目文本 -> 信息表（格式: Region: xxx - Players: 3/12 Bounty: 1,234,567）
+local function ParseServerInfo(text)
+	if type(text) ~= "string" or text == "" then return nil end
+	local region = text:match("Region:%s*(.-)%s*%-%s*Players:")
+	local cur, max = text:match("Players:%s*(%d+)%s*/%s*(%d+)")
+	local bt = text:match("Bounty:%s*([%d,]+)")
+	if not cur or not max or not bt then return nil end
+	local bounty = tonumber((bt:gsub(",", "")))
+	if not bounty then return nil end
+	return { Region = region or "Unknown", Players = tonumber(cur), MaxPlayers = tonumber(max), Bounty = bounty }
+end
+
+local function IsServerAllowed(info)
+	if not info then return false end
+	if info.Players < _G.G_HopMinPlayers or info.Players > _G.G_HopMaxPlayers then return false end
+	if info.Bounty < _G.G_HopMinBounty or info.Bounty > _G.G_HopMaxBounty then return false end
+	return true
+end
+
+ApplyPlayerRange(_G.G_HopPlayerRange)
+ApplyBountyRange(_G.G_HopBountyRange)
+
+-- 重进当前服务器（WindUI「重进服务器」按钮同款）
+local function rejoinServer()
+	local args = {
+		"teleport",
+		game.JobId
+	}
+	local ok = pcall(function()
+		ReplicatedStorage:WaitForChild("__ServerBrowser"):InvokeServer(unpack(args))
+	end)
+	print(ok and "[猎赏] 已请求重进当前服务器" or "[猎赏] 重进失败")
+	return ok
+end
+
+-- 前置声明（UI 按钮要用到）
+local triggerSoru
+local findSoruButton
+local pressSkills
+local ensureEquipped
+local getBackpackTools
+local applyTeam
+
+-- ==================== WindUI ====================
+local WindUI
+pcall(function() WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))() end)
+
+local playerDropdown
+if WindUI then
+	local Window = WindUI:CreateWindow({
+		Title = "自动猎赏", Icon = "sword", Author = "kiyo", Folder = "WindUI",
+		Size = UDim2.fromOffset(460, 400), Transparent = true, Theme = "Dark",
+		Acrylic = false, HideSearchBar = false, SideBarWidth = 170, ToggleKey = Enum.KeyCode.G,
+	})
+	local Tab = Window:Tab({ Title = "猎赏", Icon = "crosshair" })
+
+	-- 统一管理开关，方便「自动执行」同步 UI 状态
+	local uiToggles = {}
+	local function setUI(flag, v)
+		local obj = uiToggles[flag]
+		if obj then pcall(function() obj:Set(v) end) end
+	end
+
+	-- 自动执行：一键把主要功能全部打开/关闭
+	local function applyAutoRun(on)
+		_G.Hunt_Auto = on
+		_G.Hunt_AutoSoru = on
+		_G.Hunt_AutoSkill = on
+		_G.Hunt_AutoAttack = on
+		_G.Hunt_AutoEquip = on
+		_G.Hunt_SkillAim = on
+		_G.Hunt_SoruAim = on
+		_G.Hunt_AutoHop = on
+		setUI("Hunt_Auto", on)
+		setUI("Hunt_AutoSoru", on)
+		setUI("Hunt_AutoSkill", on)
+		setUI("Hunt_AutoAttack", on)
+		setUI("Hunt_AutoEquip", on)
+		setUI("Hunt_SkillAim", on)
+		setUI("Hunt_SoruAim", on)
+		setUI("Hunt_AutoHop", on)
+		print("[猎赏] 自动执行: " .. (on and "已开启，全部功能已打开" or "已关闭"))
+	end
+
+	Tab:Section({ Title = "总控" })
+	Tab:Toggle({
+		Title = "自动执行脚本 (一键全开)",
+		Value = _G.Hunt_AutoRun,
+		Callback = function(v)
+			_G.Hunt_AutoRun = v
+			_G.AutoExecute = v
+			local ok = writeAutoExecute(v)
+			if ok then
+				print("[猎赏] 自动执行 -> " .. AUTO_EXEC_FILE .. " = " .. (v and "true" or "false"))
+			else
+				warn("[猎赏] 写 " .. AUTO_EXEC_FILE .. " 失败（执行器不支持文件读写），跳服后不会自动执行")
+			end
+			applyAutoRun(v)
+		end
+	})
+	-- 只控制 AutoBounty.file：下次加载 / 换服后是否自动重跑并自动开始，不联动其它功能
+	Tab:Toggle({
+		Title = "自动执行脚本 (换服/重载后自动开始)",
+		Value = _G.AutoExecute,
+		Callback = function(v)
+			_G.AutoExecute = v
+			local ok = writeAutoExecute(v)
+			if ok then
+				print("[猎赏] 自动执行 -> " .. AUTO_EXEC_FILE .. " = " .. (v and "true" or "false"))
+			else
+				warn("[猎赏] 写 " .. AUTO_EXEC_FILE .. " 失败（执行器不支持文件读写），跳服后不会自动执行")
+			end
+		end
+	})
+
+	Tab:Section({ Title = "狩猎设置" })
+	uiToggles.Hunt_Auto = Tab:Toggle({ Title = "自动猎赏", Value = _G.Hunt_Auto, Callback = function(v) _G.Hunt_Auto = v end })
+	Tab:Toggle({ Title = "自动选择玩家", Value = _G.Hunt_AutoSelect, Callback = function(v) _G.Hunt_AutoSelect = v end })
+	uiToggles.Hunt_AutoAttack = Tab:Toggle({ Title = "自动攻击", Value = _G.Hunt_AutoAttack, Callback = function(v) _G.Hunt_AutoAttack = v end })
+	uiToggles.Hunt_AutoEquip = Tab:Toggle({ Title = "自动装备 ", Value = _G.Hunt_AutoEquip, Callback = function(v) _G.Hunt_AutoEquip = v end })
+	for _, n in ipairs(WEAPON_TYPE_NAMES) do
+		uiToggles["Weapon_" .. n] = Tab:Toggle({
+			Title = "武器类型: " .. n,
+			Value = _G.Hunt_Weapons[n],
+			Callback = function(v) _G.Hunt_Weapons[n] = v end
+		})
+	end
+	Tab:Section({ Title = "等级过滤" })
+	Tab:Toggle({ Title = "启用等级过滤", Value = _G.Hunt_UseLevel, Callback = function(v) _G.Hunt_UseLevel = v end })
+	Tab:Slider({ Title = "最低等级", Value = { Min = 1, Max = 2800, Default = _G.Hunt_MinLevel }, Callback = function(v) _G.Hunt_MinLevel = v end })
+	Tab:Toggle({ Title = "等级未知也打", Value = _G.Hunt_AllowUnknown, Callback = function(v) _G.Hunt_AllowUnknown = v end })
+
+	Tab:Section({ Title = "目标过滤" })
+	Tab:Toggle({ Title = "排除安全区的人", Value = _G.Hunt_NoSafe, Callback = function(v) _G.Hunt_NoSafe = v end })
+	Tab:Toggle({ Title = "排除没开PvP的人", Value = _G.Hunt_NoPvp, Callback = function(v) _G.Hunt_NoPvp = v end })
+	Tab:Toggle({ Title = "排除海军盟友", Value = _G.Hunt_NoMarineAlly, Callback = function(v) _G.Hunt_NoMarineAlly = v end })
+	Tab:Slider({ Title = "换人距离 (米)", Value = { Min = 500, Max = 50000, Default = _G.Hunt_MaxDist }, Callback = function(v) _G.Hunt_MaxDist = v end })
+
+	Tab:Section({ Title = "瞬步（限龙族" })
+	uiToggles.Hunt_AutoSoru = Tab:Toggle({ Title = "自动瞬步", Value = _G.Hunt_AutoSoru, Callback = function(v) _G.Hunt_AutoSoru = v end })
+	Tab:Slider({ Title = "瞬步间隔 (秒)", Value = { Min = 1, Max = 60, Default = _G.Hunt_SoruInterval }, Callback = function(v) _G.Hunt_SoruInterval = v end })
+	Tab:Button({
+		Title = "立即瞬步 (测试用)",
+		Callback = function()
+			triggerSoru()
+			local btn = findSoruButton()
+			print("[猎赏] 瞬步测试 | 游戏内瞬步按钮: " .. (btn and btn:GetFullName() or "未找到(只走发包)"))
+		end
+	})
+	uiToggles.Hunt_SoruAim = Tab:Toggle({ Title = "瞬步自瞄 (冲向锁定目标)", Value = _G.Hunt_SoruAim, Callback = function(v) _G.Hunt_SoruAim = v end })
+
+	Tab:Section({ Title = "霸气 / 种族" })
+	uiToggles.Hunt_AutoHaki = Tab:Toggle({ Title = "自动武装色 (Buso)", Value = _G.Hunt_AutoHaki, Callback = function(v) _G.Hunt_AutoHaki = v end })
+	uiToggles.Hunt_AutoV3 = Tab:Toggle({ Title = "自动 V3", Value = _G.Hunt_AutoV3, Callback = function(v) _G.Hunt_AutoV3 = v end })
+	uiToggles.Hunt_AutoV4 = Tab:Toggle({ Title = "自动 V4", Value = _G.Hunt_AutoV4, Callback = function(v) _G.Hunt_AutoV4 = v end })
+
+	Tab:Section({ Title = "低血逃生" })
+	uiToggles.Hunt_AutoFlee = Tab:Toggle({ Title = "低血自动往天上飞", Value = _G.Hunt_AutoFlee, Callback = function(v) _G.Hunt_AutoFlee = v end })
+	Tab:Slider({ Title = "触发血量 (%)", Value = { Min = 5, Max = 90, Default = _G.Hunt_FleeHP }, Callback = function(v) _G.Hunt_FleeHP = v end })
+	Tab:Slider({ Title = "上升高度 (米)", Value = { Min = 50, Max = 1500, Default = _G.Hunt_FleeHeight }, Callback = function(v) _G.Hunt_FleeHeight = v end })
+	Tab:Slider({ Title = "恢复猎赏血量 (%)", Value = { Min = 30, Max = 100, Default = _G.Hunt_FleeRecover }, Callback = function(v) _G.Hunt_FleeRecover = v end })
+
+	Tab:Section({ Title = "技能释放 (可多选)" })
+	uiToggles.Hunt_AutoSkill = Tab:Toggle({ Title = "自动释放技能", Value = _G.Hunt_AutoSkill, Callback = function(v) _G.Hunt_AutoSkill = v end })
+	uiToggles.Hunt_SkillAim = Tab:Toggle({ Title = "技能自瞄 (只瞄锁定目标)", Value = _G.Hunt_SkillAim, Callback = function(v) _G.Hunt_SkillAim = v end })
+	uiToggles.Hunt_RotateWeapon = Tab:Toggle({ Title = "技能放完自动换下一把武器", Value = _G.Hunt_RotateWeapon, Callback = function(v) _G.Hunt_RotateWeapon = v end })
+	Tab:Slider({ Title = "技能间隔 (秒)", Value = { Min = 0.3, Max = 10, Default = _G.Hunt_SkillInterval, Float = 0.1 }, Callback = function(v) _G.Hunt_SkillInterval = v end })
+	Tab:Button({
+		Title = "立即放技能 (测试用)",
+		Callback = function()
+			print("[猎赏] 技能测试 -> 背包工具数: " .. #getBackpackTools())
+			ensureEquipped()
+			pressSkills(true)
+		end
+	})
+	for _, tn in ipairs({ "拳法", "剑", "枪", "果实" }) do
+		local keys = TYPE_SKILL_KEYS[tn]
+		Tab:Section({ Title = tn .. " 技能 (" .. #keys .. " 个)" })
+		for _, k in ipairs(keys) do
+			uiToggles["Skill_" .. tn .. "_" .. k] = Tab:Toggle({
+				Title = tn .. " - " .. k,
+				Value = _G.Hunt_TypeSkills[tn][k],
+				Callback = function(v) _G.Hunt_TypeSkills[tn][k] = v end
+			})
+		end
+	end
+
+	Tab:Section({ Title = "飞行" })
+	Tab:Slider({ Title = "飞行速度", Value = { Min = 50, Max = 600, Default = _G.Hunt_FlySpeed }, Callback = function(v) _G.Hunt_FlySpeed = v end })
+	Tab:Slider({ Title = "停靠距离", Value = { Min = 2, Max = 40, Default = _G.Hunt_StopDist }, Callback = function(v) _G.Hunt_StopDist = v end })
+
+	Tab:Section({ Title = "服务器" })
+	uiToggles.Hunt_AutoHop = Tab:Toggle({ Title = "自动跳服务器", Value = _G.Hunt_AutoHop, Callback = function(v) _G.Hunt_AutoHop = v end })
+	Tab:Slider({ Title = "跳服间隔 (秒)", Value = { Min = 60, Max = 1200, Default = _G.Hunt_HopInterval }, Callback = function(v) _G.Hunt_HopInterval = v end })
+	Tab:Dropdown({
+		Title = "选择服务器区域",
+		Values = { "Oregon", "Florida", "Texas", "California", "Hong Kong", "Germany", "Brazil", "Singapore" },
+		Value = _G.G_ServerRegion,
+		Callback = function(v)
+			_G.G_ServerRegion = v
+			print("[猎赏] 区域设置: " .. v)
+		end
+	})
+	Tab:Dropdown({
+		Title = "选择人数",
+		Values = { "1-12", "3-12", "5-12", "7-12", "9-12" },
+		Value = _G.G_HopPlayerRange,
+		Callback = function(v)
+			ApplyPlayerRange(v)
+			print("[猎赏] 人数设置: " .. v .. " (" .. _G.G_HopMinPlayers .. "-" .. _G.G_HopMaxPlayers .. ")")
+		end
+	})
+	Tab:Dropdown({
+		Title = "选择赏金",
+		Values = { "大于3m", "大于5m", "大于10m", "大于15m", "大于25m", "大于35m", "大于50m" },
+		Value = _G.G_HopBountyRange,
+		Callback = function(v)
+			ApplyBountyRange(v)
+			print("[猎赏] 赏金设置: " .. v .. " (" .. FormatNumber(_G.G_HopMinBounty) .. " - " .. FormatNumber(_G.G_HopMaxBounty) .. ")")
+		end
+	})
+	Tab:Button({ Title = "立即跳服务器", Callback = function() _G.Hunt_ForceHop = true end })
+	Tab:Button({ Title = "重进服务器", Callback = function() rejoinServer() end })
+	Tab:Toggle({ Title = "跳服后自动重跑脚本", Value = _G.Hunt_ReExec, Callback = function(v) _G.Hunt_ReExec = v end })
+	Tab:Toggle({ Title = "没人开战斗模式就跳服", Value = _G.Hunt_HopIfEmpty, Callback = function(v) _G.Hunt_HopIfEmpty = v end })
+	Tab:Slider({ Title = "空服判定时长 (秒)", Value = { Min = 5, Max = 120, Default = _G.Hunt_EmptyWait }, Callback = function(v) _G.Hunt_EmptyWait = v end })
+
+	Tab:Section({ Title = "阵营 (换服后自动选)" })
+	Tab:Dropdown({
+		Title = "阵营",
+		Values = { "不切换", "海盗", "海军" },
+		Value = _G.Hunt_Team,
+		Callback = function(v)
+			_G.Hunt_Team = v
+			if v ~= "不切换" then applyTeam(true) end -- 选了就立刻切一次
+		end
+	})
+	Tab:Button({ Title = "立即切换阵营", Callback = function() applyTeam(true) end })
+
+	Tab:Section({ Title = "手动指定目标" })
+	local function buildPlayerList()
+		local list = {}
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p ~= LocalPlayer then
+				table.insert(list, p.Name)
+			end
+		end
+		return list
+	end
+
+	playerDropdown = Tab:Dropdown({
+		Title = "选择玩家",
+		Values = buildPlayerList(),
+		Value = "",
+		Callback = function(v)
+			-- 只设定指定目标，不再关掉自动选择（指定的人死了会自动切回自动模式）
+			_G.Hunt_Target = v
+		end
+	})
+	Tab:Button({
+		Title = "刷新玩家列表",
+		Callback = function()
+			if playerDropdown then playerDropdown:Refresh(buildPlayerList()) end
+		end
+	})
+	Tab:Button({
+		Title = "清除指定目标 (回到自动)",
+		Callback = function()
+			_G.Hunt_Target = nil
+			_G.Hunt_AutoSelect = true
+		end
+	})
+
+	Tab:Section({ Title = "配置" })
+	Tab:Toggle({
+		Title = "自动保存配置",
+		Value = _G.Hunt_AutoSave,
+		Callback = function(v)
+			_G.Hunt_AutoSave = v
+			-- 打开时立刻存一次
+			if v then
+				saveConfig()
+				lastSavedSnap = serializeConfig()
+			end
+		end
+	})
+	Tab:Button({
+		Title = "立即保存配置",
+		Callback = function()
+			local ok = saveConfig()
+			lastSavedSnap = serializeConfig()
+			print("[猎赏] 配置保存" .. (ok and "成功: " .. CONFIG_FILE or "失败(执行器不支持文件读写)"))
+		end
+	})
+	Tab:Button({
+		Title = "重置为默认配置 (需重载)",
+		Callback = function()
+			-- 先关掉自动保存，否则下一轮扫描又会把当前值写回去
+			_G.Hunt_AutoSave = false
+			pcall(function()
+				if hasFileAPI and isfile(CONFIG_FILE) then delfile(CONFIG_FILE) end
+			end)
+			print("[猎赏] 配置已删除并关闭自动保存，重载脚本即恢复默认")
+		end
+	})
+
+	-- AutoBounty.file 里记着「自动执行」开着（或文件不存在时的默认值），加载后直接跑起来
+	if _G.AutoExecute then
+		applyAutoRun(true)
+	end
+end
+
+-- ==================== 玩家数据 ====================
+-- Blox Fruits 其他玩家数据来源（多路径兜底）
+local function getLevel(plr)
+	local v
+	local ok = pcall(function() v = plr:GetAttribute("Level") end)
+	if ok and v then return tonumber(v) end
+	ok = pcall(function() v = plr.Data.Level.Value end)
+	if ok and v then return tonumber(v) end
+	ok = pcall(function() v = plr.leaderstats["Level"].Value end)
+	if ok and v then return tonumber(v) end
+	return nil
+end
+
+local function getBounty(plr)
+	local v
+	local ok = pcall(function() v = plr.leaderstats["Bounty/Honor"].Value end)
+	if ok and v then return tonumber(v) end
+	return 0
+end
+
+local function isAlive(plr)
+	local char = plr.Character
+	if not char then return false end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then return false end
+	return true
+end
+
+-- 当前锁定的目标（供自瞄钩子 / 安全区检测读取）
+local currentTarget = nil
+local currentTargetName = nil
+
+-- ==================== 安全区检测 ====================
+-- 优先读游戏属性；属性读不到时，靠「攻击目标被提示无法在安全区攻击」来临时拉黑
+local safeBlacklist = {}
+
+local function attrSafeZone(plr)
+	local char = plr.Character
+	local objs = { plr, char }
+	if char then table.insert(objs, char:FindFirstChild("HumanoidRootPart")) end
+	for _, obj in ipairs(objs) do
+		if obj then
+			local v = obj:GetAttribute("SafeZone")
+			if v == nil then v = obj:GetAttribute("InSafeZone") end
+			if v ~= nil then return v == true end
+		end
+	end
+	return nil
+end
+
+local function isSafeBlocked(plr)
+	if attrSafeZone(plr) == true then return true end
+	local exp = safeBlacklist[plr.Name]
+	if exp then
+		if tick() < exp then return true end
+		safeBlacklist[plr.Name] = nil
+	end
+	return false
+end
+
+-- 监听游戏提示文字
+task.spawn(function()
+	while task.wait(0.5) do
+		if _G.Hunt_Auto and _G.Hunt_NoSafe and currentTargetName then
+			local pg = LocalPlayer:FindFirstChild("PlayerGui")
+			if pg then
+				for _, obj in ipairs(pg:GetDescendants()) do
+					if obj:IsA("TextLabel") and obj.Visible and obj.Text ~= "" then
+						local t = obj.Text:lower()
+						-- 目标在安全区，打不到 -> 拉黑 20 秒
+						if t:find("cannot attack") and t:find("safe") then
+							safeBlacklist[currentTargetName] = tick() + 20
+							break
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+local function passFilter(plr)
+	-- 1. 排除没开 PvP 的人
+	if _G.Hunt_NoPvp then
+		local ok, disabled = pcall(function() return plr:GetAttribute("PvpDisabled") end)
+		if ok and disabled == true then return false end
+	end
+
+	-- 2. 排除安全区的人
+	if _G.Hunt_NoSafe and isSafeBlocked(plr) then return false end
+
+	-- 3. 排除海军盟友（自己是海军时，不打其他海军）
+	if _G.Hunt_NoMarineAlly then
+		local myTeam = LocalPlayer.Team
+		local tTeam = plr.Team
+		if myTeam and tTeam and myTeam.Name == "Marines" and tTeam.Name == "Marines" then
+			return false
+		end
+	end
+
+	-- 4. 等级过滤
+	if not _G.Hunt_UseLevel then return true end
+	local lv = getLevel(plr)
+	if not lv then return _G.Hunt_AllowUnknown end
+	return lv >= _G.Hunt_MinLevel
+end
+
+local function getRoot(plr)
+	local char = plr.Character
+	if not char then return nil end
+	return char:FindFirstChild("HumanoidRootPart"), char
+end
+
+-- 自己到目标的直线距离（有一方没角色就返回 nil）
+local function targetDistance(plr)
+	local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	local root = getRoot(plr)
+	if not myRoot or not root then return nil end
+	return (root.Position - myRoot.Position).Magnitude
+end
+
+-- 超过换人距离就不打，换下一个
+local function tooFar(plr)
+	local d = targetDistance(plr)
+	if not d then return false end
+	return d > (_G.Hunt_MaxDist or 10000)
+end
+
+-- ==================== 目标选择 ====================
+local function resolveTarget()
+	-- 1. 手动指定优先；指定的人不在/死了/超距就自动切回自动选择
+	if _G.Hunt_Target and _G.Hunt_Target ~= "" then
+		local plr = Players:FindFirstChild(_G.Hunt_Target)
+		if plr and plr ~= LocalPlayer and isAlive(plr) and not tooFar(plr) then return plr, 1 end
+	end
+
+	-- 2. 自动选择：过滤后最近的玩家（超过换人距离的直接跳过）
+	if not _G.Hunt_AutoSelect then return nil, 0 end
+	local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not myRoot then return nil, 0 end
+
+	local best, bestDist, count = nil, math.huge, 0
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and isAlive(plr) and passFilter(plr) then
+			local root = getRoot(plr)
+			if root then
+				count = count + 1
+				local d = (root.Position - myRoot.Position).Magnitude
+				if d <= _G.Hunt_MaxDist and d < bestDist then
+					bestDist = d
+					best = plr
+				end
+			end
+		end
+	end
+	return best, count
+end
+
+-- ==================== 目标扫描 ====================
+-- 找不到目标时，打印是被哪个过滤条件挡掉的
+local lastDiag = 0
+local function diagnose()
+	if tick() - lastDiag < 10 then return end
+	lastDiag = tick()
+
+	local total, alive, noRoot, pvpBlocked, safeBlocked, marineBlocked, levelBlocked, farBlocked = 0, 0, 0, 0, 0, 0, 0, 0
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			total = total + 1
+			if isAlive(plr) then
+				alive = alive + 1
+				if not getRoot(plr) then
+					noRoot = noRoot + 1
+				elseif _G.Hunt_NoPvp and plr:GetAttribute("PvpDisabled") == true then
+					pvpBlocked = pvpBlocked + 1
+				elseif _G.Hunt_NoSafe and isSafeBlocked(plr) then
+					safeBlocked = safeBlocked + 1
+				elseif _G.Hunt_NoMarineAlly and LocalPlayer.Team and plr.Team
+					and LocalPlayer.Team.Name == "Marines" and plr.Team.Name == "Marines" then
+					marineBlocked = marineBlocked + 1
+				elseif _G.Hunt_UseLevel then
+					local lv = getLevel(plr)
+					if lv then
+						if lv < _G.Hunt_MinLevel then levelBlocked = levelBlocked + 1 end
+					elseif not _G.Hunt_AllowUnknown then
+						levelBlocked = levelBlocked + 1
+					end
+				end
+				-- 过滤都过了，再看是不是太远
+				if passFilter(plr) and tooFar(plr) then
+					farBlocked = farBlocked + 1
+				end
+			end
+		end
+	end
+	print(string.format("[猎赏] 排查 -> 其他玩家:%d 存活:%d | 无角色:%d PvP挡:%d 安全区挡:%d 海军挡:%d 等级挡:%d 超距挡:%d",
+		total, alive, noRoot, pvpBlocked, safeBlocked, marineBlocked, levelBlocked, farBlocked))
+end
+
+local lastTargetName = nil
+task.spawn(function()
+	while task.wait(1) do
+		if _G.Hunt_Auto then
+			local t, count = resolveTarget()
+
+			-- 上一个目标超距了：提示一下，本次会自动换成下一个
+			if currentTarget and currentTarget ~= t and tooFar(currentTarget) then
+				print("[猎赏] " .. currentTarget.Name .. " 距离 "
+					.. math.floor(targetDistance(currentTarget) or 0) .. " 米，超过 " .. _G.Hunt_MaxDist .. " 米 -> 换下一个玩家")
+			end
+
+			currentTarget = t
+			currentTargetName = t and t.Name or nil
+
+			-- 目标变化时打印，方便排查「为什么没自动选到人」
+			if t then
+				if lastTargetName ~= t.Name then
+					lastTargetName = t.Name
+					print("[猎赏] 锁定目标: " .. t.Name .. " | 过滤后候选: " .. count
+						.. " | 距离: " .. math.floor(targetDistance(t) or 0))
+				end
+			else
+				if lastTargetName ~= nil then
+					lastTargetName = nil
+					print("[猎赏] 当前无可用目标 | 过滤后候选: 0")
+				end
+				diagnose()
+			end
+		else
+			currentTarget = nil
+			currentTargetName = nil
+			lastTargetName = nil
+		end
+	end
+end)
+
+-- ==================== 技能自瞄 (只瞄准锁定的玩家) ====================
+-- 移植自 WindUi 的实现，两条 hook 同时上：
+-- 1) ReplicatedStorage.Mouse 模块 —— BF 的技能瞄准读的是这个模块，不是标准 Mouse 对象
+-- 2) 标准 Mouse 对象 —— hookmetamethod __index，覆盖 Hit/Target/UnitRay/Origin/Direction
+-- 两条都指向「当前锁定的那个玩家」，所以技能一定朝他打
+
+-- 当前该瞄的部位（没锁定/没开启就返回 nil，交还原版逻辑）
+local function getAimPart()
+	if not _G.Hunt_SkillAim or not currentTarget then return nil end
+	local root = getRoot(currentTarget)
+	if not root or not root.Parent then return nil end
+	return root
+end
+
+-- ---- 通道1: ReplicatedStorage.Mouse 模块 ----
+local mouseModuleHooked = false
+local MouseModuleInstance = ReplicatedStorage:FindFirstChild("Mouse")
+local MouseModule = nil
+if MouseModuleInstance then
+	pcall(function() MouseModule = require(MouseModuleInstance) end)
+end
+
+if MouseModule and typeof(MouseModule) == "table" then
+	pcall(function()
+		local realStore = { Hit = rawget(MouseModule, "Hit"), Target = rawget(MouseModule, "Target") }
+		local mmt = getrawmetatable(MouseModule)
+		if mmt then setreadonly(mmt, false) else mmt = {}; setmetatable(MouseModule, mmt) end
+
+		local origIndex = mmt.__index
+
+		-- 先装好 __index，再清掉原字段：万一中途出错，模块也不会被搞坏
+		mmt.__index = function(self, key)
+			local part = getAimPart()
+			if part then
+				if key == "Hit" then return CFrame.new(part.Position) end
+				if key == "Target" then return part end
+			end
+			-- 其余 key 交还原版逻辑
+			if type(origIndex) == "function" then return origIndex(self, key) end
+			if type(origIndex) == "table" then return origIndex[key] end
+			return realStore[key]
+		end
+
+		mmt.__newindex = function(self, key, value)
+			if key == "Hit" or key == "Target" then
+				realStore[key] = value
+			else
+				rawset(self, key, value)
+			end
+		end
+		setreadonly(mmt, true)
+
+		rawset(MouseModule, "Hit", nil)
+		rawset(MouseModule, "Target", nil)
+		mouseModuleHooked = true
+	end)
+end
+
+-- ---- 通道2: 标准 Mouse 对象 ----
+local hasCheckCaller = (type(checkcaller) == "function")
+local oldIndex
+pcall(function()
+	oldIndex = hookmetamethod(game, "__index", function(self, key)
+		if _G.Hunt_SkillAim and currentTarget and self == Mouse then
+			if hasCheckCaller and checkcaller() then
+				return oldIndex(self, key)
+			end
+			local part = getAimPart()
+			if part then
+				local tp = part.Position
+				local cp = Camera.CFrame.Position
+				if key == "Hit" then
+					return CFrame.new(tp)
+				elseif key == "Target" then
+					return part
+				elseif key == "UnitRay" then
+					return Ray.new(cp, (tp - cp).Unit)
+				elseif key == "Origin" then
+					return cp
+				elseif key == "Direction" then
+					return (tp - cp).Unit
+				end
+			end
+		end
+		return oldIndex(self, key)
+	end)
+end)
+
+print("[猎赏] 技能自瞄: " .. (mouseModuleHooked and "已 hook ReplicatedStorage.Mouse 模块 + 标准 Mouse" or "未找到 Mouse 模块，仅 hook 标准 Mouse"))
+
+-- ==================== 游戏内按钮触发 (通用，给瞬步用) ====================
+local buttonCache = {}
+local buttonSearchTime = {}
+
+-- 列出所有 BoundAction* 按钮（诊断用）
+local function listBoundActions()
+	local pg = LocalPlayer:FindFirstChild("PlayerGui")
+	if not pg then return {} end
+	local mcb = pg:FindFirstChild("MobileContextButtons")
+	local frame = mcb and mcb:FindFirstChild("ContextButtonFrame")
+	if not frame then return {} end
+	local list = {}
+	for _, child in ipairs(frame:GetChildren()) do
+		table.insert(list, child.ClassName .. ":" .. child.Name)
+	end
+	return list
+end
+
+-- 按关键字找 GuiButton（名字或父级名字包含关键字）
+local function findButtonByKeyword(kw)
+	local cached = buttonCache[kw]
+	if cached and cached.Parent then return cached end
+	if tick() - (buttonSearchTime[kw] or 0) < 2 then return buttonCache[kw] end
+	buttonSearchTime[kw] = tick()
+
+	local pg = LocalPlayer:FindFirstChild("PlayerGui")
+	if not pg then return nil end
+
+	local found = nil
+	-- 已知路径: MobileContextButtons.ContextButtonFrame.BoundActionXXX.Button
+	local mcb = pg:FindFirstChild("MobileContextButtons")
+	local frame = mcb and mcb:FindFirstChild("ContextButtonFrame")
+	if frame then
+		for _, child in ipairs(frame:GetChildren()) do
+			if child.Name:lower():find(kw) then
+				found = child:FindFirstChild("Button") or child:FindFirstChildWhichIsA("GuiButton")
+				if found then break end
+			end
+		end
+	end
+
+	-- 兜底：全量搜索
+	if not found then
+		for _, obj in ipairs(pg:GetDescendants()) do
+			if obj:IsA("GuiButton") then
+				local n = obj.Name:lower()
+				local pn = obj.Parent and obj.Parent.Name:lower() or ""
+				if n:find(kw) or pn:find(kw) then
+					found = obj
+					break
+				end
+			end
+		end
+	end
+
+	-- 找不到就把现有的 BoundAction 列出来，方便定位真实名字
+	if not found and not buttonCache["_reported_" .. kw] then
+		buttonCache["_reported_" .. kw] = true
+		local acts = listBoundActions()
+		print("[猎赏] 没找到含「" .. kw .. "」的按钮 | ContextButtonFrame 里现有: "
+			.. (#acts > 0 and table.concat(acts, ", ") or "空/不存在"))
+	end
+
+	buttonCache[kw] = found
+	return found
+end
+
+-- 触发一个按钮：firesignal -> 鼠标点击，逐个降级
+local function fireButton(btn)
+	if not btn then return false end
+
+	local ok = pcall(firesignal, btn.Activated)
+	if ok then return true end
+	ok = pcall(firesignal, btn.MouseButton1Click)
+	if ok then return true end
+	ok = pcall(firesignal, btn.MouseButton1Down)
+	if ok then return true end
+	ok = pcall(firesignal, btn.TouchTap)
+	if ok then return true end
+
+	task.spawn(function()
+		pcall(function()
+			local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+			local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+			VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+			task.wait(0.05)
+			VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+		end)
+	end)
+	return true
+end
+
+findSoruButton = function()
+	return findButtonByKeyword("soru")
+end
+
+local lastSoru = 0
+triggerSoru = function()
+	if tick() - lastSoru < 0.5 then return end
+	lastSoru = tick()
+
+	-- 瞬步自瞄：把角色水平朝向锁定目标，瞬步才会朝他冲过去
+	if _G.Hunt_SoruAim and currentTarget then
+		local tRoot = getRoot(currentTarget)
+		local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if tRoot and myRoot then
+			local flat = Vector3.new(tRoot.Position.X, myRoot.Position.Y, tRoot.Position.Z)
+			if (flat - myRoot.Position).Magnitude > 1 then
+				myRoot.CFrame = CFrame.new(myRoot.Position, flat)
+			end
+		end
+	end
+
+	-- 通道1: CommE 发包（BF 瞬步真正的入口，参数: 名称/起点/终点/服务器时间/随机id）
+	local char = LocalPlayer.Character
+	local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+	if myRoot then
+		local dest
+		local tRoot = currentTarget and getRoot(currentTarget)
+		if tRoot then
+			dest = (tRoot.CFrame * CFrame.new(0, 0, 3)).Position -- 冲到目标身前 3 格
+		else
+			dest = myRoot.Position + myRoot.CFrame.LookVector * 40 -- 没目标就往前冲一段
+		end
+
+		local startCFrame = myRoot.CFrame
+		local finalCFrame = (startCFrame - startCFrame.Position) + dest + Vector3.new(0, myRoot.Size.Y * 1.5, 0)
+
+		pcall(function()
+			local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+			local commE = remotes and remotes:FindFirstChild("CommE")
+			if commE then
+				commE:FireServer("Soru", startCFrame, finalCFrame, workspace:GetServerTimeNow(), math.random(1, 999999999))
+			end
+		end)
+	end
+
+	-- 通道2: 兜底触发游戏内瞬步按钮（移动端/PC 的 BoundActionSoru）
+	fireButton(findSoruButton())
+end
+
+-- ==================== 自动切换装备 (按类型选武器，可多选) ====================
+-- 武器类型 -> ToolTip 白名单（BF 用 ToolTip 区分武器种类）
+local WEAPON_TIP_MAP = {
+	["果实"] = { "Blox Fruit" },
+	["拳法"] = { "Melee", "Fighting" },
+	["剑"] = { "Sword" },
+	["枪"] = { "Gun" },
+}
+
+-- 把勾选的类型拼成 ToolTip 白名单；一个都没勾 = nil(随便)
+local function currentWeaponTypes()
+	local list = {}
+	for _, n in ipairs(WEAPON_TYPE_NAMES) do
+		if _G.Hunt_Weapons[n] then
+			for _, tip in ipairs(WEAPON_TIP_MAP[n]) do
+				table.insert(list, tip)
+			end
+		end
+	end
+	if #list == 0 then return nil end
+	return list
+end
+
+local function weaponTypeText()
+	local list = {}
+	for _, n in ipairs(WEAPON_TYPE_NAMES) do
+		if _G.Hunt_Weapons[n] then table.insert(list, n) end
+	end
+	if #list == 0 then return "随便" end
+	return table.concat(list, "/")
+end
+
+-- 轮换模式：返回「当前该拿的类型」+ 已勾选的类型列表
+local function rotationTargetType()
+	if not _G.Hunt_RotateWeapon then return nil, nil end
+	local list = {}
+	for _, n in ipairs(WEAPON_TYPE_NAMES) do
+		if _G.Hunt_Weapons[n] then table.insert(list, n) end
+	end
+	if #list == 0 then return nil, nil end
+	local idx = ((_G.Hunt_RotateIndex - 1) % #list) + 1
+	return list[idx], list
+end
+
+local function toolMatches(tool, types)
+	if not tool or not tool:IsA("Tool") then return false end
+	if types == nil then return true end -- 随便
+	for _, t in ipairs(types) do
+		if tool.ToolTip == t then return true end
+	end
+	return false
+end
+
+getBackpackTools = function()
+	local backpack = LocalPlayer:FindFirstChild("Backpack")
+	if not backpack then return {} end
+	local list = {}
+	for _, item in ipairs(backpack:GetChildren()) do
+		if item:IsA("Tool") then table.insert(list, item) end
+	end
+	return list
+end
+
+local lastEquipLog = 0
+local lastEquipName = nil
+ensureEquipped = function()
+	if not _G.Hunt_AutoEquip then return end
+
+	local char = LocalPlayer.Character
+	if not char then return end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+
+	-- 轮换模式 -> 只认当前轮到的那个类型；否则用勾选的白名单
+	local desiredType = rotationTargetType()
+	local types
+	if desiredType then
+		types = WEAPON_TIP_MAP[desiredType]
+	else
+		types = currentWeaponTypes()
+	end
+
+	-- 手上已经拿着了：类型对就不动，类型不对就换
+	local held = char:FindFirstChildOfClass("Tool")
+	if held and toolMatches(held, types) then return end
+
+	-- 从背包装一个匹配的类型
+	local backpack = LocalPlayer:FindFirstChild("Backpack")
+	if not backpack then return end
+
+	for _, item in ipairs(backpack:GetChildren()) do
+		if toolMatches(item, types) then
+			local ok = pcall(function() hum:EquipTool(item) end)
+			-- 只在真正换了一把的时候打印，不刷屏
+			if item.Name ~= lastEquipName then
+				lastEquipName = item.Name
+				print("[猎赏] 切换装备: " .. item.Name .. " (" .. tostring(item.ToolTip) .. ")"
+					.. (desiredType and (" <-轮换:" .. desiredType) or "") .. (ok and "" or " EquipTool报错"))
+			end
+			return
+		end
+	end
+
+	if tick() - lastEquipLog > 10 then
+		lastEquipLog = tick()
+		print("[猎赏] 自动装备失败: 背包里没有「" .. (desiredType or weaponTypeText()) .. "」类型的武器")
+	end
+end
+
+task.spawn(function()
+	while task.wait(0.5) do
+		ensureEquipped()
+	end
+end)
+
+-- ==================== 阵营 (换服后自动选海盗/海军) ====================
+local TEAM_MAP = {
+	["海盗"] = "Pirates",
+	["海军"] = "Marines",
+}
+
+-- 读当前阵营：优先 Data.Team，其次 Roblox Team
+local function getCurrentTeam()
+	local ok, v = pcall(function() return LocalPlayer.Data.Team.Value end)
+	if ok and v and v ~= "" then return v end
+	local t = LocalPlayer.Team
+	return t and t.Name or nil
+end
+
+applyTeam = function(force)
+	local want = TEAM_MAP[_G.Hunt_Team]
+	if not want then return end
+	if not force and getCurrentTeam() == want then return end
+
+	pcall(function()
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		local commF = remotes and remotes:FindFirstChild("CommF_")
+		if commF then commF:InvokeServer("SetTeam", want) end
+	end)
+	print("[猎赏] 切换阵营: " .. _G.Hunt_Team .. " (" .. want .. ")")
+end
+
+-- 脚本加载/换服后自动选：持续巡检，阵营不对就切（连续失败 5 次后停手，避免刷包）
+task.spawn(function()
+	local announced = false
+	local fails = 0
+	while true do
+		task.wait(3)
+		local want = TEAM_MAP[_G.Hunt_Team]
+		if not want then
+			announced = false
+			fails = 0
+		elseif getCurrentTeam() == want then
+			if not announced then
+				print("[猎赏] 阵营已是 " .. _G.Hunt_Team .. "，无需切换")
+				announced = true
+			end
+			fails = 0
+		elseif fails < 5 then
+			fails = fails + 1
+			applyTeam(true)
+		end
+	end
+end)
+
+-- ==================== 自动武装色 / 自动V3 / 自动V4 ====================
+-- 武装色: 角色身上没有 HasBuso 标记就补一次
+task.spawn(function()
+	while task.wait(2) do
+		if _G.Hunt_AutoHaki then
+			local char = LocalPlayer.Character
+			if char and not char:FindFirstChild("HasBuso") then
+				pcall(function()
+					local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+					local commF = remotes and remotes:FindFirstChild("CommF_")
+					if commF then commF:InvokeServer("Buso") end
+				end)
+			end
+		end
+	end
+end)
+
+-- V3: CommE 触发 ActivateAbility
+task.spawn(function()
+	while task.wait(1) do
+		if _G.Hunt_AutoV3 then
+			pcall(function()
+				local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+				local commE = remotes and remotes:FindFirstChild("CommE")
+				if commE then commE:FireServer("ActivateAbility") end
+			end)
+		end
+	end
+end)
+
+-- V4: 背包里的 Awakening 工具
+task.spawn(function()
+	while task.wait(1) do
+		if _G.Hunt_AutoV4 then
+			pcall(function()
+				local backpack = LocalPlayer:FindFirstChild("Backpack")
+				local awakening = backpack and backpack:FindFirstChild("Awakening")
+				local rf = awakening and awakening:FindFirstChild("RemoteFunction")
+				if rf then rf:InvokeServer(true) end
+			end)
+		end
+	end
+end)
+
+-- ==================== 自动释放技能 (按当前手持武器类型) ====================
+local KEY_CODES = {
+	Z = Enum.KeyCode.Z,
+	X = Enum.KeyCode.X,
+	C = Enum.KeyCode.C,
+	V = Enum.KeyCode.V,
+	F = Enum.KeyCode.F,
+}
+
+-- 手持武器的 ToolTip -> 武器类型
+local TIP_TO_TYPE = {
+	["Blox Fruit"] = "果实",
+	["Melee"] = "拳法",
+	["Fighting"] = "拳法",
+	["Sword"] = "剑",
+	["Gun"] = "枪",
+}
+
+-- 当前手持武器的类型名（拿不出来就返回 nil）
+local function heldTypeName()
+	local char = LocalPlayer.Character
+	local held = char and char:FindFirstChildOfClass("Tool")
+	if not held then return nil end
+	return TIP_TO_TYPE[held.ToolTip]
+end
+
+-- 该类型下勾选要放的技能键
+local function keysForType(typeName)
+	local list = {}
+	if not typeName or not TYPE_SKILL_KEYS[typeName] then return list end
+	for _, k in ipairs(TYPE_SKILL_KEYS[typeName]) do
+		if _G.Hunt_TypeSkills[typeName][k] then table.insert(list, k) end
+	end
+	return list
+end
+
+-- 汇总显示用
+local function enabledSkillText()
+	local parts = {}
+	for _, tn in ipairs(WEAPON_TYPE_NAMES) do
+		local ks = keysForType(tn)
+		if #ks > 0 then
+			table.insert(parts, tn .. ":" .. table.concat(ks, ""))
+		end
+	end
+	if #parts == 0 then return "无" end
+	return table.concat(parts, " ")
+end
+
+local lastSkill = 0
+local lastSkillLog = 0
+pressSkills = function(force)
+	if not _G.Hunt_AutoSkill then return end
+	if _G.Hunt_Fleeing then return end -- 逃生期间不放技能
+	if not force and tick() - lastSkill < _G.Hunt_SkillInterval then return end
+	lastSkill = tick()
+
+	-- 保险：放技能前确保手上有东西
+	ensureEquipped()
+
+	local char = LocalPlayer.Character
+	local typeName = heldTypeName()
+	-- 只放「当前手里这把武器」的技能
+	local keys = keysForType(typeName)
+
+	if tick() - lastSkillLog > 5 then
+		lastSkillLog = tick()
+		local held = char and char:FindFirstChildOfClass("Tool")
+		print("[猎赏] 释放技能: " .. (typeName or "未知类型") .. " -> " .. (#keys > 0 and table.concat(keys, "") or "无")
+			.. " | 手持: " .. (held and (held.Name .. " [" .. tostring(held.ToolTip) .. "]") or "空手"))
+	end
+
+	if #keys == 0 then return end
+
+	task.spawn(function()
+		for _, k in ipairs(keys) do
+			pcall(function()
+				VirtualInputManager:SendKeyEvent(true, KEY_CODES[k], false, game)
+				task.wait(0.03)
+				VirtualInputManager:SendKeyEvent(false, KEY_CODES[k], false, game)
+			end)
+			task.wait(0.05)
+		end
+
+		-- 这一轮技能放完了 -> 轮到下一把武器，并立刻换过去
+		if _G.Hunt_RotateWeapon then
+			_G.Hunt_RotateIndex = _G.Hunt_RotateIndex + 1
+			ensureEquipped()
+		end
+	end)
+end
+
+-- 每 N 秒自动瞬步（逃生期间暂停，否则会往目标方向冲）
+task.spawn(function()
+	while task.wait(1) do
+		if _G.Hunt_Auto and _G.Hunt_AutoSoru and not _G.Hunt_Fleeing then
+			if tick() - lastSoru >= _G.Hunt_SoruInterval then
+				triggerSoru()
+			end
+		end
+	end
+end)
+
+-- ==================== 自动攻击 ====================
+local lastAttack = 0
+local function attackTarget(plr)
+	if not _G.Hunt_AutoAttack then return end
+	if tick() - lastAttack < 0.12 then return end
+	lastAttack = tick()
+
+	local char = LocalPlayer.Character
+	local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+	if not myRoot then return end
+
+	local tchar = plr.Character
+	local tRoot = tchar and tchar:FindFirstChild("HumanoidRootPart")
+	local tHum = tchar and tchar:FindFirstChildOfClass("Humanoid")
+	if not tRoot or not tHum or tHum.Health <= 0 then return end
+
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	local net = ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("Net")
+	if not net then return end
+	local RA = net:FindFirstChild("RE/RegisterAttack")
+	local RH = net:FindFirstChild("RE/RegisterHit")
+	if not RA or not RH then return end
+
+	-- 把目标身上所有部位打包，命中率更高
+	local hits = {}
+	for _, part in ipairs(tchar:GetChildren()) do
+		if part:IsA("BasePart") then
+			table.insert(hits, { tchar, part })
+		end
+	end
+	if #hits == 0 then return end
+
+	pcall(function()
+		RA:FireServer(0.3)
+		RH:FireServer(tRoot, hits)
+	end)
+end
+
+-- ==================== 飞行 + 低血逃生 + 贴身瞬步 ====================
+local fleeing = false
+local fleeBaseY = 0
+
+RunService.Heartbeat:Connect(function(dt)
+	local char = LocalPlayer.Character
+	local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not myRoot or not hum then return end
+
+	-- 无碰撞，避免卡建筑/卡在目标身上
+	for _, v in ipairs(char:GetDescendants()) do
+		if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+	end
+
+	-- ===== 低血逃生：直线上飞，满血自动恢复狩猎 =====
+	if _G.Hunt_AutoFlee and hum.Health > 0 then
+		local hpPct = (hum.Health / hum.MaxHealth) * 100
+
+		if not fleeing and hpPct <= _G.Hunt_FleeHP then
+			fleeing = true
+			_G.Hunt_Fleeing = true -- 广播给其他循环（瞬步/技能会暂停）
+			fleeBaseY = myRoot.Position.Y
+			print("[猎赏] 血量 " .. math.floor(hpPct) .. "% -> 向上逃生，暂停猎赏")
+		elseif fleeing and hpPct >= _G.Hunt_FleeRecover then
+			fleeing = false
+			_G.Hunt_Fleeing = false
+			print("[猎赏] 血量恢复到 " .. math.floor(hpPct) .. "% -> 结束逃生，自动恢复猎赏")
+		end
+
+		if fleeing then
+			local ceiling = fleeBaseY + _G.Hunt_FleeHeight
+			if myRoot.Position.Y < ceiling then
+				local rot = myRoot.CFrame - myRoot.Position
+				local step = math.min(_G.Hunt_FlySpeed * dt, ceiling - myRoot.Position.Y)
+				myRoot.CFrame = CFrame.new(myRoot.Position + Vector3.new(0, step, 0)) * rot
+				myRoot.Velocity = Vector3.new(0, 0, 0)
+				myRoot.RotVelocity = Vector3.new(0, 0, 0)
+			end
+			return -- 逃生期间不打、不放技能
+		end
+	else
+		if fleeing then
+			fleeing = false
+			_G.Hunt_Fleeing = false
+		end
+	end
+
+	-- ===== 正常狩猎 =====
+	if not _G.Hunt_Auto or not currentTarget then return end
+
+	local tRoot = getRoot(currentTarget)
+	if not tRoot then return end
+
+	local targetPos = tRoot.Position + Vector3.new(0, _G.Hunt_StopDist, 0)
+	local dist = (targetPos - myRoot.Position).Magnitude
+
+	if dist > 1 then
+		local moveDist = math.min(_G.Hunt_FlySpeed * dt, dist)
+		local dir = (targetPos - myRoot.Position).Unit
+		local rot = myRoot.CFrame - myRoot.Position -- 保留当前朝向
+		myRoot.CFrame = CFrame.new(myRoot.Position + dir * moveDist) * rot
+		myRoot.Velocity = Vector3.new(0, 0, 0)
+		myRoot.RotVelocity = Vector3.new(0, 0, 0)
+	end
+
+	-- 贴到身边了就瞬步 + 放技能 + 攻击
+	if dist <= _G.Hunt_StopDist + 6 then
+		triggerSoru()
+		pressSkills()
+		attackTarget(currentTarget)
+	end
+end)
+
+-- ==================== 跳服后自动重跑脚本 ====================
+-- 找到本脚本文件 -> 用 queue_on_teleport 排一个极短 loader，
+-- 换服后执行器会自动重新跑脚本；再配合存档里的「自动执行」= 换服后自动开始
+local function findSelfFile()
+	local ok, info = pcall(debug.getinfo, 1, "s")
+	if ok and info and type(info.source) == "string" and info.source:sub(1, 1) == "@" then
+		local p = info.source:sub(2)
+		local ok2, exists = pcall(function() return isfile(p) end)
+		if ok2 and exists then return p end
+	end
+	-- 兜底：试几个常见路径
+	for _, p in ipairs({ "BF_AutoBounty.lua", "scripts/BF_AutoBounty.lua", "Scripts/BF_AutoBounty.lua" }) do
+		local ok2, exists = pcall(function() return isfile(p) end)
+		if ok2 and exists then return p end
+	end
+	return nil
+end
+
+local function queueSelf()
+	if not _G.Hunt_ReExec then return end
+	if not hasFileAPI then
+		print("[猎赏] 跳服后自动重跑: 执行器不支持文件读写，无法定位脚本")
+		return
+	end
+
+	local path = findSelfFile()
+	if not path then
+		print("[猎赏] 跳服后自动重跑: 找不到脚本文件。把脚本放进执行器的 autoexec 文件夹，或从文件执行本脚本")
+		return
+	end
+
+	-- 换服后执行的 loader：读 AutoBounty.file，为 "true" 才重跑脚本
+	local ScriptLoadstring = ([[if isfile("%s") then
+	if readfile("%s") == "true" then
+		loadstring(readfile("%s"))()
+	end
+end]]):format(AUTO_EXEC_FILE, AUTO_EXEC_FILE, path)
+
+	-- 先编译一次：语法有问题当场报出来，别等换完服才发现
+	local success, err = loadstring(ScriptLoadstring)
+	if not success then
+		warn("[猎赏] 跳服 loader 语法错误: " .. tostring(err))
+		return
+	end
+
+	local queue_on_teleport = queue_on_teleport or (syn and syn.queue_on_teleport)
+	if not queue_on_teleport then
+		print("[猎赏] 执行器不支持 queue_on_teleport，跳服后请手动重新执行")
+		return
+	end
+
+	local ok = pcall(function() queue_on_teleport(ScriptLoadstring) end)
+	if ok then
+		print("[猎赏] 已设置跳服后自动重跑: " .. path)
+	else
+		print("[猎赏] queue_on_teleport 执行失败，跳服后请手动重新执行")
+	end
+end
+
+-- ==================== 自动跳服务器 (1:1 移植自 WindUI 的服务器浏览器扫描) ====================
+local function serverHop()
+	-- 跳之前先排好「换服后重跑」，否则新服务器里脚本就没了
+	queueSelf()
+
+	if getgenv().IsServerHopping == true then return false end
+	getgenv().IsServerHopping = true
+
+	local PlayerGui = LocalPlayer.PlayerGui
+	if not PlayerGui:FindFirstChild("ServerBrowser") then
+		getgenv().IsServerHopping = false
+		print("[猎赏] 没找到 ServerBrowser 界面，无法跳服")
+		return false
+	end
+
+	PlayerGui.ServerBrowser.Enabled = true
+	task.wait(0.1)
+
+	local Filters = PlayerGui.ServerBrowser.Frame:FindFirstChild("Filters")
+	local SearchRegion = Filters and Filters:FindFirstChild("SearchRegion")
+	local TextBox = SearchRegion and SearchRegion:FindFirstChild("TextBox")
+
+	if not TextBox then
+		getgenv().IsServerHopping = false
+		print("[猎赏] ServerBrowser 里找不到区域输入框")
+		return false
+	end
+
+	TextBox.Text = _G.G_ServerRegion
+
+	-- 展开完整列表
+	local Full = Filters and Filters:FindFirstChild("Full")
+	local FullCheck = Full and Full:FindFirstChild("Check")
+	if FullCheck then
+		FullCheck.Text = "\226\156\148\239\184\143"
+		task.wait(0.1)
+	end
+
+	local ScrollingFrame = PlayerGui.ServerBrowser.Frame.ScrollingFrame
+	local FakeScroll = PlayerGui.ServerBrowser.Frame.FakeScroll
+	local Inside = FakeScroll.Inside
+
+	-- 滚动列表，让所有服务器条目加载出来
+	task.spawn(function()
+		while getgenv().IsServerHopping do
+			ScrollingFrame.CanvasPosition = Vector2.new(0, math.random(100, 7000))
+			task.wait(0.3)
+		end
+	end)
+
+	task.wait()
+
+	local currentJobId = game.JobId
+	local ServerBrowserRemote = ReplicatedStorage:WaitForChild("__ServerBrowser")
+
+	print("[猎赏] 扫描服务器 | 区域: " .. _G.G_ServerRegion
+		.. " | 人数: " .. _G.G_HopPlayerRange .. " | 赏金: " .. _G.G_HopBountyRange)
+
+	while getgenv().IsServerHopping do
+		for _, template in ipairs(Inside:GetChildren()) do
+			if template.Name == "Template" then
+				local joinButton = template:FindFirstChild("Join")
+				local textLabel = template:FindFirstChild("TextLabel")
+				local info = textLabel and ParseServerInfo(textLabel.Text)
+
+				if joinButton and info and IsServerAllowed(info) then
+					local job = joinButton:GetAttribute("Job")
+					if job and tostring(job):find("-", 1, true) then
+						job = tostring(job)
+
+						if job ~= currentJobId then
+							print("[猎赏] 匹配到服务器 -> 地区: " .. tostring(info.Region)
+								.. " | 人数: " .. info.Players .. "/" .. info.MaxPlayers
+								.. " | 赏金: " .. FormatNumber(info.Bounty))
+
+							local success = pcall(function()
+								ServerBrowserRemote:InvokeServer("teleport", job)
+							end)
+							if not success then
+								local success2 = pcall(function()
+									ServerBrowserRemote:InvokeServer("teleport", job)
+								end)
+								if not success2 then
+									print("[猎赏] 跳服失败，请重新加入游戏")
+								end
+							end
+
+							task.wait(0.3)
+							getgenv().IsServerHopping = false
+							return true
+						end
+					end
+				end
+			end
+		end
+		task.wait(3)
+	end
+
+	getgenv().IsServerHopping = false
+	return false
+end
+
+task.spawn(function()
+	while task.wait(1) do
+		local hop = false
+		if _G.Hunt_ForceHop then
+			_G.Hunt_ForceHop = false
+			hop = true
+		elseif _G.Hunt_AutoHop then
+			if not _G.Hunt_HopTimer then _G.Hunt_HopTimer = tick() end
+			if tick() - _G.Hunt_HopTimer >= _G.Hunt_HopInterval then hop = true end
+		else
+			_G.Hunt_HopTimer = tick()
+		end
+
+		if hop then
+			print("[猎赏] 跳服务器中...")
+			if serverHop() then
+				_G.Hunt_HopTimer = tick()
+			else
+				-- 传送失败(含被服务器拒绝)就 20 秒后重试，不用再干等一个完整间隔
+				_G.Hunt_HopTimer = tick() - _G.Hunt_HopInterval + 20
+			end
+		end
+	end
+end)
+
+-- ==================== 没人开战斗模式 -> 自动跳服 ====================
+-- 统计服务器里「开了战斗模式(PvP) 且能通过其他过滤」的活人
+local function countHuntable()
+	local n = 0
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and isAlive(plr) and passFilter(plr) then
+			n = n + 1
+		end
+	end
+	return n
+end
+
+task.spawn(function()
+	task.wait(25) -- 等新服务器玩家列表加载完，别刚进来就跳走
+	local emptySince = nil
+	while task.wait(2) do
+		if _G.Hunt_HopIfEmpty then
+			local n = countHuntable()
+			if n == 0 then
+				if not emptySince then
+					emptySince = tick()
+					print("[猎赏] 服务器暂无开战斗模式的目标，开始计时 " .. _G.Hunt_EmptyWait .. " 秒")
+				elseif tick() - emptySince >= _G.Hunt_EmptyWait then
+					emptySince = nil
+					print("[猎赏] 持续 " .. _G.Hunt_EmptyWait .. " 秒无可猎目标 -> 切换服务器")
+					serverHop()
+					task.wait(30) -- 等传送完成，避免重复触发
+				end
+			else
+				if emptySince then
+					print("[猎赏] 发现 " .. n .. " 个可猎目标，取消跳服")
+				end
+				emptySince = nil
+			end
+		else
+			emptySince = nil
+		end
+	end
+end)
+
+print(string.rep("=", 40))
+print("  自动猎赏 已加载")
+print("  配置: " .. (not hasFileAPI and "执行器不支持文件读写(无法保存)"
+	or (configLoaded and ("已读取 " .. CONFIG_FILE) or "无存档，使用默认值"))
+	.. (_G.Hunt_AutoSave and " | 自动保存: 开" or " | 自动保存: 关"))
+print("  自动执行: " .. (_G.AutoExecute and "开" or "关") .. " (" .. AUTO_EXEC_FILE .. ")"
+	.. (hasFileAPI and "" or " | 执行器不支持文件读写，开关无法保存"))
+print("  等级过滤: " .. (_G.Hunt_UseLevel and (">= " .. _G.Hunt_MinLevel) or "关闭"))
+print("  过滤: " .. (_G.Hunt_NoSafe and "排除安全区 " or "") .. (_G.Hunt_NoPvp and "排除无PvP " or "") .. (_G.Hunt_NoMarineAlly and "排除海军盟友 " or "") .. "| 换人距离: " .. _G.Hunt_MaxDist .. " 米")
+print("  瞬步: CommE 发包(冲向锁定目标) 每 " .. _G.Hunt_SoruInterval .. " 秒")
+print("  技能: " .. enabledSkillText() .. " | 间隔 " .. _G.Hunt_SkillInterval .. " 秒")
+print("  飞行: " .. _G.Hunt_FlySpeed .. " | 跳服: 每 " .. _G.Hunt_HopInterval .. " 秒 (ServerBrowser 扫描)")
+print("  跳服筛选: 区域 " .. _G.G_ServerRegion .. " | 人数 " .. _G.G_HopPlayerRange
+	.. " | 赏金 " .. _G.G_HopBountyRange .. " (" .. FormatNumber(_G.G_HopMinBounty) .. " - " .. FormatNumber(_G.G_HopMaxBounty) .. ")")
+print("  自动装备: " .. (_G.Hunt_AutoEquip and "开" or "关") .. " | 武器类型: " .. weaponTypeText() .. " | 背包工具数: " .. #getBackpackTools())
+print("  霸气/种族: " .. (_G.Hunt_AutoHaki and "武装色 " or "") .. (_G.Hunt_AutoV3 and "V3 " or "") .. (_G.Hunt_AutoV4 and "V4" or "") .. " (全程开启)")
+print("  自瞄: " .. (_G.Hunt_SkillAim and "技能 " or "") .. (_G.Hunt_SoruAim and "瞬步" or "") .. " -> 只瞄锁定目标")
+print("  武器轮换: " .. (_G.Hunt_RotateWeapon and "技能放完自动换下一把" or "关"))
+print("  跳服重跑: " .. (_G.Hunt_ReExec and "开 (换服后自动重跑并自动执行)" or "关"))
+print("  空服跳服: " .. (_G.Hunt_HopIfEmpty and ("连续 " .. _G.Hunt_EmptyWait .. " 秒无可猎目标就跳") or "关"))
+print("  阵营: " .. _G.Hunt_Team .. (TEAM_MAP[_G.Hunt_Team] and " (换服后自动选)" or ""))
+print("  低血逃生: " .. (_G.Hunt_AutoFlee and ("血量<" .. _G.Hunt_FleeHP .. "% 上飞 " .. _G.Hunt_FleeHeight .. " 米，恢复到 " .. _G.Hunt_FleeRecover .. "% 继续猎赏") or "关"))
+
