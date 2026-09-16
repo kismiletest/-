@@ -12,7 +12,7 @@ local Mouse = LocalPlayer:GetMouse()
 -- ==================== 配置 (自动保存/读取) ====================
 local CONFIG_FILE = "BF_AutoBounty_Config.json"
 local CONFIG_KEYS = {
-	"Hunt_Auto", "Hunt_AutoRun", "Hunt_AutoSelect",
+	"Hunt_Auto", "Hunt_AutoRun", "Hunt_AutoSelect", "Hunt_StartWait",
 	"Hunt_UseLevel", "Hunt_MinLevel", "Hunt_AllowUnknown",
 	"Hunt_NoSafe", "Hunt_NoArena", "Hunt_NoMarineAlly", "Hunt_MaxDist",
 	"Hunt_FlySpeed", "Hunt_StopDist",
@@ -115,6 +115,7 @@ end
 
 -- ==================== 状态（默认值） ====================
 _G.Hunt_Auto = true   -- 自动猎赏：默认开；关掉后会写进存档，下次加载仍然保持关闭
+_G.Hunt_StartWait = 8 -- 进服务器后等待多少秒才开始猎赏（等地图/玩家列表加载完）
 _G.Hunt_AutoSelect = true
 _G.Hunt_Target = nil
 _G.Hunt_UseLevel = true
@@ -190,8 +191,8 @@ _G.G_AttackPlayers = true
 -- 读取上次保存的配置（覆盖默认值）
 local configLoaded = loadConfig()
 
--- 「自动猎赏」「自动攻击」：按要求保持开启，存档里是关的也拉回来（之后由「强制项保活」循环兜住）
-_G.Hunt_Auto = true
+-- 「自动攻击」：按要求保持开启，存档里是关的也拉回来（之后由「强制项保活」循环兜住）
+-- 「自动猎赏」不再强制开启：以存档 / 你的手动开关为准
 _G.Hunt_AutoAttack = true
 
 local lastSavedSnap = serializeConfig()
@@ -263,6 +264,8 @@ end
 
 local function IsServerAllowed(info)
 	if not info then return false end
+	-- 满人的服务器不加：进去要么进不去、要么被弹回大厅，白等一轮
+	if info.MaxPlayers and info.Players >= info.MaxPlayers then return false end
 	if info.Players < _G.G_HopMinPlayers or info.Players > _G.G_HopMaxPlayers then return false end
 	if info.Bounty < _G.G_HopMinBounty or info.Bounty > _G.G_HopMaxBounty then return false end
 	return true
@@ -779,8 +782,9 @@ if WindUI then
 	})
 
 	Tab:Section({ Title = "狩猎设置" })
-	uiToggles.Hunt_Auto = Tab:Toggle({ Title = "自动猎赏（保持开启）", Value = _G.Hunt_Auto, Callback = function(v) _G.Hunt_Auto = v end })
+	uiToggles.Hunt_Auto = Tab:Toggle({ Title = "自动猎赏", Value = _G.Hunt_Auto, Callback = function(v) _G.Hunt_Auto = v end })
 	Tab:Toggle({ Title = "自动选择玩家", Value = _G.Hunt_AutoSelect, Callback = function(v) _G.Hunt_AutoSelect = v end })
+	Tab:Slider({ Title = "进服务器后等待 (秒)", Value = { Min = 0, Max = 60, Default = _G.Hunt_StartWait }, Callback = function(v) _G.Hunt_StartWait = v end })
 	uiToggles.Hunt_AutoAttack = Tab:Toggle({ Title = "自动攻击（保持开启）", Value = _G.Hunt_AutoAttack, Callback = function(v) _G.Hunt_AutoAttack = v end })
 	uiToggles.Hunt_AutoEquip = Tab:Toggle({ Title = "自动装备 ", Value = _G.Hunt_AutoEquip, Callback = function(v) _G.Hunt_AutoEquip = v end })
 	for _, n in ipairs(WEAPON_TYPE_NAMES) do
@@ -1417,6 +1421,11 @@ end
 local lastTargetName = nil
 local lastScanErr = 0
 task.spawn(function()
+	-- 进服务器后先等一会儿：地图/玩家列表加载完再开始猎赏，避免刚进服就乱飞
+	if (_G.Hunt_StartWait or 0) > 0 then
+		print("[猎赏] 进服务器后等待 " .. _G.Hunt_StartWait .. " 秒再开始猎赏")
+		task.wait(_G.Hunt_StartWait)
+	end
 	while task.wait(1) do
 		if _G.Hunt_Auto then
 			-- 用 pcall 包住：选人时万一抛错，也不会把这个线程搞死导致以后永远不猎赏
@@ -1426,7 +1435,8 @@ task.spawn(function()
 					lastScanErr = tick()
 					print("[猎赏] 目标扫描异常(已自动继续): " .. tostring(t))
 				end
-				t, count = nil, 0
+				-- 出错时保持原来的锁定目标，别把锁清掉导致停下不猎
+				t, count = currentTarget, 1
 			end
 
 			-- 上一个目标超距了：提示一下，本次会自动换成下一个
@@ -1452,10 +1462,6 @@ task.spawn(function()
 				end
 				pcall(diagnose)
 			end
-		else
-			currentTarget = nil
-			currentTargetName = nil
-			lastTargetName = nil
 		end
 	end
 end)
@@ -1466,12 +1472,7 @@ task.spawn(function()
 	while task.wait(5) do
 		_G.Hunt_NoPvp = true -- 强制只猎开了战斗模式的玩家
 
-		-- 自动猎赏 / 自动攻击：按要求保持开启
-		if not _G.Hunt_Auto then
-			_G.Hunt_Auto = true
-			setUI("Hunt_Auto", true)
-			print("[猎赏] 「自动猎赏」已自动恢复为开启（保持开启）")
-		end
+		-- 「自动攻击」按要求保持开启（「自动猎赏」不再强制，以你的开关为准）
 		if not _G.Hunt_AutoAttack then
 			_G.Hunt_AutoAttack = true
 			setUI("Hunt_AutoAttack", true)
@@ -1488,10 +1489,12 @@ end)
 
 -- 当前该瞄的部位（没锁定/没开启就返回 nil，交还原版逻辑）
 local function getAimPart()
-	if not _G.Hunt_SkillAim or not currentTarget then return nil end
-	local root = getRoot(currentTarget)
-	if not root or not root.Parent then return nil end
-	return root
+	if not _G.Hunt_SkillAim then return nil end
+	if currentTarget then
+		local root = getRoot(currentTarget)
+		if root and root.Parent then return root end
+	end
+	return nil
 end
 
 -- ---- 通道1: ReplicatedStorage.Mouse 模块 ----
@@ -2023,7 +2026,7 @@ task.spawn(function()
 	while task.wait(1) do
 		if _G.Hunt_Auto and _G.Hunt_AutoSoru and not _G.Hunt_Fleeing then
 			if tick() - lastSoru >= _G.Hunt_SoruInterval then
-				triggerSoru()
+				pcall(triggerSoru) -- 包一层：瞬步里万一出错，也不会把这个循环搞死导致以后都不瞬步
 			end
 		end
 	end
@@ -2074,9 +2077,10 @@ end
 local fleeing = false
 local fleeBaseY = 0
 local fleeStart = 0
-local skyBaseY = nil -- 「没人可猎 -> 飞天等待」时的起始高度
+local skyBaseY = nil -- 「准备跳服 -> 飞天等待」时的起始高度
 
-RunService.Heartbeat:Connect(function(dt)
+local lastHbErr = 0
+local function huntTick(dt)
 	local char = LocalPlayer.Character
 	local myRoot = char and char:FindFirstChild("HumanoidRootPart")
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -2180,6 +2184,15 @@ RunService.Heartbeat:Connect(function(dt)
 	if dist <= _G.Hunt_StopDist + 6 then
 		triggerSoru()
 	end
+end
+
+-- 用 pcall 包住整帧逻辑：某一帧出错也不会把飞行/攻击/技能整条链停掉（出错限频打印，方便排查）
+RunService.Heartbeat:Connect(function(dt)
+	local ok, err = pcall(huntTick, dt)
+	if not ok and tick() - lastHbErr > 10 then
+		lastHbErr = tick()
+		print("[猎赏] 飞行/猎赏循环异常(已自动继续): " .. tostring(err))
+	end
 end)
 
 -- ==================== 同一个玩家打死 N 次 -> 自动换服 / 过滤 ====================
@@ -2270,7 +2283,12 @@ local function doServerHop()
 	print("[猎赏] 扫描服务器 | 区域: " .. _G.G_ServerRegion
 		.. " | 人数: " .. _G.G_HopPlayerRange .. " | 赏金: " .. _G.G_HopBountyRange)
 
-	while getgenv().IsServerHopping do
+	-- 先滚动几轮把服务器列表尽量加载全，收集所有符合条件的候选，再挑「人数最少」的那个加入
+	--（已满人的服务器在上面的 IsServerAllowed 里就被挡掉了，不会去挤）
+	local candidates = {} -- jobId -> info
+	local rounds = 0
+	while getgenv().IsServerHopping and rounds < 12 do
+		rounds = rounds + 1
 		for _, template in ipairs(Inside:GetChildren()) do
 			if template.Name == "Template" then
 				local joinButton = template:FindFirstChild("Join")
@@ -2279,39 +2297,55 @@ local function doServerHop()
 
 				if joinButton and info and IsServerAllowed(info) then
 					local job = joinButton:GetAttribute("Job")
-					if job and tostring(job):find("-", 1, true) then
+					if job then
 						job = tostring(job)
-
-						if job ~= currentJobId then
-							print("[猎赏] 匹配到服务器 -> 地区: " .. tostring(info.Region)
-								.. " | 人数: " .. info.Players .. "/" .. info.MaxPlayers
-								.. " | 赏金: " .. FormatNumber(info.Bounty))
-
-							local success = pcall(function()
-								ServerBrowserRemote:InvokeServer("teleport", job)
-							end)
-							if not success then
-								local success2 = pcall(function()
-									ServerBrowserRemote:InvokeServer("teleport", job)
-								end)
-								if not success2 then
-									print("[猎赏] 跳服失败，请重新加入游戏")
-								end
+						if job:find("-", 1, true) and job ~= currentJobId then
+							local old = candidates[job]
+							if not old or info.Players < old.Players then
+								candidates[job] = info
 							end
-
-							task.wait(0.3)
-							getgenv().IsServerHopping = false
-							return true
 						end
 					end
 				end
 			end
 		end
-		task.wait(3)
+		task.wait(0.3)
 	end
 
+	-- 选人数最少的那个
+	local bestJob, bestInfo, candCount = nil, nil, 0
+	for job, info in pairs(candidates) do
+		candCount = candCount + 1
+		if not bestInfo or info.Players < bestInfo.Players then
+			bestJob, bestInfo = job, info
+		end
+	end
+
+	if not bestJob then
+		getgenv().IsServerHopping = false
+		print("[猎赏] 没有符合条件的空位服务器（人数/赏金/满人都被过滤掉了）")
+		return false
+	end
+
+	print("[猎赏] 扫到 " .. candCount .. " 个可用服务器 -> 选人数最少的: 地区 " .. tostring(bestInfo.Region)
+		.. " | 人数 " .. bestInfo.Players .. "/" .. bestInfo.MaxPlayers
+		.. " | 赏金 " .. FormatNumber(bestInfo.Bounty))
+
+	local success = pcall(function()
+		ServerBrowserRemote:InvokeServer("teleport", bestJob)
+	end)
+	if not success then
+		success = pcall(function()
+			ServerBrowserRemote:InvokeServer("teleport", bestJob)
+		end)
+	end
+	if not success then
+		print("[猎赏] 跳服失败，请重新加入游戏")
+	end
+
+	task.wait(0.3)
 	getgenv().IsServerHopping = false
-	return false
+	return true
 end
 
 -- 外层包装：用 pcall 包住扫描，异常也不会把跳服功能卡死（换服后由执行器的自动执行重跑脚本）
@@ -2404,11 +2438,18 @@ task.spawn(function()
 				waitingCombat = false
 				combatWaitSince = nil
 				print("[猎赏] 跳服务器中...")
-				if serverHop() then
+				local hopOk = serverHop()
+				if hopOk then
 					_G.Hunt_HopTimer = tick()
 				else
-					-- 传送失败(含被服务器拒绝)就 20 秒后重试，不用再干等一个完整间隔
+					-- 传送失败(含服务器拒绝 / 没找到空位)就 20 秒后重试，不用再干等一个完整间隔
 					_G.Hunt_HopTimer = tick() - _G.Hunt_HopInterval + 20
+				end
+				-- 不管成功失败都先解除飞天等待：
+				-- 传送成功的话马上就换服了；失败的话要下来继续猎赏，否则会一直挂在天上不干活
+				if _G.Hunt_HopSkyTimer then
+					_G.Hunt_HopSkyTimer = false
+					if not hopOk then print("[猎赏] 这轮没跳成功 -> 从天上下来继续猎赏，稍后重试") end
 				end
 			elseif not waitingCombat then
 				-- 到点了但还在打：不跳，等这场架打完再跳（提前跳会丢掉这单赏金）
@@ -2420,10 +2461,10 @@ task.spawn(function()
 		else
 			waitingCombat = false
 			combatWaitSince = nil
-			-- 关掉自动跳服了：从天上下来继续猎赏
-			if _G.Hunt_HopSkyTimer and not _G.Hunt_AutoHop then
+			-- 没有待处理的跳服了（关掉了自动跳服 / 本轮已结束）：从天上下来继续猎赏
+			if _G.Hunt_HopSkyTimer then
 				_G.Hunt_HopSkyTimer = false
-				print("[猎赏] 自动跳服已关闭 -> 从天上下来继续猎赏")
+				print("[猎赏] 当前没有待跳服 -> 从天上下来继续猎赏")
 			end
 		end
 	end
@@ -2466,7 +2507,12 @@ task.spawn(function()
 					emptyCombatSince = nil
 					emptySince = nil
 					print("[猎赏] 持续 " .. _G.Hunt_EmptyWait .. " 秒没有可猎目标 -> 切换服务器")
-					serverHop()
+					local hopOk = serverHop()
+					-- 不管成功失败都先解除飞天等待：跳成了马上换服；没跳成要下来继续猎，别一直挂天上
+					if _G.Hunt_HopSkyEmpty then
+						_G.Hunt_HopSkyEmpty = false
+						if not hopOk then print("[猎赏] 这轮没跳成功 -> 从天上下来继续猎赏，稍后重试") end
+					end
 					task.wait(30) -- 等传送完成，避免重复触发
 				elseif not emptyWaitCombat then
 					-- 判定到期但还在打（或刚交手 30 秒内）：等这场架打完再跳，别提前跳走丢赏金
@@ -2499,6 +2545,7 @@ print("  配置: " .. (not hasFileAPI and "执行器不支持文件读写(无法
 	.. (_G.Hunt_AutoSave and " | 自动保存: 开" or " | 自动保存: 关"))
 print("  自动执行(一键全开): " .. (_G.Hunt_AutoRun and "开" or "关"))
 print("  等级过滤: " .. (_G.Hunt_UseLevel and (">= " .. _G.Hunt_MinLevel) or "关闭"))
+print("  进服务器等待: " .. _G.Hunt_StartWait .. " 秒后才开始猎赏")
 print("  过滤: " .. (_G.Hunt_NoSafe and "排除安全区 " or "") .. (_G.Hunt_NoArena and "排除竞技场 " or "") .. (_G.Hunt_NoKilledEnough and ("排除已打死 " .. _G.Hunt_KillHopCount .. " 次的 " ) or "") .. "只猎开战斗模式(强制) " .. (_G.Hunt_NoMarineAlly and "排除海军盟友 " or "") .. "| 换人距离: " .. _G.Hunt_MaxDist .. " 米")
 print("  瞬步: CommE 发包(冲向锁定目标) 每 " .. _G.Hunt_SoruInterval .. " 秒")
 print("  技能: " .. enabledSkillText() .. " | 间隔 " .. _G.Hunt_SkillInterval .. " 秒")
