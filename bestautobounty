@@ -778,7 +778,6 @@ end)
 
 -- 前置声明（UI 按钮要用到）
 local triggerSoru
-local findSoruButton
 local pressSkills
 local ensureEquipped
 local getBackpackTools
@@ -899,8 +898,7 @@ if WindUI then
 		Title = "立即瞬步 (测试用)",
 		Callback = function()
 			triggerSoru()
-			local btn = findSoruButton()
-			print("[猎赏] 瞬步测试 | 游戏内瞬步按钮: " .. (btn and btn:GetFullName() or "未找到(只走发包)"))
+			print("[猎赏] 瞬步测试 -> 已发送瞬步发包 (CommE)")
 		end
 	})
 	uiToggles.Hunt_SoruAim = Tab:Toggle({ Title = "瞬步自瞄 (冲向锁定目标)", Value = _G.Hunt_SoruAim, Callback = function(v) _G.Hunt_SoruAim = v end })
@@ -1669,145 +1667,34 @@ end)
 
 print("[猎赏] 技能自瞄: " .. (mouseModuleHooked and "已 hook ReplicatedStorage.Mouse 模块 + 标准 Mouse" or "未找到 Mouse 模块，仅 hook 标准 Mouse"))
 
--- ==================== 游戏内按钮触发 (通用，给瞬步用) ====================
-local buttonCache = {}
-local buttonSearchTime = {}
-
--- 列出所有 BoundAction* 按钮（诊断用）
-local function listBoundActions()
-	local pg = LocalPlayer:FindFirstChild("PlayerGui")
-	if not pg then return {} end
-	local mcb = pg:FindFirstChild("MobileContextButtons")
-	local frame = mcb and mcb:FindFirstChild("ContextButtonFrame")
-	if not frame then return {} end
-	local list = {}
-	for _, child in ipairs(frame:GetChildren()) do
-		table.insert(list, child.ClassName .. ":" .. child.Name)
-	end
-	return list
-end
-
--- 按关键字找 GuiButton（名字或父级名字包含关键字）
-local function findButtonByKeyword(kw)
-	local cached = buttonCache[kw]
-	if cached and cached.Parent then return cached end
-	if tick() - (buttonSearchTime[kw] or 0) < 2 then return buttonCache[kw] end
-	buttonSearchTime[kw] = tick()
-
-	local pg = LocalPlayer:FindFirstChild("PlayerGui")
-	if not pg then return nil end
-
-	local found = nil
-	-- 已知路径: MobileContextButtons.ContextButtonFrame.BoundActionXXX.Button
-	local mcb = pg:FindFirstChild("MobileContextButtons")
-	local frame = mcb and mcb:FindFirstChild("ContextButtonFrame")
-	if frame then
-		for _, child in ipairs(frame:GetChildren()) do
-			if child.Name:lower():find(kw) then
-				found = child:FindFirstChild("Button") or child:FindFirstChildWhichIsA("GuiButton")
-				if found then break end
-			end
-		end
-	end
-
-	-- 兜底：全量搜索
-	if not found then
-		for _, obj in ipairs(pg:GetDescendants()) do
-			if obj:IsA("GuiButton") then
-				local n = obj.Name:lower()
-				local pn = obj.Parent and obj.Parent.Name:lower() or ""
-				if n:find(kw) or pn:find(kw) then
-					found = obj
-					break
-				end
-			end
-		end
-	end
-
-	-- 找不到就把现有的 BoundAction 列出来，方便定位真实名字
-	if not found and not buttonCache["_reported_" .. kw] then
-		buttonCache["_reported_" .. kw] = true
-		local acts = listBoundActions()
-		print("[猎赏] 没找到含「" .. kw .. "」的按钮 | ContextButtonFrame 里现有: "
-			.. (#acts > 0 and table.concat(acts, ", ") or "空/不存在"))
-	end
-
-	buttonCache[kw] = found
-	return found
-end
-
--- 触发一个按钮：firesignal -> 鼠标点击，逐个降级
-local function fireButton(btn)
-	if not btn then return false end
-
-	local ok = pcall(firesignal, btn.Activated)
-	if ok then return true end
-	ok = pcall(firesignal, btn.MouseButton1Click)
-	if ok then return true end
-	ok = pcall(firesignal, btn.MouseButton1Down)
-	if ok then return true end
-	ok = pcall(firesignal, btn.TouchTap)
-	if ok then return true end
-
-	task.spawn(function()
-		pcall(function()
-			local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
-			local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
-			VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-			task.wait(0.05)
-			VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-		end)
-	end)
-	return true
-end
-
-findSoruButton = function()
-	return findButtonByKeyword("soru")
-end
-
 local lastSoru = 0
 triggerSoru = function()
 	if tick() - lastSoru < 0.5 then return end
 	lastSoru = tick()
 
-	-- 瞬步自瞄：把角色水平朝向锁定目标，瞬步才会朝他冲过去
-	if _G.Hunt_SoruAim and currentTarget then
-		local tRoot = getRoot(currentTarget)
-		local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-		if tRoot and myRoot then
-			local flat = Vector3.new(tRoot.Position.X, myRoot.Position.Y, tRoot.Position.Z)
-			if (flat - myRoot.Position).Magnitude > 1 then
-				myRoot.CFrame = CFrame.new(myRoot.Position, flat)
-			end
-		end
+	-- 只发包，不做其它任何操作（不改角色 CFrame、不点 UI 按钮、不按键）
+	-- 冲刺终点直接写在包里的 finalCFrame，所以「冲向锁定目标」靠终点，不靠改朝向
+	local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not myRoot then return end
+
+	local dest
+	local tRoot = _G.Hunt_SoruAim and currentTarget and getRoot(currentTarget)
+	if tRoot then
+		dest = (tRoot.CFrame * CFrame.new(0, 0, 3)).Position -- 冲到目标身前 3 格
+	else
+		dest = myRoot.Position + myRoot.CFrame.LookVector * 40 -- 没目标就往前冲一段
 	end
 
-	-- 通道1: CommE 发包（BF 瞬步真正的入口，参数: 名称/起点/终点/服务器时间/随机id）
-	local char = LocalPlayer.Character
-	local myRoot = char and char:FindFirstChild("HumanoidRootPart")
-	if myRoot then
-		local dest
-		local tRoot = currentTarget and getRoot(currentTarget)
-		if tRoot then
-			dest = (tRoot.CFrame * CFrame.new(0, 0, 3)).Position -- 冲到目标身前 3 格
-		else
-			dest = myRoot.Position + myRoot.CFrame.LookVector * 40 -- 没目标就往前冲一段
+	local startCFrame = myRoot.CFrame
+	local finalCFrame = (startCFrame - startCFrame.Position) + dest + Vector3.new(0, myRoot.Size.Y * 1.5, 0)
+
+	pcall(function()
+		local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+		local commE = remotes and remotes:FindFirstChild("CommE")
+		if commE then
+			commE:FireServer("Soru", startCFrame, finalCFrame, workspace:GetServerTimeNow(), math.random(1, 999999999))
 		end
-
-		local startCFrame = myRoot.CFrame
-		local finalCFrame = (startCFrame - startCFrame.Position) + dest + Vector3.new(0, myRoot.Size.Y * 1.5, 0)
-
-		pcall(function()
-			local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-			local commE = remotes and remotes:FindFirstChild("CommE")
-			if commE then
-				commE:FireServer("Soru", startCFrame, finalCFrame, workspace:GetServerTimeNow(), math.random(1, 999999999))
-			end
-		end)
-	end
-
-	-- 通道2: 兜底触发游戏内瞬步按钮（移动端/PC 的 BoundActionSoru）
-	fireButton(findSoruButton())
+	end)
 end
 
 -- ==================== 自动切换装备 (按类型选武器，可多选) ====================
