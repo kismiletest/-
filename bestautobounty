@@ -9,6 +9,9 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
+-- ==================== 脚本名（面板标题 / 启动日志都用这一个，改名字只改这里） ====================
+local SCRIPT_NAME = "kiyo hub auto bounty"
+
 -- ==================== 配置 (自动保存/读取) ====================
 local CONFIG_FILE = "BF_AutoBounty_Config.json"
 local CONFIG_KEYS = {
@@ -307,8 +310,10 @@ local function luaStringList(t)
 	return "{" .. table.concat(parts, ", ") .. "}"
 end
 
--- 传送后执行的内容：抓取脚本 -> 重新加载；抓不到就 warn 出来，方便排查（否则会静默没反应）
-local ScriptLoadstring = [[local ok, err = pcall(function()
+-- 传送后执行的内容：抓取脚本 -> 纠正脚本名 -> 重新加载
+-- 抓不到就 warn 出来，方便排查（否则会静默没反应）
+local ScriptLoadstring = [[local NAME = "]] .. SCRIPT_NAME .. [["
+local ok, err = pcall(function()
 	if isfile and isfile("AutoBounty.file") and readfile("AutoBounty.file") ~= "true" then
 		warn("[猎赏] 换服后自动重跑是关的（AutoBounty.file 不是 true）")
 		return
@@ -318,6 +323,10 @@ local ScriptLoadstring = [[local ok, err = pcall(function()
 	for _, u in ipairs(urls) do
 		local got, src = pcall(function() return game:HttpGet(u) end)
 		if got and src and src ~= "" then
+			-- 线上那份可能是旧名字：把脚本名/面板标题强行改成 NAME，保证换服后名字不变
+			src = src:gsub("local SCRIPT_NAME%s*=%s*\"[^\"]*\"", "local SCRIPT_NAME = \"" .. NAME .. "\"")
+			src = src:gsub("(CreateWindow%s*%(%s*{%s*Title%s*=%s*)\"[^\"]*\"", "%1\"" .. NAME .. "\"")
+			src = src:gsub("自动猎赏 已加载", NAME .. " 已加载")
 			print("[猎赏] 传送完成，正在重新加载脚本: " .. u)
 			loadstring(src)()
 			return
@@ -832,7 +841,7 @@ end
 local playerDropdown
 if WindUI then
 	local Window = WindUI:CreateWindow({
-		Title = "自动猎赏", Icon = "sword", Author = "kiyo", Folder = "WindUI",
+		Title = SCRIPT_NAME, Icon = "sword", Author = "kiyo", Folder = "WindUI",
 		Size = UDim2.fromOffset(460, 400), Transparent = true, Theme = "Dark",
 		Acrylic = false, HideSearchBar = false, SideBarWidth = 170, ToggleKey = Enum.KeyCode.G,
 	})
@@ -2644,7 +2653,7 @@ task.spawn(function()
 end)
 
 print(string.rep("=", 40))
-print("  自动猎赏 已加载")
+print("  " .. SCRIPT_NAME .. " 已加载")
 print("  配置: " .. (not hasFileAPI and "执行器不支持文件读写(无法保存)"
 	or (configLoaded and ("已读取 " .. CONFIG_FILE) or "无存档，使用默认值"))
 	.. (_G.Hunt_AutoSave and " | 自动保存: 开" or " | 自动保存: 关"))
