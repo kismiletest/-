@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Workspace = game:GetService("Workspace")
+local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
@@ -2150,7 +2151,13 @@ local function huntTick(dt)
 			myRoot.Velocity = Vector3.new(0, 0, 0)
 			myRoot.RotVelocity = Vector3.new(0, 0, 0)
 		end
-		return -- 等跳服期间不猎、不放技能
+		-- 在天上等的时候照样把手上这单打完（攻击/技能都是发包，不用贴近）：
+		-- 不然「等战斗结束」永远等不到（人一直活着），只能干等到超时才跳，看着就像卡在天上
+		if currentTarget then
+			pressSkills()
+			attackTarget(currentTarget)
+		end
+		return
 	end
 	if not skyWaiting then skyBaseY = nil end
 
@@ -2227,15 +2234,66 @@ end)
 
 -- ==================== 自动跳服务器 (1:1 移植自 WindUI 的服务器浏览器扫描) ====================
 -- 真正的扫描逻辑：任何一步报错都由外层 serverHop 兜住，不会把 IsServerHopping 卡死
+
+-- 兜底跳服：走 Roblox 公开服务器列表 + TeleportService，完全不依赖游戏内的 ServerBrowser 界面。
+-- 用于「界面里扫不到服务器」或「点了传送但没真的换服」的情况
+local function hopByApi()
+	local url = "https://games.roblox.com/v1/games/" .. tostring(game.PlaceId)
+		.. "/servers/Public?sortOrder=Asc&limit=100&excludeFullGames=true"
+
+	local ok, body = pcall(function() return game:HttpGet(url) end)
+	if not ok or type(body) ~= "string" or body == "" then
+		print("[猎赏] HTTP 兜底: 拿服务器列表失败 -> " .. tostring(body))
+		return false
+	end
+
+	local ok2, data = pcall(function() return HttpService:JSONDecode(body) end)
+	if not ok2 or type(data) ~= "table" or type(data.data) ~= "table" then
+		print("[猎赏] HTTP 兜底: 服务器列表解析失败")
+		return false
+	end
+
+	local bestJob, bestPlayers, total = nil, nil, 0
+	for _, srv in ipairs(data.data) do
+		local job = srv.id
+		local playing = srv.playing or 0
+		local maxP = srv.maxPlayers or 12
+		if job and job ~= game.JobId and playing < maxP then
+			total = total + 1
+			if playing >= (_G.G_HopMinPlayers or 1) and playing <= (_G.G_HopMaxPlayers or 12) then
+				if not bestPlayers or playing < bestPlayers then bestJob, bestPlayers = job, playing end
+			end
+		end
+	end
+
+	if not bestJob then
+		print("[猎赏] HTTP 兜底: " .. total .. " 个有空位的服务器，但没有符合人数条件("
+			.. _G.G_HopPlayerRange .. ")的")
+		return false
+	end
+
+	print("[猎赏] HTTP 兜底 -> 传送到 " .. bestJob .. "（" .. bestPlayers .. " 人）| 这条路没有区域/赏金过滤")
+	queueAutoReload() -- 先排队再传送
+	local ok3, err = pcall(function()
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, bestJob, LocalPlayer)
+	end)
+	if not ok3 then
+		print("[猎赏] HTTP 兜底传送失败: " .. tostring(err))
+		return false
+	end
+	return true
+end
+
 local function doServerHop()
 	if getgenv().IsServerHopping == true then return false end
 	getgenv().IsServerHopping = true
 
 	local PlayerGui = LocalPlayer.PlayerGui
 	if not PlayerGui:FindFirstChild("ServerBrowser") then
+		print("[猎赏] 没找到 ServerBrowser 界面 -> 改用 HTTP 服务器列表兜底")
+		local apiOk = hopByApi()
 		getgenv().IsServerHopping = false
-		print("[猎赏] 没找到 ServerBrowser 界面，无法跳服")
-		return false
+		return apiOk
 	end
 
 	PlayerGui.ServerBrowser.Enabled = true
@@ -2246,9 +2304,10 @@ local function doServerHop()
 	local TextBox = SearchRegion and SearchRegion:FindFirstChild("TextBox")
 
 	if not TextBox then
+		print("[猎赏] ServerBrowser 里找不到区域输入框 -> 改用 HTTP 服务器列表兜底")
+		local apiOk = hopByApi()
 		getgenv().IsServerHopping = false
-		print("[猎赏] ServerBrowser 里找不到区域输入框")
-		return false
+		return apiOk
 	end
 
 	TextBox.Text = _G.G_ServerRegion
@@ -2320,9 +2379,10 @@ local function doServerHop()
 	end
 
 	if not bestJob then
+		print("[猎赏] 界面里没扫到符合条件(人数/赏金/满人)的服务器 -> 改用 HTTP 服务器列表兜底")
+		local apiOk = hopByApi()
 		getgenv().IsServerHopping = false
-		print("[猎赏] 没有符合条件的空位服务器（人数/赏金/满人都被过滤掉了）")
-		return false
+		return apiOk
 	end
 
 	print("[猎赏] 扫到 " .. candCount .. " 个可用服务器 -> 选人数最少的: 地区 " .. tostring(bestInfo.Region)
@@ -2332,6 +2392,7 @@ local function doServerHop()
 	-- 先把「传送后自动重跑脚本」排进队列，再发起传送
 	queueAutoReload()
 
+	local jobBefore = game.JobId
 	local success = pcall(function()
 		ServerBrowserRemote:InvokeServer("teleport", bestJob)
 	end)
@@ -2340,13 +2401,26 @@ local function doServerHop()
 			ServerBrowserRemote:InvokeServer("teleport", bestJob)
 		end)
 	end
-	if not success then
-		print("[猎赏] 跳服失败，请重新加入游戏")
+
+	-- 发包成功不代表真的换服：等 3 秒看 JobId 有没有变，没变就走 HTTP 兜底再传送一次
+	if success then
+		local t0 = tick()
+		while tick() - t0 < 3 do
+			if game.JobId ~= jobBefore then
+				print("[猎赏] 跳服成功，正在传送...")
+				return true
+			end
+			task.wait(0.2)
+		end
+		print("[猎赏] 游戏内跳服没生效（还停在原服务器）-> 改用 HTTP 服务器列表兜底")
+	else
+		print("[猎赏] 游戏内跳服发包失败 -> 改用 HTTP 服务器列表兜底")
 	end
 
-	task.wait(0.3)
+	local apiOk = hopByApi()
 	getgenv().IsServerHopping = false
-	return true
+	task.wait(0.3)
+	return apiOk
 end
 
 -- 外层包装：用 pcall 包住扫描，异常也不会把跳服功能卡死（换服后由执行器的自动执行重跑脚本）
@@ -2360,14 +2434,11 @@ local function serverHop()
 	return result == true
 end
 
--- 是否正在战斗中：逃生中 / 手动锁了人 / 锁定了够近的目标 / 刚攻击过 / 30 秒内交手过的对手还活着在附近
+-- 是否正在战斗中：逃生中 / 手动锁了人 / 刚出过手 / 30 秒内交手过的对手还活着在附近
+-- 注意：不能用「锁定了目标」当战斗判据 —— 猎赏时永远都锁着人，会导致每次跳服都干等到超时
 local function inCombat()
 	if _G.Hunt_Fleeing then return true end
 	if _G.Hunt_Target and _G.Hunt_Target ~= "" then return true end
-	if currentTarget and isAlive(currentTarget) then
-		local d = targetDistance(currentTarget)
-		if d and d <= (_G.Hunt_MaxDist or 10000) then return true end
-	end
 	if tick() - lastAttack < 5 then return true end
 
 	local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
