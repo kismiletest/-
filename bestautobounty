@@ -1984,9 +1984,11 @@ task.spawn(function()
 	end
 end)
 
--- 见闻色 (Ken): CommE 发包开启；Ken 会自己断，所以定时补一次
+-- 见闻色 (Ken): CommE 发包开启。
+-- Ken 在游戏里有持续时间的，而且被攻击/放技能/瞬步/死亡重生都会被打断，
+-- 所以刷新必须够快（0.5 秒一次），否则断了要等下一轮才补回来，看起来就是「开了又消失」。
 task.spawn(function()
-	while task.wait(2) do
+	while task.wait(0.5) do
 		if _G.Hunt_AutoKen then
 			pcall(function()
 				local remotes = ReplicatedStorage:FindFirstChild("Remotes")
