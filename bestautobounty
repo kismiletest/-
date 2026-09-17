@@ -341,7 +341,11 @@ if not ok then
 end]]
 
 -- 跳服前调用：把「传送后自动重跑脚本」排进队列
+-- 注意：有的执行器是「累加」而不是「替换」，同一个会话里排队多次，传送后就会把脚本跑好几次
+--（表现为同时出现 2 个面板 / 两套循环），所以这里保证一次会话只排一次
+local autoReloadQueued = false
 local function queueAutoReload()
+	if autoReloadQueued then return end -- 已经排过了：不重复排，避免传送后执行多次
 	if _G.AutoExecute ~= true then
 		print("[猎赏] 换服后自动重跑: 关（AutoBounty.file 内容不是 true）")
 		return
@@ -352,7 +356,8 @@ local function queueAutoReload()
 	end
 	local ok, err = pcall(queue_on_teleport, ScriptLoadstring)
 	if ok then
-		print("[猎赏] 已排队 -> 传送完成后自动重新加载脚本")
+		autoReloadQueued = true
+		print("[猎赏] 已排队 -> 传送完成后自动重新加载脚本（本次会话只排一次，不会跑两遍）")
 	else
 		warn("[猎赏] 排队自动重跑失败: " .. tostring(err))
 	end
