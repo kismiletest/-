@@ -30,7 +30,7 @@ local CONFIG_KEYS = {
 	"Hunt_AutoFlee", "Hunt_FleeHP", "Hunt_FleeHeight", "Hunt_FleeRecover", "Hunt_AutoStand",
 	"Hunt_HopSkyUp", "Hunt_HopSkyHeight", "Hunt_KillHop", "Hunt_KillHopCount", "Hunt_NoKilledEnough",
 	"G_FastAttack", "G_FastAttackMode", "G_AttackMobs", "G_AttackPlayers",
-	"Hunt_AutoSave",
+	"Hunt_AutoSave", "G_Language",
 }
 local WEAPON_TYPE_NAMES = { "果实", "拳法", "剑", "枪" }
 -- 每种武器类型的技能键（BF 实际：剑/枪 2 个，拳法 3 个，果实 5 个）
@@ -192,6 +192,9 @@ _G.G_FastAttack = false
 _G.G_FastAttackMode = "模式2(部分账号失效用)"
 _G.G_AttackMobs = true
 _G.G_AttackPlayers = true
+
+-- 面板语言（中文 / English）：和 WindUI 那套一样，状态存在配置里
+_G.G_Language = _G.G_Language or "中文"
 
 -- 读取上次保存的配置（覆盖默认值）
 local configLoaded = loadConfig()
@@ -817,6 +820,183 @@ local function applyAutoRun(on)
 	print("[猎赏] 自动执行: " .. (on and "已开启，全部功能已打开" or "已关闭"))
 end
 
+-- ==================== 语言切换 (移植自 WindUI) ====================
+-- 面板上所有文案都经过 L()：当前语言是 English 时查表替换，查不到就原样显示（中文）。
+-- 下拉框的选项值是内部用来判断的数据，显示走 L()、回调里用 unL() 换回来。
+local Translations = {
+	["中文"] = {},
+	["English"] = {
+		-- 分页
+		["猎赏"] = "Bounty Hunt",
+		["战斗"] = "Combat",
+		["杀戮光环"] = "Kill Aura",
+		["移动"] = "Movement",
+		["环境"] = "Environment",
+		["服务器"] = "Server",
+		["设置"] = "Settings",
+
+		-- 猎赏
+		["总控"] = "Master Control",
+		["自动执行脚本 (一键全开)"] = "Auto Run Script (Enable All)",
+		["狩猎设置"] = "Hunt Settings",
+		["自动猎赏"] = "Auto Hunt",
+		["自动选择玩家"] = "Auto Select Player",
+		["进服务器后等待 (秒)"] = "Wait After Joining (s)",
+		["自动攻击（保持开启）"] = "Auto Attack (Always On)",
+		["自动装备 "] = "Auto Equip ",
+		["武器类型"] = "Weapon Type",
+		["等级过滤"] = "Level Filter",
+		["启用等级过滤"] = "Enable Level Filter",
+		["最低等级"] = "Minimum Level",
+		["等级未知也打"] = "Attack If Level Unknown",
+		["目标过滤"] = "Target Filter",
+		["排除安全区的人"] = "Exclude Safe Zone Players",
+		["排除竞技场里的人"] = "Exclude Colosseum Players",
+		["只猎开战斗模式(PvP)的玩家"] = "Only Hunt Players With PvP On",
+		["强制开启，不受开关和存档影响"] = "Forced on, ignores toggles and saved config",
+		["排除海军盟友"] = "Exclude Marine Allies",
+		["换人距离 (米)"] = "Target Switch Distance (m)",
+
+		-- 霸气 / 种族
+		["霸气 / 种族"] = "Haki / Race",
+		["自动武装色 (Buso)"] = "Auto Buso (Armament)",
+		["自动见闻色 (Ken)"] = "Auto Ken (Observation)",
+		["自动 V3"] = "Auto Race V3",
+		["自动 V4"] = "Auto Race V4",
+
+		-- 瞬步
+		["瞬步（限龙族"] = "Soru (Dragon Race Only",
+		["自动瞬步"] = "Auto Soru",
+		["瞬步间隔 (秒)"] = "Soru Interval (s)",
+		["立即瞬步 (测试用)"] = "Soru Now (Test)",
+		["瞬步自瞄 (冲向锁定目标)"] = "Soru Aim (Dash To Locked Target)",
+
+		-- 低血逃生
+		["低血逃生"] = "Low HP Escape",
+		["低血自动往天上飞"] = "Fly Up When Low HP",
+		["触发血量 (%)"] = "Trigger HP (%)",
+		["上升高度 (米)"] = "Rise Height (m)",
+		["恢复猎赏血量 (%)"] = "Resume Hunt HP (%)",
+
+		-- 技能
+		["技能释放 (可多选)"] = "Skills (Multi-select)",
+		["自动释放技能"] = "Auto Use Skills",
+		["技能自瞄 (只瞄锁定目标)"] = "Skill Aim (Locked Target Only)",
+		["技能放完自动换下一把武器"] = "Auto Switch Weapon After Skills",
+		["技能间隔 (秒)"] = "Skill Interval (s)",
+		["立即放技能 (测试用)"] = "Use Skills Now (Test)",
+		["拳法 技能 (3 个)"] = "Melee Skills (3)",
+		["剑 技能 (2 个)"] = "Sword Skills (2)",
+		["枪 技能 (2 个)"] = "Gun Skills (2)",
+		["果实 技能 (5 个)"] = "Fruit Skills (5)",
+		["拳法 - Z"] = "Melee - Z",
+		["拳法 - X"] = "Melee - X",
+		["拳法 - C"] = "Melee - C",
+		["剑 - Z"] = "Sword - Z",
+		["剑 - X"] = "Sword - X",
+		["枪 - Z"] = "Gun - Z",
+		["枪 - X"] = "Gun - X",
+		["果实 - Z"] = "Fruit - Z",
+		["果实 - X"] = "Fruit - X",
+		["果实 - C"] = "Fruit - C",
+		["果实 - V"] = "Fruit - V",
+		["果实 - F"] = "Fruit - F",
+
+		-- 移动 / 环境
+		["飞行"] = "Flight",
+		["飞行速度"] = "Fly Speed",
+		["停靠距离"] = "Stop Distance",
+		["站立"] = "Standing",
+		["坐在椅子上自动站起"] = "Auto Stand Up From Chairs",
+		["移除岩浆 (需重进恢复)"] = "Remove Lava (Rejoin To Restore)",
+		["水上行走"] = "Walk On Water",
+		["画质"] = "Graphics",
+		["减画质 (持续开启)"] = "Reduce Graphics (Always On)",
+
+		-- 武器类型（也会用在「武器类型: xxx」和技能小标题里）
+		["果实"] = "Fruit",
+		["拳法"] = "Melee",
+		["剑"] = "Sword",
+		["枪"] = "Gun",
+
+		-- 杀戮光环
+		["快速攻击"] = "Fast Attack",
+		["开启快速攻击"] = "Enable Fast Attack",
+		["快速攻击模式"] = "Fast Attack Mode",
+		["模式1"] = "Mode 1",
+		["模式2(部分账号失效用)"] = "Mode 2 (Use If Mode 1 Fails)",
+		["攻击怪物"] = "Attack Mobs",
+		["攻击玩家"] = "Attack Players",
+
+		-- 服务器
+		["自动跳服务器"] = "Auto Server Hop",
+		["换服后自动重跑脚本"] = "Auto Reload Script After Hop",
+		["跳服间隔 (秒)"] = "Hop Interval (s)",
+		["选择服务器区域"] = "Server Region",
+		["选择人数"] = "Player Count",
+		["选择赏金"] = "Bounty",
+		["大于3m"] = "Above 3M",
+		["大于5m"] = "Above 5M",
+		["大于10m"] = "Above 10M",
+		["大于15m"] = "Above 15M",
+		["大于25m"] = "Above 25M",
+		["大于35m"] = "Above 35M",
+		["大于50m"] = "Above 50M",
+		["立即跳服务器"] = "Hop Server Now",
+		["重进服务器"] = "Rejoin Server",
+		["等战斗结束再跳服"] = "Wait For Fight To End Before Hop",
+		["战斗结束最多等 (秒)"] = "Max Wait For Fight End (s)",
+		["没人开战斗模式就跳服"] = "Hop When Nobody Has PvP On",
+		["空服判定时长 (秒)"] = "Empty Server Detect Time (s)",
+		["跳服前先飞到天上等"] = "Fly Up Before Hop",
+		["跳服前飞天高度 (米)"] = "Pre-Hop Fly Height (m)",
+		["击杀换服"] = "Hop After Kills",
+		["同一个玩家打死 N 次就跳服"] = "Hop After Killing Same Player N Times",
+		["击杀次数 N"] = "Kill Count N",
+		["过滤已打死 N 次的玩家"] = "Filter Players Already Killed N Times",
+		["阵营 (换服后自动选)"] = "Team (Auto Pick After Hop)",
+		["阵营"] = "Team",
+		["不切换"] = "Don't Switch",
+		["海盗"] = "Pirate",
+		["海军"] = "Marine",
+		["立即切换阵营"] = "Switch Team Now",
+
+		-- 手动指定目标
+		["手动指定目标"] = "Manual Target",
+		["选择玩家"] = "Select Player",
+		["刷新玩家列表"] = "Refresh Player List",
+		["清除指定目标 (回到自动)"] = "Clear Target (Back To Auto)",
+
+		-- 配置 / 语言
+		["配置"] = "Config",
+		["自动保存配置"] = "Auto Save Config",
+		["立即保存配置"] = "Save Config Now",
+		["重置为默认配置 (需重载)"] = "Reset To Default (Reload Needed)",
+		["语言"] = "Language",
+		["点一下切换"] = "click to switch",
+		["语言已切换为: "] = "Language switched to: ",
+		["重新执行脚本后面板文案生效"] = "panel text applies after you re-run the script",
+	}
+}
+
+-- 显示用：当前是英文就查表，查不到就用原文（中文）
+local function L(text)
+	if _G.G_Language == "English" and Translations["English"][text] then
+		return Translations["English"][text]
+	end
+	return text
+end
+
+-- 反向：下拉框显示的是翻译后的文案，回调里要换回内部真正判断用的值
+local function unL(text)
+	if _G.G_Language == "English" then
+		for k, v in pairs(Translations["English"]) do
+			if v == text then return k end
+		end
+	end
+	return text
+end
+
 -- ==================== WindUI ====================
 -- 库有 1.3MB 左右，手机执行器拉取+编译要几秒，所以打进度；并且多源兜底
 local WINDUI_URLS = {
@@ -851,18 +1031,18 @@ if WindUI then
 		Acrylic = false, HideSearchBar = false, SideBarWidth = 170, ToggleKey = Enum.KeyCode.G,
 	})
 	-- 分页（按侧边栏顺序创建）
-	local TabMain = Window:Tab({ Title = "猎赏", Icon = "crosshair" })
-	local TabCombat = Window:Tab({ Title = "战斗", Icon = "sword" })
-	local TabAura = Window:Tab({ Title = "杀戮光环", Icon = "zap" })
-	local TabMove = Window:Tab({ Title = "移动", Icon = "wind" })
-	local TabEnv = Window:Tab({ Title = "环境", Icon = "monitor" })
-	local TabServer = Window:Tab({ Title = "服务器", Icon = "server" })
-	local TabConfig = Window:Tab({ Title = "设置", Icon = "settings" })
+	local TabMain = Window:Tab({ Title = L("猎赏"), Icon = "crosshair" })
+	local TabCombat = Window:Tab({ Title = L("战斗"), Icon = "sword" })
+	local TabAura = Window:Tab({ Title = L("杀戮光环"), Icon = "zap" })
+	local TabMove = Window:Tab({ Title = L("移动"), Icon = "wind" })
+	local TabEnv = Window:Tab({ Title = L("环境"), Icon = "monitor" })
+	local TabServer = Window:Tab({ Title = L("服务器"), Icon = "server" })
+	local TabConfig = Window:Tab({ Title = L("设置"), Icon = "settings" })
 	local Tab = TabMain
 
-	Tab:Section({ Title = "总控" })
+	Tab:Section({ Title = L("总控") })
 	Tab:Toggle({
-		Title = "自动执行脚本 (一键全开)",
+		Title = L("自动执行脚本 (一键全开)"),
 		Value = _G.Hunt_AutoRun,
 		Callback = function(v)
 			_G.Hunt_AutoRun = v
@@ -870,64 +1050,64 @@ if WindUI then
 		end
 	})
 
-	Tab:Section({ Title = "狩猎设置" })
-	uiToggles.Hunt_Auto = Tab:Toggle({ Title = "自动猎赏", Value = _G.Hunt_Auto, Callback = function(v) _G.Hunt_Auto = v end })
-	Tab:Toggle({ Title = "自动选择玩家", Value = _G.Hunt_AutoSelect, Callback = function(v) _G.Hunt_AutoSelect = v end })
-	Tab:Slider({ Title = "进服务器后等待 (秒)", Value = { Min = 0, Max = 60, Default = _G.Hunt_StartWait }, Callback = function(v) _G.Hunt_StartWait = v end })
-	uiToggles.Hunt_AutoAttack = Tab:Toggle({ Title = "自动攻击（保持开启）", Value = _G.Hunt_AutoAttack, Callback = function(v) _G.Hunt_AutoAttack = v end })
-	uiToggles.Hunt_AutoEquip = Tab:Toggle({ Title = "自动装备 ", Value = _G.Hunt_AutoEquip, Callback = function(v) _G.Hunt_AutoEquip = v end })
+	Tab:Section({ Title = L("狩猎设置") })
+	uiToggles.Hunt_Auto = Tab:Toggle({ Title = L("自动猎赏"), Value = _G.Hunt_Auto, Callback = function(v) _G.Hunt_Auto = v end })
+	Tab:Toggle({ Title = L("自动选择玩家"), Value = _G.Hunt_AutoSelect, Callback = function(v) _G.Hunt_AutoSelect = v end })
+	Tab:Slider({ Title = L("进服务器后等待 (秒)"), Value = { Min = 0, Max = 60, Default = _G.Hunt_StartWait }, Callback = function(v) _G.Hunt_StartWait = v end })
+	uiToggles.Hunt_AutoAttack = Tab:Toggle({ Title = L("自动攻击（保持开启）"), Value = _G.Hunt_AutoAttack, Callback = function(v) _G.Hunt_AutoAttack = v end })
+	uiToggles.Hunt_AutoEquip = Tab:Toggle({ Title = L("自动装备 "), Value = _G.Hunt_AutoEquip, Callback = function(v) _G.Hunt_AutoEquip = v end })
 	for _, n in ipairs(WEAPON_TYPE_NAMES) do
 		uiToggles["Weapon_" .. n] = Tab:Toggle({
-			Title = "武器类型: " .. n,
+			Title = L("武器类型") .. ": " .. L(n),
 			Value = _G.Hunt_Weapons[n],
 			Callback = function(v) _G.Hunt_Weapons[n] = v end
 		})
 	end
-	Tab:Section({ Title = "等级过滤" })
-	Tab:Toggle({ Title = "启用等级过滤", Value = _G.Hunt_UseLevel, Callback = function(v) _G.Hunt_UseLevel = v end })
-	Tab:Slider({ Title = "最低等级", Value = { Min = 1, Max = 2800, Default = _G.Hunt_MinLevel }, Callback = function(v) _G.Hunt_MinLevel = v end })
-	Tab:Toggle({ Title = "等级未知也打", Value = _G.Hunt_AllowUnknown, Callback = function(v) _G.Hunt_AllowUnknown = v end })
+	Tab:Section({ Title = L("等级过滤") })
+	Tab:Toggle({ Title = L("启用等级过滤"), Value = _G.Hunt_UseLevel, Callback = function(v) _G.Hunt_UseLevel = v end })
+	Tab:Slider({ Title = L("最低等级"), Value = { Min = 1, Max = 2800, Default = _G.Hunt_MinLevel }, Callback = function(v) _G.Hunt_MinLevel = v end })
+	Tab:Toggle({ Title = L("等级未知也打"), Value = _G.Hunt_AllowUnknown, Callback = function(v) _G.Hunt_AllowUnknown = v end })
 
-	Tab:Section({ Title = "目标过滤" })
-	Tab:Toggle({ Title = "排除安全区的人", Value = _G.Hunt_NoSafe, Callback = function(v) _G.Hunt_NoSafe = v end })
-	Tab:Toggle({ Title = "排除竞技场里的人", Value = _G.Hunt_NoArena, Callback = function(v) _G.Hunt_NoArena = v end })
-	Tab:Paragraph({ Title = "只猎开战斗模式(PvP)的玩家", Desc = "强制开启，不受开关和存档影响" })
-	Tab:Toggle({ Title = "排除海军盟友", Value = _G.Hunt_NoMarineAlly, Callback = function(v) _G.Hunt_NoMarineAlly = v end })
-	Tab:Slider({ Title = "换人距离 (米)", Value = { Min = 500, Max = 50000, Default = _G.Hunt_MaxDist }, Callback = function(v) _G.Hunt_MaxDist = v end })
+	Tab:Section({ Title = L("目标过滤") })
+	Tab:Toggle({ Title = L("排除安全区的人"), Value = _G.Hunt_NoSafe, Callback = function(v) _G.Hunt_NoSafe = v end })
+	Tab:Toggle({ Title = L("排除竞技场里的人"), Value = _G.Hunt_NoArena, Callback = function(v) _G.Hunt_NoArena = v end })
+	Tab:Paragraph({ Title = L("只猎开战斗模式(PvP)的玩家"), Desc = L("强制开启，不受开关和存档影响") })
+	Tab:Toggle({ Title = L("排除海军盟友"), Value = _G.Hunt_NoMarineAlly, Callback = function(v) _G.Hunt_NoMarineAlly = v end })
+	Tab:Slider({ Title = L("换人距离 (米)"), Value = { Min = 500, Max = 50000, Default = _G.Hunt_MaxDist }, Callback = function(v) _G.Hunt_MaxDist = v end })
 
 	-- ===== Tab: 战斗 =====
 	Tab = TabCombat
-	Tab:Section({ Title = "瞬步（限龙族" })
-	uiToggles.Hunt_AutoSoru = Tab:Toggle({ Title = "自动瞬步", Value = _G.Hunt_AutoSoru, Callback = function(v) _G.Hunt_AutoSoru = v end })
-	Tab:Slider({ Title = "瞬步间隔 (秒)", Value = { Min = 1, Max = 60, Default = _G.Hunt_SoruInterval }, Callback = function(v) _G.Hunt_SoruInterval = v end })
+	Tab:Section({ Title = L("瞬步（限龙族") })
+	uiToggles.Hunt_AutoSoru = Tab:Toggle({ Title = L("自动瞬步"), Value = _G.Hunt_AutoSoru, Callback = function(v) _G.Hunt_AutoSoru = v end })
+	Tab:Slider({ Title = L("瞬步间隔 (秒)"), Value = { Min = 1, Max = 60, Default = _G.Hunt_SoruInterval }, Callback = function(v) _G.Hunt_SoruInterval = v end })
 	Tab:Button({
-		Title = "立即瞬步 (测试用)",
+		Title = L("立即瞬步 (测试用)"),
 		Callback = function()
 			triggerSoru()
 			print("[猎赏] 瞬步测试 -> 已发送瞬步发包 (CommE)")
 		end
 	})
-	uiToggles.Hunt_SoruAim = Tab:Toggle({ Title = "瞬步自瞄 (冲向锁定目标)", Value = _G.Hunt_SoruAim, Callback = function(v) _G.Hunt_SoruAim = v end })
+	uiToggles.Hunt_SoruAim = Tab:Toggle({ Title = L("瞬步自瞄 (冲向锁定目标)"), Value = _G.Hunt_SoruAim, Callback = function(v) _G.Hunt_SoruAim = v end })
 
-	Tab:Section({ Title = "霸气 / 种族" })
-	uiToggles.Hunt_AutoHaki = Tab:Toggle({ Title = "自动武装色 (Buso)", Value = _G.Hunt_AutoHaki, Callback = function(v) _G.Hunt_AutoHaki = v end })
-	uiToggles.Hunt_AutoKen = Tab:Toggle({ Title = "自动见闻色 (Ken)", Value = _G.Hunt_AutoKen, Callback = function(v) _G.Hunt_AutoKen = v end })
-	uiToggles.Hunt_AutoV3 = Tab:Toggle({ Title = "自动 V3", Value = _G.Hunt_AutoV3, Callback = function(v) _G.Hunt_AutoV3 = v end })
-	uiToggles.Hunt_AutoV4 = Tab:Toggle({ Title = "自动 V4", Value = _G.Hunt_AutoV4, Callback = function(v) _G.Hunt_AutoV4 = v end })
+	Tab:Section({ Title = L("霸气 / 种族") })
+	uiToggles.Hunt_AutoHaki = Tab:Toggle({ Title = L("自动武装色 (Buso)"), Value = _G.Hunt_AutoHaki, Callback = function(v) _G.Hunt_AutoHaki = v end })
+	uiToggles.Hunt_AutoKen = Tab:Toggle({ Title = L("自动见闻色 (Ken)"), Value = _G.Hunt_AutoKen, Callback = function(v) _G.Hunt_AutoKen = v end })
+	uiToggles.Hunt_AutoV3 = Tab:Toggle({ Title = L("自动 V3"), Value = _G.Hunt_AutoV3, Callback = function(v) _G.Hunt_AutoV3 = v end })
+	uiToggles.Hunt_AutoV4 = Tab:Toggle({ Title = L("自动 V4"), Value = _G.Hunt_AutoV4, Callback = function(v) _G.Hunt_AutoV4 = v end })
 
-	Tab:Section({ Title = "低血逃生" })
-	uiToggles.Hunt_AutoFlee = Tab:Toggle({ Title = "低血自动往天上飞", Value = _G.Hunt_AutoFlee, Callback = function(v) _G.Hunt_AutoFlee = v end })
-	Tab:Slider({ Title = "触发血量 (%)", Value = { Min = 5, Max = 90, Default = _G.Hunt_FleeHP }, Callback = function(v) _G.Hunt_FleeHP = v end })
-	Tab:Slider({ Title = "上升高度 (米)", Value = { Min = 200, Max = 10000, Default = _G.Hunt_FleeHeight }, Callback = function(v) _G.Hunt_FleeHeight = v end })
-	Tab:Slider({ Title = "恢复猎赏血量 (%)", Value = { Min = 30, Max = 100, Default = _G.Hunt_FleeRecover }, Callback = function(v) _G.Hunt_FleeRecover = v end })
+	Tab:Section({ Title = L("低血逃生") })
+	uiToggles.Hunt_AutoFlee = Tab:Toggle({ Title = L("低血自动往天上飞"), Value = _G.Hunt_AutoFlee, Callback = function(v) _G.Hunt_AutoFlee = v end })
+	Tab:Slider({ Title = L("触发血量 (%)"), Value = { Min = 5, Max = 90, Default = _G.Hunt_FleeHP }, Callback = function(v) _G.Hunt_FleeHP = v end })
+	Tab:Slider({ Title = L("上升高度 (米)"), Value = { Min = 200, Max = 10000, Default = _G.Hunt_FleeHeight }, Callback = function(v) _G.Hunt_FleeHeight = v end })
+	Tab:Slider({ Title = L("恢复猎赏血量 (%)"), Value = { Min = 30, Max = 100, Default = _G.Hunt_FleeRecover }, Callback = function(v) _G.Hunt_FleeRecover = v end })
 
-	Tab:Section({ Title = "技能释放 (可多选)" })
-	uiToggles.Hunt_AutoSkill = Tab:Toggle({ Title = "自动释放技能", Value = _G.Hunt_AutoSkill, Callback = function(v) _G.Hunt_AutoSkill = v end })
-	uiToggles.Hunt_SkillAim = Tab:Toggle({ Title = "技能自瞄 (只瞄锁定目标)", Value = _G.Hunt_SkillAim, Callback = function(v) _G.Hunt_SkillAim = v end })
-	uiToggles.Hunt_RotateWeapon = Tab:Toggle({ Title = "技能放完自动换下一把武器", Value = _G.Hunt_RotateWeapon, Callback = function(v) _G.Hunt_RotateWeapon = v end })
-	Tab:Slider({ Title = "技能间隔 (秒)", Value = { Min = 0.3, Max = 10, Default = _G.Hunt_SkillInterval, Float = 0.1 }, Callback = function(v) _G.Hunt_SkillInterval = v end })
+	Tab:Section({ Title = L("技能释放 (可多选)") })
+	uiToggles.Hunt_AutoSkill = Tab:Toggle({ Title = L("自动释放技能"), Value = _G.Hunt_AutoSkill, Callback = function(v) _G.Hunt_AutoSkill = v end })
+	uiToggles.Hunt_SkillAim = Tab:Toggle({ Title = L("技能自瞄 (只瞄锁定目标)"), Value = _G.Hunt_SkillAim, Callback = function(v) _G.Hunt_SkillAim = v end })
+	uiToggles.Hunt_RotateWeapon = Tab:Toggle({ Title = L("技能放完自动换下一把武器"), Value = _G.Hunt_RotateWeapon, Callback = function(v) _G.Hunt_RotateWeapon = v end })
+	Tab:Slider({ Title = L("技能间隔 (秒)"), Value = { Min = 0.3, Max = 10, Default = _G.Hunt_SkillInterval, Float = 0.1 }, Callback = function(v) _G.Hunt_SkillInterval = v end })
 	Tab:Button({
-		Title = "立即放技能 (测试用)",
+		Title = L("立即放技能 (测试用)"),
 		Callback = function()
 			print("[猎赏] 技能测试 -> 背包工具数: " .. #getBackpackTools())
 			ensureEquipped()
@@ -936,10 +1116,10 @@ if WindUI then
 	})
 	for _, tn in ipairs({ "拳法", "剑", "枪", "果实" }) do
 		local keys = TYPE_SKILL_KEYS[tn]
-		Tab:Section({ Title = tn .. " 技能 (" .. #keys .. " 个)" })
+		Tab:Section({ Title = L(tn .. " 技能 (" .. #keys .. " 个)") })
 		for _, k in ipairs(keys) do
 			uiToggles["Skill_" .. tn .. "_" .. k] = Tab:Toggle({
-				Title = tn .. " - " .. k,
+				Title = L(tn .. " - " .. k),
 				Value = _G.Hunt_TypeSkills[tn][k],
 				Callback = function(v) _G.Hunt_TypeSkills[tn][k] = v end
 			})
@@ -948,17 +1128,17 @@ if WindUI then
 
 	-- ===== Tab: 移动 =====
 	Tab = TabMove
-	Tab:Section({ Title = "飞行" })
-	Tab:Slider({ Title = "飞行速度", Value = { Min = 50, Max = 600, Default = _G.Hunt_FlySpeed }, Callback = function(v) _G.Hunt_FlySpeed = v end })
-	Tab:Slider({ Title = "停靠距离", Value = { Min = 2, Max = 40, Default = _G.Hunt_StopDist }, Callback = function(v) _G.Hunt_StopDist = v end })
-	Tab:Section({ Title = "站立" })
-	Tab:Toggle({ Title = "坐在椅子上自动站起", Value = _G.Hunt_AutoStand, Callback = function(v) _G.Hunt_AutoStand = v end })
+	Tab:Section({ Title = L("飞行") })
+	Tab:Slider({ Title = L("飞行速度"), Value = { Min = 50, Max = 600, Default = _G.Hunt_FlySpeed }, Callback = function(v) _G.Hunt_FlySpeed = v end })
+	Tab:Slider({ Title = L("停靠距离"), Value = { Min = 2, Max = 40, Default = _G.Hunt_StopDist }, Callback = function(v) _G.Hunt_StopDist = v end })
+	Tab:Section({ Title = L("站立") })
+	Tab:Toggle({ Title = L("坐在椅子上自动站起"), Value = _G.Hunt_AutoStand, Callback = function(v) _G.Hunt_AutoStand = v end })
 
 	-- ===== Tab: 环境 =====
 	Tab = TabEnv
-	Tab:Section({ Title = "环境" })
+	Tab:Section({ Title = L("环境") })
 	Tab:Toggle({
-		Title = "移除岩浆 (需重进恢复)",
+		Title = L("移除岩浆 (需重进恢复)"),
 		Value = _G.G_RemoveLava,
 		Callback = function(v)
 			_G.G_RemoveLava = v
@@ -966,7 +1146,7 @@ if WindUI then
 		end
 	})
 	Tab:Toggle({
-		Title = "水上行走",
+		Title = L("水上行走"),
 		Value = _G.G_WalkOnWater,
 		Callback = function(v)
 			_G.G_WalkOnWater = v
@@ -974,9 +1154,9 @@ if WindUI then
 		end
 	})
 
-	Tab:Section({ Title = "画质" })
+	Tab:Section({ Title = L("画质") })
 	Tab:Toggle({
-		Title = "减画质 (持续开启)",
+		Title = L("减画质 (持续开启)"),
 		Value = _G.G_LowGraphics,
 		Callback = function(v)
 			_G.G_LowGraphics = v
@@ -986,23 +1166,23 @@ if WindUI then
 
 	-- ===== Tab: 杀戮光环 =====
 	Tab = TabAura
-	Tab:Section({ Title = "快速攻击" })
-	Tab:Toggle({ Title = "开启快速攻击", Value = _G.G_FastAttack, Callback = function(v) _G.G_FastAttack = v end })
+	Tab:Section({ Title = L("快速攻击") })
+	Tab:Toggle({ Title = L("开启快速攻击"), Value = _G.G_FastAttack, Callback = function(v) _G.G_FastAttack = v end })
 	Tab:Dropdown({
-		Title = "快速攻击模式",
-		Values = { "模式1", "模式2(部分账号失效用)" },
-		Value = _G.G_FastAttackMode,
-		Callback = function(v) _G.G_FastAttackMode = v end
+		Title = L("快速攻击模式"),
+		Values = { L("模式1"), L("模式2(部分账号失效用)") },
+		Value = L(_G.G_FastAttackMode),
+		Callback = function(v) _G.G_FastAttackMode = unL(v) end
 	})
-	Tab:Toggle({ Title = "攻击怪物", Value = _G.G_AttackMobs, Callback = function(v) _G.G_AttackMobs = v end })
-	Tab:Toggle({ Title = "攻击玩家", Value = _G.G_AttackPlayers, Callback = function(v) _G.G_AttackPlayers = v end })
+	Tab:Toggle({ Title = L("攻击怪物"), Value = _G.G_AttackMobs, Callback = function(v) _G.G_AttackMobs = v end })
+	Tab:Toggle({ Title = L("攻击玩家"), Value = _G.G_AttackPlayers, Callback = function(v) _G.G_AttackPlayers = v end })
 
 	-- ===== Tab: 服务器 =====
 	Tab = TabServer
-	Tab:Section({ Title = "服务器" })
-	uiToggles.Hunt_AutoHop = Tab:Toggle({ Title = "自动跳服务器", Value = _G.Hunt_AutoHop, Callback = function(v) _G.Hunt_AutoHop = v end })
+	Tab:Section({ Title = L("服务器") })
+	uiToggles.Hunt_AutoHop = Tab:Toggle({ Title = L("自动跳服务器"), Value = _G.Hunt_AutoHop, Callback = function(v) _G.Hunt_AutoHop = v end })
 	Tab:Toggle({
-		Title = "换服后自动重跑脚本",
+		Title = L("换服后自动重跑脚本"),
 		Value = _G.AutoExecute,
 		Callback = function(v)
 			_G.AutoExecute = v
@@ -1012,9 +1192,9 @@ if WindUI then
 			print("[猎赏] 换服后自动重跑脚本: " .. (v and "开" or "关") .. " (写入 " .. AUTOEXEC_FILE .. ")")
 		end
 	})
-	Tab:Slider({ Title = "跳服间隔 (秒)", Value = { Min = 60, Max = 1200, Default = _G.Hunt_HopInterval }, Callback = function(v) _G.Hunt_HopInterval = v end })
+	Tab:Slider({ Title = L("跳服间隔 (秒)"), Value = { Min = 60, Max = 1200, Default = _G.Hunt_HopInterval }, Callback = function(v) _G.Hunt_HopInterval = v end })
 	Tab:Dropdown({
-		Title = "选择服务器区域",
+		Title = L("选择服务器区域"),
 		Values = { "Oregon", "Florida", "Texas", "California", "Hong Kong", "Germany", "Brazil", "Singapore" },
 		Value = _G.G_ServerRegion,
 		Callback = function(v)
@@ -1023,7 +1203,7 @@ if WindUI then
 		end
 	})
 	Tab:Dropdown({
-		Title = "选择人数",
+		Title = L("选择人数"),
 		Values = { "1-12", "3-12", "5-12", "7-12", "9-12" },
 		Value = _G.G_HopPlayerRange,
 		Callback = function(v)
@@ -1032,47 +1212,49 @@ if WindUI then
 		end
 	})
 	Tab:Dropdown({
-		Title = "选择赏金",
-		Values = { "大于3m", "大于5m", "大于10m", "大于15m", "大于25m", "大于35m", "大于50m" },
-		Value = _G.G_HopBountyRange,
+		Title = L("选择赏金"),
+		Values = { L("大于3m"), L("大于5m"), L("大于10m"), L("大于15m"), L("大于25m"), L("大于35m"), L("大于50m") },
+		Value = L(_G.G_HopBountyRange),
 		Callback = function(v)
+			v = unL(v)
 			ApplyBountyRange(v)
 			print("[猎赏] 赏金设置: " .. v .. " (" .. FormatNumber(_G.G_HopMinBounty) .. " - " .. FormatNumber(_G.G_HopMaxBounty) .. ")")
 		end
 	})
-	Tab:Button({ Title = "立即跳服务器", Callback = function() _G.Hunt_ForceHop = true end })
-	Tab:Button({ Title = "重进服务器", Callback = function() rejoinServer() end })
-	Tab:Toggle({ Title = "等战斗结束再跳服", Value = _G.Hunt_HopWaitCombat, Callback = function(v) _G.Hunt_HopWaitCombat = v end })
+	Tab:Button({ Title = L("立即跳服务器"), Callback = function() _G.Hunt_ForceHop = true end })
+	Tab:Button({ Title = L("重进服务器"), Callback = function() rejoinServer() end })
+	Tab:Toggle({ Title = L("等战斗结束再跳服"), Value = _G.Hunt_HopWaitCombat, Callback = function(v) _G.Hunt_HopWaitCombat = v end })
 	Tab:Slider({
-		Title = "战斗结束最多等 (秒)",
+		Title = L("战斗结束最多等 (秒)"),
 		Value = { Min = 10, Max = 600, Default = _G.Hunt_HopCombatWait },
 		Callback = function(v) _G.Hunt_HopCombatWait = v end
 	})
-	Tab:Toggle({ Title = "没人开战斗模式就跳服", Value = _G.Hunt_HopIfEmpty, Callback = function(v) _G.Hunt_HopIfEmpty = v end })
-	Tab:Slider({ Title = "空服判定时长 (秒)", Value = { Min = 5, Max = 120, Default = _G.Hunt_EmptyWait }, Callback = function(v) _G.Hunt_EmptyWait = v end })
-	Tab:Toggle({ Title = "跳服前先飞到天上等", Value = _G.Hunt_HopSkyUp, Callback = function(v) _G.Hunt_HopSkyUp = v end })
-	Tab:Slider({ Title = "跳服前飞天高度 (米)", Value = { Min = 200, Max = 10000, Default = _G.Hunt_HopSkyHeight }, Callback = function(v) _G.Hunt_HopSkyHeight = v end })
+	Tab:Toggle({ Title = L("没人开战斗模式就跳服"), Value = _G.Hunt_HopIfEmpty, Callback = function(v) _G.Hunt_HopIfEmpty = v end })
+	Tab:Slider({ Title = L("空服判定时长 (秒)"), Value = { Min = 5, Max = 120, Default = _G.Hunt_EmptyWait }, Callback = function(v) _G.Hunt_EmptyWait = v end })
+	Tab:Toggle({ Title = L("跳服前先飞到天上等"), Value = _G.Hunt_HopSkyUp, Callback = function(v) _G.Hunt_HopSkyUp = v end })
+	Tab:Slider({ Title = L("跳服前飞天高度 (米)"), Value = { Min = 200, Max = 10000, Default = _G.Hunt_HopSkyHeight }, Callback = function(v) _G.Hunt_HopSkyHeight = v end })
 
-	Tab:Section({ Title = "击杀换服" })
-	Tab:Toggle({ Title = "同一个玩家打死 N 次就跳服", Value = _G.Hunt_KillHop, Callback = function(v) _G.Hunt_KillHop = v end })
-	Tab:Slider({ Title = "击杀次数 N", Value = { Min = 1, Max = 10, Default = _G.Hunt_KillHopCount }, Callback = function(v) _G.Hunt_KillHopCount = v end })
-	Tab:Toggle({ Title = "过滤已打死 N 次的玩家", Value = _G.Hunt_NoKilledEnough, Callback = function(v) _G.Hunt_NoKilledEnough = v end })
+	Tab:Section({ Title = L("击杀换服") })
+	Tab:Toggle({ Title = L("同一个玩家打死 N 次就跳服"), Value = _G.Hunt_KillHop, Callback = function(v) _G.Hunt_KillHop = v end })
+	Tab:Slider({ Title = L("击杀次数 N"), Value = { Min = 1, Max = 10, Default = _G.Hunt_KillHopCount }, Callback = function(v) _G.Hunt_KillHopCount = v end })
+	Tab:Toggle({ Title = L("过滤已打死 N 次的玩家"), Value = _G.Hunt_NoKilledEnough, Callback = function(v) _G.Hunt_NoKilledEnough = v end })
 
-	Tab:Section({ Title = "阵营 (换服后自动选)" })
+	Tab:Section({ Title = L("阵营 (换服后自动选)") })
 	Tab:Dropdown({
-		Title = "阵营",
-		Values = { "不切换", "海盗", "海军" },
-		Value = _G.Hunt_Team,
+		Title = L("阵营"),
+		Values = { L("不切换"), L("海盗"), L("海军") },
+		Value = L(_G.Hunt_Team),
 		Callback = function(v)
+			v = unL(v)
 			_G.Hunt_Team = v
 			if v ~= "不切换" then applyTeam(true) end -- 选了就立刻切一次
 		end
 	})
-	Tab:Button({ Title = "立即切换阵营", Callback = function() applyTeam(true) end })
+	Tab:Button({ Title = L("立即切换阵营"), Callback = function() applyTeam(true) end })
 
 	-- ===== Tab: 猎赏（手动指定目标） =====
 	Tab = TabMain
-	Tab:Section({ Title = "手动指定目标" })
+	Tab:Section({ Title = L("手动指定目标") })
 	local function buildPlayerList()
 		local list = {}
 		for _, p in ipairs(Players:GetPlayers()) do
@@ -1084,7 +1266,7 @@ if WindUI then
 	end
 
 	playerDropdown = Tab:Dropdown({
-		Title = "选择玩家",
+		Title = L("选择玩家"),
 		Values = buildPlayerList(),
 		Value = "",
 		Callback = function(v)
@@ -1093,13 +1275,13 @@ if WindUI then
 		end
 	})
 	Tab:Button({
-		Title = "刷新玩家列表",
+		Title = L("刷新玩家列表"),
 		Callback = function()
 			if playerDropdown then playerDropdown:Refresh(buildPlayerList()) end
 		end
 	})
 	Tab:Button({
-		Title = "清除指定目标 (回到自动)",
+		Title = L("清除指定目标 (回到自动)"),
 		Callback = function()
 			_G.Hunt_Target = nil
 			_G.Hunt_AutoSelect = true
@@ -1108,9 +1290,27 @@ if WindUI then
 
 	-- ===== Tab: 设置 =====
 	Tab = TabConfig
-	Tab:Section({ Title = "配置" })
+	Tab:Section({ Title = L("语言") })
+	Tab:Button({
+		Title = L("语言") .. ": " .. _G.G_Language .. " (" .. L("点一下切换") .. ")",
+		Icon = "globe",
+		Callback = function()
+			_G.G_Language = (_G.G_Language == "中文") and "English" or "中文"
+			local saved = saveConfig()
+			print("[猎赏] " .. L("语言已切换为: ") .. _G.G_Language
+				.. (saved and " (已保存)" or " (存档不可用)"))
+			pcall(function()
+				WindUI:Notify({
+					Title = L("语言"),
+					Content = L("语言已切换为: ") .. _G.G_Language .. " | " .. L("重新执行脚本后面板文案生效"),
+					Duration = 5,
+				})
+			end)
+		end
+	})
+	Tab:Section({ Title = L("配置") })
 	Tab:Toggle({
-		Title = "自动保存配置",
+		Title = L("自动保存配置"),
 		Value = _G.Hunt_AutoSave,
 		Callback = function(v)
 			_G.Hunt_AutoSave = v
@@ -1122,7 +1322,7 @@ if WindUI then
 		end
 	})
 	Tab:Button({
-		Title = "立即保存配置",
+		Title = L("立即保存配置"),
 		Callback = function()
 			local ok = saveConfig()
 			lastSavedSnap = serializeConfig()
@@ -1130,7 +1330,7 @@ if WindUI then
 		end
 	})
 	Tab:Button({
-		Title = "重置为默认配置 (需重载)",
+		Title = L("重置为默认配置 (需重载)"),
 		Callback = function()
 			-- 先关掉自动保存，否则下一轮扫描又会把当前值写回去
 			_G.Hunt_AutoSave = false
@@ -2237,6 +2437,19 @@ end)
 -- ==================== 自动跳服务器 (1:1 移植自 WindUI 的服务器浏览器扫描) ====================
 -- 真正的扫描逻辑：任何一步报错都由外层 serverHop 兜住，不会把 IsServerHopping 卡死
 
+-- 传送 + 验证：发包成功 ≠ 真的换服，3 秒内 JobId 变了才算跳成功
+local function teleportAndVerify(doTeleport)
+	local jobBefore = game.JobId
+	local ok = pcall(doTeleport)
+	if not ok then return false end
+	local t0 = tick()
+	while tick() - t0 < 3 do
+		if game.JobId ~= jobBefore then return true end
+		task.wait(0.2)
+	end
+	return false
+end
+
 -- 兜底跳服：走 Roblox 公开服务器列表 + TeleportService，完全不依赖游戏内的 ServerBrowser 界面。
 -- 用于「界面里扫不到服务器」或「点了传送但没真的换服」的情况
 local function hopByApi()
@@ -2255,7 +2468,7 @@ local function hopByApi()
 		return false
 	end
 
-	local bestJob, bestPlayers, total = nil, nil, 0
+	local list, total = {}, 0
 	for _, srv in ipairs(data.data) do
 		local job = srv.id
 		local playing = srv.playing or 0
@@ -2263,27 +2476,39 @@ local function hopByApi()
 		if job and job ~= game.JobId and playing < maxP then
 			total = total + 1
 			if playing >= (_G.G_HopMinPlayers or 1) and playing <= (_G.G_HopMaxPlayers or 12) then
-				if not bestPlayers or playing < bestPlayers then bestJob, bestPlayers = job, playing end
+				table.insert(list, { Job = job, Players = playing })
 			end
 		end
 	end
 
-	if not bestJob then
+	if #list == 0 then
 		print("[猎赏] HTTP 兜底: " .. total .. " 个有空位的服务器，但没有符合人数条件("
 			.. _G.G_HopPlayerRange .. ")的")
 		return false
 	end
 
-	print("[猎赏] HTTP 兜底 -> 传送到 " .. bestJob .. "（" .. bestPlayers .. " 人）| 这条路没有区域/赏金过滤")
+	-- 同样是从人数最少的开始逐个试，跳不进去就换下一个
+	table.sort(list, function(a, b) return a.Players < b.Players end)
+	print("[猎赏] HTTP 兜底: 找到 " .. #list .. " 个候选 | 这条路没有区域/赏金过滤")
 	queueAutoReload() -- 先排队再传送
-	local ok3, err = pcall(function()
-		TeleportService:TeleportToPlaceInstance(game.PlaceId, bestJob, LocalPlayer)
-	end)
-	if not ok3 then
-		print("[猎赏] HTTP 兜底传送失败: " .. tostring(err))
-		return false
+
+	local tried = 0
+	for _, cand in ipairs(list) do
+		tried = tried + 1
+		print("[猎赏] HTTP 兜底 尝试第 " .. tried .. " 个: " .. cand.Job .. "（" .. cand.Players .. " 人）")
+		if teleportAndVerify(function()
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, cand.Job, LocalPlayer)
+		end) then
+			print("[猎赏] HTTP 兜底传送成功，正在传送...")
+			return true
+		end
+		print("[猎赏] HTTP 兜底: 这个也没跳进去 -> 换下一个服务器")
+		if tried >= 5 then
+			print("[猎赏] HTTP 兜底: 试了 " .. tried .. " 个都不行 -> 本轮放弃，稍后重试")
+			break
+		end
 	end
-	return true
+	return false
 end
 
 local function doServerHop()
