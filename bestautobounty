@@ -1977,6 +1977,8 @@ local lastSkillLog = 0
 pressSkills = function(force)
 	if not _G.Hunt_AutoSkill then return end
 	if _G.Hunt_Fleeing then return end -- 逃生期间不放技能
+	-- 跳服前在天上等待期间也不放技能（到处乱放技能会暴露位置/打断躲着等这场架打完）
+	if _G.Hunt_HopSkyTimer or _G.Hunt_HopSkyEmpty then return end
 	if not force and tick() - lastSkill < _G.Hunt_SkillInterval then return end
 	lastSkill = tick()
 
@@ -2020,10 +2022,11 @@ pressSkills = function(force)
 	end)
 end
 
--- 每 N 秒自动瞬步（逃生期间暂停，否则会往目标方向冲）
+-- 每 N 秒自动瞬步（逃生期间、跳服前飞天等待期间都暂停，否则会往目标方向冲出去）
 task.spawn(function()
 	while task.wait(1) do
-		if _G.Hunt_Auto and _G.Hunt_AutoSoru and not _G.Hunt_Fleeing then
+		if _G.Hunt_Auto and _G.Hunt_AutoSoru and not _G.Hunt_Fleeing
+			and not (_G.Hunt_HopSkyTimer or _G.Hunt_HopSkyEmpty) then
 			if tick() - lastSoru >= _G.Hunt_SoruInterval then
 				pcall(triggerSoru) -- 包一层：瞬步里万一出错，也不会把这个循环搞死导致以后都不瞬步
 			end
@@ -2151,13 +2154,7 @@ local function huntTick(dt)
 			myRoot.Velocity = Vector3.new(0, 0, 0)
 			myRoot.RotVelocity = Vector3.new(0, 0, 0)
 		end
-		-- 在天上等的时候照样把手上这单打完（攻击/技能都是发包，不用贴近）：
-		-- 不然「等战斗结束」永远等不到（人一直活着），只能干等到超时才跳，看着就像卡在天上
-		if currentTarget then
-			pressSkills()
-			attackTarget(currentTarget)
-		end
-		return
+		return -- 在天上等待跳服期间：不放技能、不攻击（躲着等这场架打完再跳）
 	end
 	if not skyWaiting then skyBaseY = nil end
 
