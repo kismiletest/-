@@ -1,0 +1,589 @@
+--[[
+    手动进服务器 (提取自 rjr2 的「服务器」页) + 中英切换 + Webhook
+    ------------------------------------------------------------------
+    流程:
+      1. 拉取全服列表 (ReplicatedStorage.__ServerBrowser), 每条含 Region / Count / Bounty。
+      2. 按「手动进服赏金范围」区间 + 人数区间过滤, 按赏金从高到低排序。
+      3. 结果填进「选择服务器」下拉框; 选中后点「进入所选服务器」传送过去。
+    另有: 自动刷新 / Webhook 推送 / 直接输入服务器ID进服 / 执行即进服 / 中英切换。
+]]
+
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService       = game:GetService("HttpService")
+local LocalPlayer       = Players.LocalPlayer
+
+-- ============================ 存档 ============================
+local CONFIG_FILE = "manual_server_hop.json"
+
+local function SaveConfig()
+    if not writefile then return end
+    local ok, raw = pcall(function()
+        return HttpService:JSONEncode({
+            WebhookURL     = _G.WebhookURL,
+            WebhookEnabled = _G.WebhookEnabled,
+            WebhookName    = _G.WebhookName,
+            WebhookOnFind  = _G.WebhookOnFind,
+            ManualHopRange = _G.ManualHopRange,
+            HopPlayerRange = _G.HopPlayerRange,
+            ManualHopAuto  = _G.ManualHopAuto,
+            JoinJobId      = _G.JoinJobId,
+            Language       = _G.Language,
+        })
+    end)
+    if ok and raw then pcall(writefile, CONFIG_FILE, raw) end
+end
+
+local function LoadConfig()
+    if not (readfile and isfile) then return end
+    pcall(function()
+        if not isfile(CONFIG_FILE) then return end
+        local raw = readfile(CONFIG_FILE)
+        if not raw or raw == "" then return end
+        local data = HttpService:JSONDecode(raw)
+        if type(data) ~= "table" then return end
+        for k, v in pairs(data) do
+            if v ~= nil then _G[k] = v end
+        end
+    end)
+end
+
+-- ============================ 设置 ============================
+_G.HopPlayerRange = _G.HopPlayerRange or "1-12"      -- 人数过滤(用于手动进服的人数区间)
+_G.ManualHopRange = _G.ManualHopRange or "100-200m"  -- 手动进服赏金范围
+_G.ManualHopAuto  = _G.ManualHopAuto  or true        -- 自动刷新服务器列表
+_G.ManualHopJob   = _G.ManualHopJob   or ""          -- 当前选中的服务器 jobId
+
+-- webhook 设置
+_G.WebhookURL     = _G.WebhookURL     or ""          -- Discord webhook 地址
+_G.WebhookEnabled = _G.WebhookEnabled or false       -- webhook 总开关
+_G.WebhookName    = _G.WebhookName    or "Server Notifier"
+_G.WebhookOnFind  = _G.WebhookOnFind  or true        -- 刷新到服务器时自动推送
+_G.JoinJobId      = _G.JoinJobId      or ""          -- 「输入服务器ID」框的值(会存档)
+_G.Language       = _G.Language       or "中文"       -- 界面语言: 中文 / English
+
+LoadConfig()  -- 读档, 覆盖上面的默认值
+
+-- 想「执行即进服」: 把服务器ID填到这里, 执行后直接进入该服务器(留空=不自动进)
+local JOIN_JOB_ID = ""
+
+-- ============================ 语言 ============================
+local Translations = {
+    ["中文"] = {},
+    ["English"] = {
+        ["手动进服"] = "Manual Join",
+        ["选择服务器"] = "Select Server",
+        ["刷新服务器列表"] = "Refresh Server List",
+        ["进入所选服务器"] = "Join Selected Server",
+        ["输入服务器ID"] = "Enter Server ID",
+        ["进入该服务器ID"] = "Join This Server ID",
+        ["Webhook 地址"] = "Webhook URL",
+        ["启用 Webhook"] = "Enable Webhook",
+        ["刷新时自动推送"] = "Auto Push On Refresh",
+        ["测试发送"] = "Send Test",
+        ["自动刷新服务器列表"] = "Auto Refresh Server List",
+        ["手动进服赏金范围"] = "Manual Join Bounty Range",
+        ["语言"] = "Language",
+        ["语言已切换为: English"] = "Language switched to: English",
+        ["语言已切换为: 中文"] = "Language switched to: Chinese",
+        -- 描述
+        ["自动列出该赏金范围内的服务器"] = "Auto list servers within this bounty range",
+        ["按赏金从高到低排列，选中后点下面按钮进入"] = "Sorted by bounty (high to low); select then use the button below",
+        ["开启后每 45 秒自动重新扫描一次"] = "Rescan every 45 seconds when enabled",
+        ["粘贴 jobId"] = "Paste jobId",
+        ["（点刷新获取服务器列表）"] = "(click refresh to load servers)",
+        -- 通知 / 提示
+        ["操作失败"] = "Failed",
+        ["请先选择一个服务器"] = "Please select a server first",
+        ["请先输入服务器ID"] = "Please enter a server ID first",
+        ["进服"] = "Join",
+        ["正在进入..."] = "Joining...",
+        ["进入失败"] = "Join failed",
+        ["已找到"] = "Found",
+        ["个服务器"] = "servers",
+        ["正在进入服务器: "] = "Joining server: ",
+        ["发送成功"] = "Sent",
+        ["发送失败(检查地址/执行器)"] = "Send failed (check URL/executor)",
+        ["测试: webhook 正常, job "] = "Test: webhook OK, job ",
+        -- webhook 内容
+        ["服务器扫描结果"] = "Server scan results",
+        ["共"] = "total",
+        ["个"] = "",
+        ["赏金从高到低"] = "bounty high to low",
+        ["人数"] = "Players",
+        ["赏金"] = "Bounty",
+        ["加入代码"] = "Join code",
+    },
+}
+
+local function L(text)
+    if _G.Language == "English" and Translations["English"][text] then
+        return Translations["English"][text]
+    end
+    return text
+end
+
+-- 反查: 英文 -> 中文(用于切换语言时把界面上已有的英文还原再翻译)
+local EnglishTranslationSources = {}
+for source, translation in pairs(Translations["English"]) do
+    if EnglishTranslationSources[translation] == nil then
+        EnglishTranslationSources[translation] = source
+    end
+end
+
+local function LocalizeExistingText(text)
+    if type(text) ~= "string" or text == "" then
+        return text
+    end
+    return L(EnglishTranslationSources[text] or text)
+end
+
+-- ============================ 工具函数 ============================
+local function FormatNumber(n)
+    local s = tostring(math.floor(tonumber(n) or 0))
+    local left, num, right = s:match("^([^%d]*%d)(%d*)(.-)$")
+    return left .. (num:reverse():gsub("(%d%d%d)", "%1,"):reverse()) .. right
+end
+
+local function ApplyPlayerRange(label)
+    _G.HopPlayerRange = label
+    local minPlayers, maxPlayers = label:match("(%d+)%-(%d+)")
+    if minPlayers and maxPlayers then
+        _G.HopMinPlayers = tonumber(minPlayers)
+        _G.HopMaxPlayers = tonumber(maxPlayers)
+        return
+    end
+    _G.HopMinPlayers = 1
+    _G.HopMaxPlayers = 12
+end
+
+-- 区间 100-200m / 下限 大于100m / 其它 = 不限
+local function ParseBountyFilter(label)
+    label = tostring(label or "")
+    local lo, hi = label:match("([%d%.]+)%s*%-%s*([%d%.]+)[Mm]")
+    if lo and hi then
+        return (tonumber(lo) or 0) * 1000000, (tonumber(hi) or 0) * 1000000
+    end
+    local minOnly = label:match("大于([%d%.]+[Mm]?)")
+    if minOnly then
+        local num, unit = minOnly:match("([%d%.]+)([Mm]?)")
+        local value = tonumber(num) or 0
+        if unit and unit:lower() == "m" then value = value * 1000000 end
+        return value + 1, 999999999999999
+    end
+    return 0, 999999999999999
+end
+
+ApplyPlayerRange(_G.HopPlayerRange)
+
+-- ============================ 拉取全服列表 ============================
+local ServerHopCache = { List = nil, Fetching = false }
+
+local function FetchServerList(timeout)
+    local browser = ReplicatedStorage:FindFirstChild("__ServerBrowser")
+    if not browser then return nil end
+    local servers = {}
+    local pending = 0
+    for page = 1, 100 do
+        pending = pending + 1
+        task.delay(page * 0.02, function()
+            local ok, result = pcall(function()
+                return browser:InvokeServer(page)
+            end)
+            if not ok then
+                local tries = 0
+                repeat
+                    task.wait(0.5)
+                    tries = tries + 1
+                    ok, result = pcall(function()
+                        return browser:InvokeServer(page)
+                    end)
+                until ok or tries >= 2
+            end
+            if ok and type(result) == "table" then
+                for job, info in pairs(result) do
+                    if type(info) == "table" then
+                        servers[job] = {
+                            Region = tostring(info.Region or "Unknown"),
+                            Count = tonumber(info.Count) or 0,
+                            Bounty = tonumber(info.Bounty) or 0,
+                        }
+                    end
+                end
+            end
+            pending = pending - 1
+        end)
+    end
+    local deadline = tick() + (timeout or 20)
+    while pending > 0 and tick() < deadline do
+        task.wait(0.1)
+    end
+    return servers
+end
+
+local function GetServerList()
+    if ServerHopCache.List then
+        return ServerHopCache.List
+    end
+    if ServerHopCache.Fetching then
+        local deadline = tick() + 25
+        while ServerHopCache.Fetching and tick() < deadline do
+            task.wait(0.1)
+        end
+        return ServerHopCache.List
+    end
+    ServerHopCache.Fetching = true
+    local ok, servers = pcall(FetchServerList, 20)
+    ServerHopCache.Fetching = false
+    if ok and type(servers) == "table" and next(servers) ~= nil then
+        ServerHopCache.List = servers
+    end
+    return ServerHopCache.List
+end
+
+-- ============================ 传送 ============================
+local function JoinServerJob(job)
+    if type(job) ~= "string" or job == "" then return false end
+    local ok = false
+    local browser = ReplicatedStorage:FindFirstChild("__ServerBrowser")
+    if browser then
+        ok = pcall(function()
+            browser:InvokeServer("teleport", job)
+        end)
+    end
+    if not ok then
+        ok = pcall(function()
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, job, LocalPlayer)
+        end)
+    end
+    return ok
+end
+
+-- ============================ Webhook ============================
+-- 优先用执行器的 request / http_request, 兜底 HttpService
+local function HttpPost(url, body)
+    if request then
+        local ok = pcall(function()
+            request({
+                Url = url,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body,
+            })
+        end)
+        if ok then return true end
+    end
+    if http_request then
+        local ok = pcall(function()
+            http_request({
+                Url = url,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body,
+            })
+        end)
+        if ok then return true end
+    end
+    return pcall(function()
+        HttpService:PostAsync(url, body, Enum.HttpContentType.ApplicationJson)
+    end)
+end
+
+-- 发送一条文本消息到 Discord webhook
+local function SendWebhook(content)
+    if not _G.WebhookEnabled then return false end
+    local url = tostring(_G.WebhookURL or "")
+    if url == "" then return false end
+    local payload = HttpService:JSONEncode({
+        content = tostring(content),
+        username = tostring(_G.WebhookName or "Notifier"),
+    })
+    return HttpPost(url, payload)
+end
+
+-- 把服务器列表格式化成多行文本(加入代码用代码块包住, Discord 里高亮显示且可复制)
+local function FormatServerLines(list, limit)
+    local lines = {}
+    for i = 1, math.min(#list, limit or 10) do
+        local s = list[i]
+        lines[#lines + 1] = string.format(
+            "%d. **%s** | %s %d | %s %s\n%s:\n```\n%s\n```",
+            i, s.Region, L("人数"), s.Count, L("赏金"), FormatNumber(s.Bounty), L("加入代码"), s.Job)
+    end
+    return table.concat(lines, "\n")
+end
+
+-- ============================ 手动进服列表 ============================
+local ManualHopDropdown
+local ManualHopMap = {}
+local ManualHopScanning = false
+
+-- 扫描服务器列表, 按 _G.ManualHopRange 过滤, 赏金从高到低排序后刷进下拉框
+local function RefreshManualHopList(notify)
+    if ManualHopScanning then return end
+    ManualHopScanning = true
+
+    ServerHopCache.List = nil
+    local servers = GetServerList()
+
+    local minBounty, maxBounty = ParseBountyFilter(_G.ManualHopRange)
+    local list = {}
+    if type(servers) == "table" then
+        for job, info in pairs(servers) do
+            if type(info) == "table" and job ~= game.JobId then
+                local bounty = tonumber(info.Bounty) or 0
+                local count = tonumber(info.Count) or 0
+                if bounty >= minBounty and bounty <= maxBounty
+                    and count >= _G.HopMinPlayers and count <= _G.HopMaxPlayers then
+                    table.insert(list, {
+                        Job = job,
+                        Region = tostring(info.Region or "Unknown"),
+                        Count = count,
+                        Bounty = bounty,
+                    })
+                end
+            end
+        end
+    end
+    table.sort(list, function(a, b) return a.Bounty > b.Bounty end)
+
+    ManualHopMap = {}
+    local labels = {}
+    for i, s in ipairs(list) do
+        local label = string.format("%d. %s | %s", i, s.Region, FormatNumber(s.Bounty))
+        ManualHopMap[label] = s
+        table.insert(labels, label)
+    end
+    if #labels == 0 then
+        labels = { L("（点刷新获取服务器列表）") }
+    end
+
+    if ManualHopDropdown and ManualHopDropdown.Refresh then
+        pcall(function() ManualHopDropdown:Refresh(labels, false) end)
+    end
+
+    ManualHopScanning = false
+    if notify then
+        WindUI:Notify({
+            Title = L("手动进服"),
+            Content = L("已找到") .. " " .. #list .. " " .. L("个服务器"),
+            Icon = "wind",
+            Duration = 3
+        })
+        -- 刷新时推送服务器列表到 webhook
+        if _G.WebhookEnabled and _G.WebhookOnFind and #list > 0 then
+            local msg = string.format("%s [%s] %s %d %s (%s):\n%s",
+                L("服务器扫描结果"), _G.ManualHopRange, L("共"), #list, L("个"), L("赏金从高到低"),
+                FormatServerLines(list, 10))
+            task.spawn(SendWebhook, msg)
+        end
+    end
+end
+
+-- ============================ UI (WindUI) ============================
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local Window = WindUI:CreateWindow({
+    Title = L("手动进服"),
+    Icon = "server",
+    Theme = "Dark",
+    Folder = "ManualServerJoin",
+    ToggleKey = Enum.KeyCode.G,
+})
+local Tab = Window:Tab({ Title = L("手动进服"), Icon = "server" })
+
+Tab:Dropdown({
+    Title = L("手动进服赏金范围"),
+    Desc = L("自动列出该赏金范围内的服务器"),
+    Values = { "100-200m", "50-100m", "200-300m", "大于100m", "大于200m" },
+    Value = _G.ManualHopRange,
+    Callback = function(v)
+        _G.ManualHopRange = v
+        SaveConfig()
+        task.spawn(function() RefreshManualHopList(true) end)
+    end
+})
+
+ManualHopDropdown = Tab:Dropdown({
+    Title = L("选择服务器"),
+    Desc = L("按赏金从高到低排列，选中后点下面按钮进入"),
+    Values = { L("（点刷新获取服务器列表）") },
+    Value = L("（点刷新获取服务器列表）"),
+    Callback = function(v)
+        local info = ManualHopMap[v]
+        _G.ManualHopJob = info and info.Job or ""
+    end
+})
+
+Tab:Button({
+    Title = L("刷新服务器列表"),
+    Icon = "refresh-cw",
+    Callback = function()
+        task.spawn(function() RefreshManualHopList(true) end)
+    end
+})
+
+Tab:Button({
+    Title = L("进入所选服务器"),
+    Icon = "log-in",
+    Callback = function()
+        local job = _G.ManualHopJob
+        if not job or job == "" then
+            WindUI:Notify({ Title = L("操作失败"), Content = L("请先选择一个服务器"), Duration = 2 })
+            return
+        end
+        local ok = JoinServerJob(job)
+        WindUI:Notify({
+            Title = L("手动进服"),
+            Content = ok and (L("正在进入...") .. " " .. tostring(job):sub(1, 8)) or L("进入失败"),
+            Icon = "wind",
+            Duration = 4
+        })
+        task.spawn(SendWebhook, L("正在进入服务器: ") .. tostring(job))
+    end
+})
+
+-- 直接输入服务器ID进入
+Tab:Input({
+    Title = L("输入服务器ID"),
+    Value = _G.JoinJobId or "",
+    Placeholder = L("粘贴 jobId"),
+    Callback = function(v) _G.JoinJobId = v; SaveConfig() end
+})
+
+Tab:Button({
+    Title = L("进入该服务器ID"),
+    Icon = "log-in",
+    Callback = function()
+        local job = _G.JoinJobId
+        if not job or job == "" then
+            WindUI:Notify({ Title = L("操作失败"), Content = L("请先输入服务器ID"), Duration = 2 })
+            return
+        end
+        local ok = JoinServerJob(job)
+        WindUI:Notify({ Title = L("进服"), Content = ok and L("正在进入...") or L("进入失败"), Duration = 4 })
+        task.spawn(SendWebhook, L("正在进入服务器: ") .. tostring(job))
+    end
+})
+
+-- Webhook 设置
+Tab:Input({
+    Title = L("Webhook 地址"),
+    Value = _G.WebhookURL,
+    Placeholder = "https://discord.com/api/webhooks/...",
+    Callback = function(v) _G.WebhookURL = v; SaveConfig() end
+})
+
+Tab:Toggle({
+    Title = L("启用 Webhook"),
+    Value = _G.WebhookEnabled,
+    Callback = function(v) _G.WebhookEnabled = v; SaveConfig() end
+})
+
+Tab:Toggle({
+    Title = L("刷新时自动推送"),
+    Value = _G.WebhookOnFind,
+    Callback = function(v) _G.WebhookOnFind = v; SaveConfig() end
+})
+
+Tab:Button({
+    Title = L("测试发送"),
+    Icon = "send",
+    Callback = function()
+        local ok = SendWebhook(L("测试: webhook 正常, job ") .. tostring(game.JobId):sub(1, 8))
+        WindUI:Notify({
+            Title = "Webhook",
+            Content = ok and L("发送成功") or L("发送失败(检查地址/执行器)"),
+            Duration = 4
+        })
+    end
+})
+
+Tab:Toggle({
+    Title = L("自动刷新服务器列表"),
+    Desc = L("开启后每 45 秒自动重新扫描一次"),
+    Value = _G.ManualHopAuto,
+    Callback = function(v)
+        _G.ManualHopAuto = v
+        SaveConfig()
+    end
+})
+
+-- ============================ 语言切换 ============================
+local RefreshLocalizedUI
+local LanguageButton
+
+LanguageButton = Tab:Button({
+    Title = L("语言") .. " (" .. _G.Language .. ")",
+    Icon = "globe",
+    Callback = function()
+        if _G.Language == "中文" then
+            _G.Language = "English"
+        else
+            _G.Language = "中文"
+        end
+        SaveConfig()
+        if RefreshLocalizedUI then RefreshLocalizedUI() end
+        WindUI:Notify({
+            Title = L("语言"),
+            Content = _G.Language == "English" and L("语言已切换为: English") or L("语言已切换为: 中文"),
+            Duration = 3
+        })
+    end
+})
+
+RefreshLocalizedUI = function()
+    pcall(function() Window:SetTitle(LocalizeExistingText(Window.Title)) end)
+    for _, tab in ipairs((Window.TabModule and Window.TabModule.Tabs) or {}) do
+        for _, element in ipairs(tab.Elements or {}) do
+            if type(element) == "table" and element.SetTitle and element.Title then
+                pcall(function()
+                    element:SetTitle(LocalizeExistingText(element.Title))
+                    if element.SetDesc and element.Desc then
+                        element:SetDesc(LocalizeExistingText(element.Desc))
+                    end
+                end)
+            end
+        end
+    end
+    -- 扫描侧边栏/静态文本
+    local sb = Window.UIElements and Window.UIElements.SideBar and Window.UIElements.SideBar.Frame
+    if sb then
+        local function scan(inst)
+            for _, child in ipairs(inst:GetChildren()) do
+                if child:IsA("TextLabel") then
+                    local nt = LocalizeExistingText(child.Text)
+                    if nt ~= child.Text then child.Text = nt end
+                end
+                scan(child)
+            end
+        end
+        pcall(scan, sb)
+    end
+    if LanguageButton then
+        local languageName = _G.Language == "English" and "English" or "中文"
+        pcall(function() LanguageButton:SetTitle(L("语言") .. " (" .. languageName .. ")") end)
+    end
+end
+
+-- ============================ 自动刷新 + 启动 ============================
+-- 自动刷新循环
+task.spawn(function()
+    task.wait(6)
+    while true do
+        if _G.ManualHopAuto and not ManualHopScanning then
+            pcall(RefreshManualHopList, false)
+        end
+        task.wait(45)
+    end
+end)
+
+-- 执行即进服: JOIN_JOB_ID 非空时, 脚本执行后直接进入该服务器
+if JOIN_JOB_ID ~= "" then
+    task.spawn(function()
+        task.wait(1)
+        local ok = JoinServerJob(JOIN_JOB_ID)
+        print("[手动进服] 执行即进服:", JOIN_JOB_ID, ok)
+    end)
+end
+
+print("[手动进服] 已加载, 按 G 开关菜单")
