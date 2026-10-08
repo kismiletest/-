@@ -16,6 +16,7 @@ for key, defaultValue in pairs({
     M1FireInterval          = 0,
     FruitM1                 = false,
     VoidFruitM1             = false,
+    InfRange                = false,
     AutoHaki                = false,
     AutoKen                 = false,
     AutoV3                  = false,
@@ -131,6 +132,7 @@ local ConfigKeys = {
     "M1FireInterval",
     "FruitM1",
     "VoidFruitM1",
+    "InfRange",
     "AutoHaki",
     "AutoKen",
     "AutoV3",
@@ -466,6 +468,7 @@ local Translations = {
         ["枪械 m1 发射间隔"] = "Gun M1 Fire Interval",
         ["果实m1"] = "Fruit M1",
         ["虚空果实m1"] = "Void Fruit M1",
+        ["无限范围"] = "Inf Range",
         ["移动速度"] = "Move Speed",
         ["加速开关"] = "Speed Boost",
         ["跳跃高度"] = "Jump Height",
@@ -1256,6 +1259,54 @@ do
         Callback = function(vatt)
             _G.VoidFruitM1 = vatt
             SetVoidFruitM1Enabled(vatt)
+            SaveConfiguration()
+        end
+    })
+
+    local InfRangeThread = nil
+    local infRangeVec = Vector3.new(6e7, 6e7, 6e7)
+
+    local function GetM1Remote()
+        local char = LocalPlayer.Character
+        if not char then return nil end
+        -- 无限范围(Z技能): 优先指定武器 Dragonheart-Dragonheart
+        local tool = char:FindFirstChild("Dragonheart-Dragonheart")
+        if not tool then
+            tool = char:FindFirstChildOfClass("Tool")
+        end
+        if tool then
+            local remote = tool:FindFirstChild("LeftClickRemote")
+            if remote then return remote end
+        end
+        local fruit = GetPlayerFruit()
+        return fruit and fruit:FindFirstChild("LeftClickRemote") or nil
+    end
+
+    local function SetInfRangeEnabled(enabled)
+        if InfRangeThread then
+            task.cancel(InfRangeThread)
+            InfRangeThread = nil
+        end
+        if not enabled then return end
+        InfRangeThread = task.spawn(function()
+            while _G.InfRange do
+                task.wait(0.1)
+                local remote = GetM1Remote()
+                if not remote then continue end
+                pcall(function() remote:FireServer(infRangeVec) end)
+            end
+        end)
+    end
+
+    if _G.InfRange then
+        SetInfRangeEnabled(true)
+    end
+    RJR[L("杀戮光环")]:Toggle({
+        Title = L("无限范围"),
+        Value = _G.InfRange,
+        Callback = function(vatt)
+            _G.InfRange = vatt
+            SetInfRangeEnabled(vatt)
             SaveConfiguration()
         end
     })
@@ -2311,6 +2362,13 @@ do
     local flyLockedTracks, flyAnimateScript = {}, nil
     local FlyHidePanel
 
+    -- 船穿墙:与飞行开关互不影响,只由面板上的「船穿墙」按钮控制
+    local boatNoclipOn = false
+    local boatNoclipConn = nil
+    local boatNoclipRestore = {}   -- part -> 原本的 CanCollide,关闭时按原值还原
+    local boatNoclipBoat = nil
+    local BoatNoclipBtn = nil
+
     local function FlyClampSpeed(v)
         v = math.floor(tonumber(v) or 50)
         if v < FLY_MIN_SPEED then v = FLY_MIN_SPEED end
@@ -2454,6 +2512,79 @@ do
         end)
     end
 
+    -- ==================== 船穿墙 ====================
+    -- 坐到船的座位上后,把该船所有部件的 CanCollide 关掉,船就能穿过地形/建筑。
+    -- 船的定位:Humanoid.SeatPart 往上找 Model(Workspace 本身也是 Model,已排除),
+    -- 所以必须坐着;只是站在甲板上没坐下的话找不到船,不会生效。
+    local function BoatNoclipGetBoat()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local seat = hum and hum.SeatPart
+        if not seat then return nil end
+        local model = seat:FindFirstAncestorOfClass("Model")
+        if model and model ~= workspace then return model end
+        return seat.Parent
+    end
+
+    local function BoatNoclipApply(boat)
+        for _, d in ipairs(boat:GetDescendants()) do
+            if d:IsA("BasePart") then
+                if boatNoclipRestore[d] == nil then
+                    boatNoclipRestore[d] = d.CanCollide
+                end
+                if d.CanCollide then
+                    d.CanCollide = false
+                end
+            end
+        end
+    end
+
+    local function BoatNoclipRestoreAll()
+        for part, orig in pairs(boatNoclipRestore) do
+            pcall(function()
+                if part.Parent and part.CanCollide ~= orig then
+                    part.CanCollide = orig
+                end
+            end)
+        end
+        boatNoclipRestore = {}
+    end
+
+    local function BoatNoclipStop()
+        boatNoclipOn = false
+        if boatNoclipConn then
+            boatNoclipConn:Disconnect()
+            boatNoclipConn = nil
+        end
+        BoatNoclipRestoreAll()
+        boatNoclipBoat = nil
+        if BoatNoclipBtn then
+            BoatNoclipBtn.Text = "船穿墙: 关"
+            BoatNoclipBtn.BackgroundColor3 = Color3.fromRGB(255, 249, 74)
+        end
+    end
+
+    local function BoatNoclipStart()
+        if boatNoclipConn then return end
+        boatNoclipOn = true
+        boatNoclipConn = RunService.Stepped:Connect(function()
+            if not boatNoclipOn then return end
+            local boat = BoatNoclipGetBoat()
+            if boat ~= boatNoclipBoat then
+                -- 换船或离开座位:先把上一艘还回去,避免下了船还穿墙
+                BoatNoclipRestoreAll()
+                boatNoclipBoat = boat
+            end
+            if boat then
+                pcall(BoatNoclipApply, boat)
+            end
+        end)
+        if BoatNoclipBtn then
+            BoatNoclipBtn.Text = "船穿墙: 开"
+            BoatNoclipBtn.BackgroundColor3 = Color3.fromRGB(79, 255, 152)
+        end
+    end
+
     local function FlySyncButtonText()
         if FlyStartBtn then
             FlyStartBtn.Text = FlyOn and "停止" or "开始"
@@ -2485,6 +2616,8 @@ do
 
     local function FlyDestroyPanel()
         FlyStopHold()
+        BoatNoclipStop()   -- 面板关了按钮就没了,顺手把船还回可碰撞
+        BoatNoclipBtn = nil
         if FlyPanel then
             FlyPanel:Destroy()
             FlyPanel = nil
@@ -2511,6 +2644,7 @@ do
         local c = Instance.new("TextButton")
         local h = Instance.new("TextButton")
         local h2 = Instance.new("TextButton")
+        local br = Instance.new("TextButton")
 
         m.Name = "RJRFly"
         m.Parent = PlayerGui
@@ -2521,7 +2655,7 @@ do
         f.BackgroundColor3 = Color3.fromRGB(163, 255, 137)
         f.BorderColor3 = Color3.fromRGB(103, 221, 213)
         f.Position = UDim2.new(0.100320168, 0, 0.379746825, 0)
-        f.Size = UDim2.new(0, 190, 0, 57)
+        f.Size = UDim2.new(0, 190, 0, 85)
         f.Active = true
         f.Draggable = true
 
@@ -2542,14 +2676,14 @@ do
         u.BackgroundColor3 = Color3.fromRGB(79, 255, 152)
         u.Text = "加速"
 
-        b(d, "↓", UDim2.new(0, 0, 0.491228074, 0), UDim2.new(0, 44, 0, 28))
+        b(d, "↓", UDim2.new(0, 0, 0, 28), UDim2.new(0, 44, 0, 28))
         d.BackgroundColor3 = Color3.fromRGB(215, 255, 121)
         d.Text = "减速"
 
         o.Name = "onoff"
         o.Parent = f
         o.BackgroundColor3 = Color3.fromRGB(255, 249, 74)
-        o.Position = UDim2.new(0.702823281, 0, 0.491228074, 0)
+        o.Position = UDim2.new(0.702823281, 0, 0, 28)
         o.Size = UDim2.new(0, 56, 0, 28)
         o.Font = Enum.Font.SourceSans
         o.Text = "开始"
@@ -2565,7 +2699,7 @@ do
         s.Parent = f
         s.Name = "speed"
         s.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
-        s.Position = UDim2.new(0.468421042, 0, 0.491228074, 0)
+        s.Position = UDim2.new(0.468421042, 0, 0, 28)
         s.Size = UDim2.new(0, 44, 0, 28)
         s.Font = Enum.Font.SourceSans
         s.Text = tostring(flySpeed)
@@ -2577,7 +2711,7 @@ do
         s.TextEditable = true
         s.PlaceholderText = "1-10000"
 
-        b(n, "mine", UDim2.new(0.231578946, 0, 0.491228074, 0), UDim2.new(0, 45, 0, 29))
+        b(n, "mine", UDim2.new(0.231578946, 0, 0, 28), UDim2.new(0, 45, 0, 29))
         n.BackgroundColor3 = Color3.fromRGB(123, 255, 247)
         n.Text = "-5"
 
@@ -2620,8 +2754,26 @@ do
         h2.Position = UDim2.new(0, 44, -1, 57)
         h2.Visible = false
 
+        b(br, "船穿墙: 关", UDim2.new(0, 0, 0, 57), UDim2.new(0, 190, 0, 28))
+        br.TextScaled = false
+        br.TextSize = 20
+        br.BackgroundColor3 = Color3.fromRGB(255, 249, 74)
+
         FlyPanel, FlySpeedBox, FlyStartBtn = m, s, o
+        BoatNoclipBtn = br
         FlySyncButtonText()
+        if boatNoclipOn then
+            br.Text = "船穿墙: 开"
+            br.BackgroundColor3 = Color3.fromRGB(79, 255, 152)
+        end
+
+        br.MouseButton1Click:Connect(function()
+            if boatNoclipOn then
+                BoatNoclipStop()
+            else
+                BoatNoclipStart()
+            end
+        end)
 
         o.MouseButton1Click:Connect(function()
             if FlyOn then
@@ -2684,6 +2836,7 @@ do
             s.Visible = false
             n.Visible = false
             h.Visible = false
+            br.Visible = false
             h2.Visible = true
             f.BackgroundTransparency = 1
             c.Position = UDim2.new(0, 0, -1, 57)
@@ -2697,6 +2850,7 @@ do
             s.Visible = true
             n.Visible = true
             h.Visible = true
+            br.Visible = true
             h2.Visible = false
             f.BackgroundTransparency = 0
             c.Position = UDim2.new(0, 0, -1, 27)
