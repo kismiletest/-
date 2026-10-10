@@ -1,0 +1,836 @@
+-- Rivals Auto Play (Rayfield remake)
+-- Single tab: Kill All + Auto Queue + Auto Ban, config saved on every run
+
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+-- Re-execution guard (autoexecute + manual run): new run invalidates the old one
+local env = (getgenv and getgenv()) or {}
+env.RivalsAutoPlayToken = {}
+local myToken = env.RivalsAutoPlayToken
+local function isCurrent()
+	return env.RivalsAutoPlayToken == myToken
+end
+
+local cloneRef = cloneref
+local function ref(object)
+	if object and cloneRef then
+		return cloneRef(object)
+	end
+	return object
+end
+
+local RS = ref(ReplicatedStorage)
+local SP = ref(StarterPlayer)
+local LocalPlayer = ref(Players.LocalPlayer)
+
+local function findPath(root, ...)
+	local current = root
+	for _, name in ipairs({ ... }) do
+		if not current then
+			return nil
+		end
+		current = current:FindFirstChild(name)
+	end
+	return current
+end
+
+local function optionOf(dropdown, default)
+	local current = dropdown and dropdown.CurrentOption
+	if type(current) == "table" then
+		current = current[1]
+	end
+	if current == nil or current == "" then
+		return default
+	end
+	return current
+end
+
+--// Game data -------------------------------------------------------
+
+local queueLookup = {}
+
+local function getDuelLibrary()
+	local module = findPath(RS, "Modules", "DuelLibrary")
+	if not module then
+		return nil
+	end
+	local ok, result = pcall(require, module)
+	return ok and result or nil
+end
+
+local function getQueueData()
+	local list = {}
+	local duelLibrary = getDuelLibrary()
+
+	if duelLibrary then
+		for _, queueName in pairs(duelLibrary.MatchmakingQueueOrder or {}) do
+			local info = duelLibrary.MatchmakingQueues and duelLibrary.MatchmakingQueues[queueName]
+			local display = (info and info.DisplayName) or queueName
+			table.insert(list, display)
+			queueLookup[display] = queueName
+		end
+	end
+
+	if #list == 0 then
+		list = { "1v1", "2v2" }
+		queueLookup["1v1"] = "1v1"
+		queueLookup["2v2"] = "2v2"
+	end
+
+	return list
+end
+
+local function getWeaponList()
+	local list = { "None" }
+
+	pcall(function()
+		local weapons = findPath(SP, "StarterPlayerScripts", "Assets", "ViewModels", "Weapons")
+		if not weapons then
+			return
+		end
+
+		for _, child in pairs(weapons:GetChildren()) do
+			if child:IsA("Model") then
+				table.insert(list, child.Name)
+			end
+		end
+
+		local unobtainable = weapons:FindFirstChild("Unobtainable")
+		if unobtainable then
+			for _, child in pairs(unobtainable:GetChildren()) do
+				if child:IsA("Model") then
+					table.insert(list, child.Name)
+				end
+			end
+		end
+	end)
+
+	table.sort(list, function(a, b)
+		if a == "None" then
+			return true
+		end
+		if b == "None" then
+			return false
+		end
+		return a < b
+	end)
+
+	return list
+end
+
+local function buildMapList()
+	local maps = {}
+	local duelLibrary = getDuelLibrary()
+
+	if duelLibrary then
+		for _, name in pairs(duelLibrary.MapOrder or {}) do
+			local data = duelLibrary.Maps and duelLibrary.Maps[name]
+			if data and not data.IsHidden then
+				table.insert(maps, name)
+			end
+		end
+
+		if #maps == 0 then
+			for name, data in pairs(duelLibrary.Maps or {}) do
+				if not data.IsHidden then
+					table.insert(maps, name)
+				end
+			end
+		end
+	end
+
+	table.sort(maps)
+	return maps
+end
+
+local function getVoteRemote()
+	return findPath(RS, "Remotes", "Duels", "Vote")
+end
+
+local function getMatchmakingRemote(name)
+	return findPath(RS, "Remotes", "Matchmaking", name)
+end
+
+--// Auto Queue ------------------------------------------------------
+
+local AutoQueueToggle, GameMode
+local queueLoopRunning = false
+
+local function queueIntoSelected()
+	local selected = optionOf(GameMode, "1v1")
+	local queueName = queueLookup[selected] or selected
+
+	local playerScripts = LocalPlayer:FindFirstChild("PlayerScripts")
+	local controllers = playerScripts and playerScripts:FindFirstChild("Controllers")
+	local controller = controllers and controllers:FindFirstChild("MatchmakingController")
+
+	if controller then
+		local ok, matchmakingController = pcall(require, controller)
+		if ok and type(matchmakingController) == "table" and matchmakingController.QueueInto then
+			matchmakingController:QueueInto(queueName)
+			return true
+		end
+	end
+
+	local joinQueue = getMatchmakingRemote("JoinQueue")
+	if joinQueue and joinQueue.InvokeServer then
+		joinQueue:InvokeServer(queueName)
+		return true
+	end
+
+	return false
+end
+
+local function startQueueLoop()
+	if queueLoopRunning then
+		return
+	end
+	queueLoopRunning = true
+
+	task.spawn(function()
+		while isCurrent() and AutoQueueToggle and AutoQueueToggle.CurrentValue do
+			pcall(queueIntoSelected)
+			task.wait(5)
+		end
+		queueLoopRunning = false
+	end)
+end
+
+--// Auto Ban --------------------------------------------------------
+
+local AutoBanToggle, BanWeapons, BanRandomMap
+local FirstBan, SecondBan, FirstBanDelay, SecondBanDelay, MapBanDelay
+local weaponBanRunning = false
+local mapBanRunning = false
+
+local function startWeaponBanLoop()
+	if weaponBanRunning then
+		return
+	end
+	weaponBanRunning = true
+
+	task.spawn(function()
+		local index = 1
+
+		while isCurrent() and AutoBanToggle.CurrentValue and BanWeapons.CurrentValue do
+			local votes = {}
+
+			local first = optionOf(FirstBan, "None")
+			if first ~= "None" then
+				table.insert(votes, { Name = first, Delay = tonumber(FirstBanDelay.CurrentValue) or 0 })
+			end
+
+			local second = optionOf(SecondBan, "None")
+			if second ~= "None" then
+				table.insert(votes, { Name = second, Delay = tonumber(SecondBanDelay.CurrentValue) or 0 })
+			end
+
+			if #votes > 0 then
+				if index > #votes then
+					index = 1
+				end
+
+				local vote = votes[index]
+				task.wait(math.max(vote.Delay, 0))
+
+				if not (AutoBanToggle.CurrentValue and BanWeapons.CurrentValue) then
+					break
+				end
+
+				local voteRemote = getVoteRemote()
+				if voteRemote then
+					voteRemote:FireServer(vote.Name)
+				end
+
+				index = index % #votes + 1
+			end
+
+			task.wait(1)
+		end
+
+		weaponBanRunning = false
+	end)
+end
+
+local function startMapBanLoop()
+	if mapBanRunning then
+		return
+	end
+	mapBanRunning = true
+
+	task.spawn(function()
+		local rng = Random.new()
+
+		while isCurrent() and AutoBanToggle.CurrentValue and BanRandomMap.CurrentValue do
+			local maps = buildMapList()
+
+			if #maps > 0 then
+				task.wait(math.max(tonumber(MapBanDelay.CurrentValue) or 0, 0))
+
+				if not (AutoBanToggle.CurrentValue and BanRandomMap.CurrentValue) then
+					break
+				end
+
+				local voteRemote = getVoteRemote()
+				if voteRemote then
+					voteRemote:FireServer(maps[rng:NextInteger(1, #maps)])
+				end
+
+				task.wait(1)
+			else
+				task.wait(1)
+			end
+		end
+
+		mapBanRunning = false
+	end)
+end
+
+local function startAutoBanLoops()
+	if not (AutoBanToggle and AutoBanToggle.CurrentValue) then
+		return
+	end
+
+	if BanWeapons and BanWeapons.CurrentValue then
+		startWeaponBanLoop()
+	end
+
+	if BanRandomMap and BanRandomMap.CurrentValue then
+		startMapBanLoop()
+	end
+end
+
+--// Kill All --------------------------------------------------------
+
+local KillAll, KillDesync, KillFireRate, KillSlot
+local killLastFire = 0
+local deflecting = {}
+
+local slots = {
+	Primary = 1,
+	Secondary = 2,
+	Melee = 3
+}
+
+local function getSlotNumber()
+	return slots[optionOf(KillSlot, "Melee")] or 3
+end
+
+local util, enum, FighterController, SpectateController
+local killModulesReady = false
+local killModulesAttempt = 0
+
+local function loadKillModules()
+	if killModulesReady then
+		return true
+	end
+	if os.clock() - killModulesAttempt < 1 then
+		return false
+	end
+	killModulesAttempt = os.clock()
+
+	local ok, result = pcall(function()
+		return {
+			require(findPath(RS, "Modules", "Utility")),
+			require(findPath(RS, "Modules", "EnumLibrary")),
+			require(findPath(LocalPlayer, "PlayerScripts", "Controllers", "FighterController")),
+			require(findPath(LocalPlayer, "PlayerScripts", "Controllers", "SpectateController"))
+		}
+	end)
+
+	if ok and result[1] and result[2] and result[3] and result[4] then
+		util, enum, FighterController, SpectateController = result[1], result[2], result[3], result[4]
+		killModulesReady = true
+		return true
+	end
+
+	return false
+end
+
+local function updateDeflection()
+	if not FighterController or not FighterController.Objects then
+		return
+	end
+
+	for _, fighterObj in pairs(FighterController.Objects) do
+		local player = fighterObj.Player
+		if player then
+			local alive = fighterObj.Entity and fighterObj.Entity:IsAlive()
+			local spectating = fighterObj:Get("IsSpectating")
+
+			if not alive or spectating then
+				deflecting[player] = false
+			else
+				local equipped = fighterObj.EquippedItem
+				local isKatana = equipped and equipped.ViewModel and equipped.ViewModel.Name == "Katana"
+				local isDeflecting = false
+
+				if isKatana then
+					isDeflecting = (equipped._attack_cooldown and equipped._attack_cooldown > tick()) or false
+				end
+
+				deflecting[player] = isDeflecting
+			end
+		end
+	end
+end
+
+local function isEnemy(player)
+	if player == LocalPlayer then
+		return false
+	end
+
+	local duel = SpectateController and SpectateController.CurrentDuelSubject
+	local localDueler = duel and duel:GetDueler(LocalPlayer)
+	local localTeam = localDueler and localDueler:Get("TeamID") or nil
+
+	if localTeam and duel and duel.Duelers then
+		for _, dueler in pairs(duel.Duelers) do
+			if dueler.Player == player then
+				return dueler:Get("TeamID") ~= localTeam
+			end
+		end
+	end
+
+	local pTeam = player:GetAttribute("TeamID")
+	local lTeam = LocalPlayer:GetAttribute("TeamID")
+	if pTeam and lTeam then
+		return pTeam ~= lTeam
+	end
+
+	return true
+end
+
+local function getClosestTarget()
+	local char = LocalPlayer.Character
+	if not char then
+		return nil, nil, nil
+	end
+
+	local myRoot = char:FindFirstChild("HumanoidRootPart")
+	if not myRoot then
+		return nil, nil, nil
+	end
+
+	local closestPlayer, closestRoot, closestHead = nil, nil, nil
+	local closestDist = 500
+
+	for _, player in pairs(Players:GetPlayers()) do
+		if isEnemy(player) then
+			local pChar = player.Character
+			if pChar then
+				local pRoot = pChar:FindFirstChild("HumanoidRootPart")
+				local pHead = pChar:FindFirstChild("Head")
+				local pHum = pChar:FindFirstChildWhichIsA("Humanoid")
+
+				if pRoot and pHead and pHum and pHum.Health > 0 then
+					local dist = (myRoot.Position - pRoot.Position).Magnitude
+					if dist < closestDist then
+						closestDist = dist
+						closestPlayer = player
+						closestRoot = pRoot
+						closestHead = pHead
+					end
+				end
+			end
+		end
+	end
+
+	return closestPlayer, closestRoot, closestHead
+end
+
+local function hasKnifeViewModel(targetPlayer)
+	if not targetPlayer then
+		return false
+	end
+
+	local viewModels = Workspace:FindFirstChild("ViewModels")
+	if not viewModels then
+		return false
+	end
+
+	local targetName = targetPlayer.Name
+	for _, model in pairs(viewModels:GetChildren()) do
+		if model:IsA("Model")
+			and string.find(model.Name, targetName, 1, true)
+			and string.find(model.Name, "Knife", 1, true)
+		then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function equipKillSlot()
+	if not FighterController or not FighterController.LocalFighter then
+		return
+	end
+	pcall(function()
+		FighterController.LocalFighter:EquipItem(getSlotNumber())
+	end)
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	deflecting[player] = nil
+end)
+
+local function killHeartbeat()
+	if not isCurrent() then
+		return
+	end
+
+	local killEnabled = KillAll and KillAll.CurrentValue
+	local desyncEnabled = KillDesync and KillDesync.CurrentValue
+	if not killEnabled and not desyncEnabled then
+		return
+	end
+	if not loadKillModules() then
+		return
+	end
+
+	pcall(updateDeflection)
+
+	local targetPlayer, targetRoot, targetHead = getClosestTarget()
+	local desyncCF = nil
+
+	if desyncEnabled and targetRoot and targetHead then
+		local desyncPos
+		if hasKnifeViewModel(targetPlayer) then
+			desyncPos = (targetRoot.CFrame * CFrame.new(0, 6, 0)).Position
+		else
+			desyncPos = (targetRoot.CFrame * CFrame.new(0, 1, 2)).Position
+		end
+		desyncCF = CFrame.lookAt(desyncPos, targetHead.Position)
+	end
+
+	if desyncCF and LocalPlayer.Character then
+		local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if myRoot then
+			local oldCF = myRoot.CFrame
+			local oldVel = myRoot.Velocity
+			local oldRotVel = myRoot.RotVelocity
+			myRoot.CFrame = desyncCF
+			RunService:BindToRenderStep("__RivalsAutoPlayRestore", 101, function()
+				pcall(function()
+					if myRoot then
+						myRoot.CFrame = oldCF
+						myRoot.Velocity = oldVel
+						myRoot.RotVelocity = oldRotVel
+					end
+				end)
+				RunService:UnbindFromRenderStep("__RivalsAutoPlayRestore")
+			end)
+		end
+	end
+
+	if not killEnabled then
+		return
+	end
+	if not targetPlayer or not targetHead or not targetRoot then
+		return
+	end
+	if deflecting[targetPlayer] then
+		return
+	end
+	if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		return
+	end
+	if not FighterController or not FighterController.LocalFighter then
+		return
+	end
+
+	local item = FighterController.LocalFighter.EquippedItem
+	if not item then
+		return
+	end
+
+	local fireRate = tonumber(KillFireRate and KillFireRate.CurrentValue) or 0.0005
+	if tick() - killLastFire < fireRate then
+		return
+	end
+	killLastFire = tick()
+
+	local originPos = desyncCF and desyncCF.Position or targetRoot.Position
+	local targetPos = targetHead.Position
+	local aimCF = CFrame.lookAt(originPos, targetPos)
+	local targetCF = targetHead.CFrame
+	local randomOffset = Vector3.new(
+		(math.random() - 0.5) * 0.1,
+		(math.random() - 0.5) * 0.1,
+		(math.random() - 0.5) * 0.1
+	)
+	local aimedPos = targetPos + randomOffset
+	local objSpaceHeadOffset = targetHead.CFrame:ToObjectSpace(CFrame.new(aimedPos))
+
+	local cameradata = {}
+	cameradata[utf8.char(1)] = {
+		[utf8.char(0)] = util:EncodeCFrame(aimCF),
+		[utf8.char(1)] = util:EncodeCFrame(targetCF),
+		[utf8.char(2)] = targetHead,
+		[utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
+	}
+
+	local useItem = findPath(RS, "Remotes", "Replication", "Fighter", "UseItem")
+		if useItem then
+			pcall(function()
+				useItem:FireServer(
+					item:Get("ObjectID"),
+					enum:ToEnum("StartShooting"),
+					cameradata,
+					nil
+				)
+			end)
+		end
+end
+
+-- pcall keeps the connection alive if the game changes under us.
+RunService.Heartbeat:Connect(function()
+	pcall(killHeartbeat)
+end)
+
+--// UI ---------------------------------------------------------------
+
+local Window = Rayfield:CreateWindow({
+	Name = "Rivals Auto Play",
+	LoadingTitle = "Rivals Auto Play",
+	LoadingSubtitle = "auto queue + auto ban",
+	ConfigurationSaving = {
+		Enabled = true,
+		FolderName = "RivalsAutoPlay",
+		FileName = "Config"
+	},
+	KeySystem = false
+})
+
+local Tab = Window:CreateTab("Auto Play", "play")
+
+local queueOptions = getQueueData()
+local weaponOptions = getWeaponList()
+
+Tab:CreateSection("Kill All")
+
+KillAll = Tab:CreateToggle({
+	Name = "Kill All",
+	CurrentValue = true,
+	Flag = "KillAll",
+	Callback = function()
+		killLastFire = 0
+	end
+})
+
+KillDesync = Tab:CreateToggle({
+	Name = "Desync",
+	CurrentValue = true,
+	Flag = "KillDesync",
+	Callback = function() end
+})
+
+KillFireRate = Tab:CreateSlider({
+	Name = "Fire Rate",
+	Range = { 0, 0.05 },
+	Increment = 0.0005,
+	Suffix = "s",
+	CurrentValue = 0.0005,
+	Flag = "KillFireRate",
+	Callback = function() end
+})
+
+KillSlot = Tab:CreateDropdown({
+	Name = "Weapon Slot",
+	Options = { "Primary", "Secondary", "Melee" },
+	CurrentOption = { "Melee" },
+	MultipleOptions = false,
+	Flag = "KillSlot",
+	Callback = function()
+		if loadKillModules() then
+			equipKillSlot()
+		end
+	end
+})
+
+Tab:CreateSection("Auto Queue")
+
+AutoQueueToggle = Tab:CreateToggle({
+	Name = "Auto Queue",
+	CurrentValue = false,
+	Flag = "AutoQueue",
+	Callback = function(value)
+		if value then
+			startQueueLoop()
+			pcall(queueIntoSelected)
+		else
+			local leaveQueue = getMatchmakingRemote("LeaveQueue")
+			if leaveQueue then
+				pcall(function()
+					leaveQueue:FireServer()
+				end)
+			end
+		end
+	end
+})
+
+GameMode = Tab:CreateDropdown({
+	Name = "Game Mode",
+	Options = queueOptions,
+	CurrentOption = { queueOptions[1] },
+	MultipleOptions = false,
+	Flag = "GameMode",
+	Callback = function()
+		if AutoQueueToggle and AutoQueueToggle.CurrentValue then
+			pcall(queueIntoSelected)
+		end
+	end
+})
+
+Tab:CreateSection("Auto Ban")
+
+AutoBanToggle = Tab:CreateToggle({
+	Name = "Auto Ban",
+	CurrentValue = false,
+	Flag = "AutoBan",
+	Callback = function(value)
+		if value then
+			startAutoBanLoops()
+		end
+	end
+})
+
+BanWeapons = Tab:CreateToggle({
+	Name = "Ban Weapons",
+	CurrentValue = true,
+	Flag = "BanWeapons",
+	Callback = function()
+		startAutoBanLoops()
+	end
+})
+
+local firstDefault = table.find(weaponOptions, "Riot Shield") or weaponOptions[2] or "None"
+
+FirstBan = Tab:CreateDropdown({
+	Name = "First Ban",
+	Options = weaponOptions,
+	CurrentOption = { firstDefault },
+	MultipleOptions = false,
+	Flag = "FirstBan",
+	Callback = function()
+		startAutoBanLoops()
+	end
+})
+
+FirstBanDelay = Tab:CreateSlider({
+	Name = "First Ban Delay",
+	Range = { 0, 10 },
+	Increment = 0.1,
+	Suffix = "s",
+	CurrentValue = 0,
+	Flag = "FirstBanDelay",
+	Callback = function() end
+})
+
+local secondDefault = table.find(weaponOptions, "Katana") or weaponOptions[3] or weaponOptions[2] or "None"
+
+SecondBan = Tab:CreateDropdown({
+	Name = "Second Ban",
+	Options = weaponOptions,
+	CurrentOption = { secondDefault },
+	MultipleOptions = false,
+	Flag = "SecondBan",
+	Callback = function()
+		startAutoBanLoops()
+	end
+})
+
+SecondBanDelay = Tab:CreateSlider({
+	Name = "Second Ban Delay",
+	Range = { 0, 10 },
+	Increment = 0.1,
+	Suffix = "s",
+	CurrentValue = 0,
+	Flag = "SecondBanDelay",
+	Callback = function() end
+})
+
+BanRandomMap = Tab:CreateToggle({
+	Name = "Ban Random Map",
+	CurrentValue = false,
+	Flag = "BanRandomMap",
+	Callback = function()
+		startAutoBanLoops()
+	end
+})
+
+MapBanDelay = Tab:CreateSlider({
+	Name = "Map Ban Delay",
+	Range = { 0, 10 },
+	Increment = 0.1,
+	Suffix = "s",
+	CurrentValue = 0,
+	Flag = "MapBanDelay",
+	Callback = function() end
+})
+
+Tab:CreateButton({
+	Name = "Refresh Lists",
+	Callback = function()
+		local newQueues = getQueueData()
+		GameMode:Refresh(newQueues)
+
+		local newWeapons = getWeaponList()
+		FirstBan:Refresh(newWeapons)
+		SecondBan:Refresh(newWeapons)
+
+		Rayfield:Notify({
+			Title = "Lists Refreshed",
+			Content = #newQueues .. " queues / " .. (#newWeapons - 1) .. " weapons",
+			Duration = 3
+		})
+	end
+})
+
+--// Config: restore saved state immediately, and write current state on every run.
+
+pcall(function()
+	Rayfield:LoadConfiguration()
+end)
+
+-- Persist whatever is active right now, so a fresh/autoexecute run always has a config file.
+task.delay(1, function()
+	pcall(function()
+		local flag = Rayfield.Flags["KillFireRate"]
+		if flag and flag.Set then
+			flag:Set(flag.CurrentValue)
+		end
+	end)
+end)
+
+-- Keeps every module alive (including states restored from the config file).
+task.spawn(function()
+	while task.wait(1) do
+		if not isCurrent() then
+			return
+		end
+
+		if KillAll and KillAll.CurrentValue and loadKillModules() then
+			equipKillSlot()
+		end
+
+		if AutoQueueToggle and AutoQueueToggle.CurrentValue then
+			startQueueLoop()
+		end
+
+		if AutoBanToggle and AutoBanToggle.CurrentValue then
+			startAutoBanLoops()
+		end
+	end
+end)
