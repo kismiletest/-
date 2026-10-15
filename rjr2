@@ -5,7 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local UIS = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local CONFIG_FILE = "RJR_NEW_C.json"
+local CONFIG_FILE = "kiyo_NEW_C.json"
 
 for key, defaultValue in pairs({
     FastAttackMode          = "模式2(部分账号失效用)",
@@ -111,6 +111,8 @@ for key, defaultValue in pairs({
     ManualHopRange          = "100-200m",
     ManualHopAuto           = true,
     ManualHopJob            = "",
+    SearchUsername          = "",
+    SearchFoundJob          = "",
     FaceTP                  = false,
     FaceTPKey               = "F",
     FaceSkill               = "X",
@@ -201,6 +203,9 @@ local ConfigKeys = {
     "ManualHopRange",
     "ManualHopAuto",
     "ManualHopJob",
+    "SearchUsername",
+    "SearchFoundJob",
+    "SearchScanPages",
     "FaceTP",
     "FaceTPKey",
     "FaceSkill",
@@ -449,7 +454,7 @@ end)
 local Translations = {
     ["中文"] = {},
     ["English"] = {
-        ["人挤人中心"] = "RJR",
+        ["人挤人中心"] = "kiyo hub",
         ["主要功能"] = "Main",
         ["杀戮光环"] = "Aura",
         ["ESP"] = "ESP",
@@ -686,6 +691,26 @@ local Translations = {
         ["匹配到服务器"] = "Matched Server",
         ["未找到匹配的服务器"] = "No matching server found",
         ["地区: "] = "Region: ",
+        ["搜索用户名"] = "Search Username",
+        ["查询对方当前所在的 Blox Fruits 服务器"] = "Find which Blox Fruits server a player is on",
+        ["搜索所在服务器"] = "Find Player Server",
+        ["搜索结果"] = "Search Result",
+        ["输入用户名后点上方按钮"] = "Enter a username then click the button above",
+        ["加入对方服务器"] = "Join Player Server",
+        ["请先输入用户名"] = "Enter a username first",
+        ["搜索中..."] = "Searching...",
+        ["找不到该用户(检查用户名是否正确)"] = "User not found (check the username)",
+        ["查询失败(接口受限, 需登录态或代理)"] = "Query failed (API restricted; needs login or proxy)",
+        [" 当前不在游戏中"] = " is not in a game",
+        [" 当前不在 Blox Fruits (在: "] = " is not in Blox Fruits (playing: ",
+        [" 在 Blox Fruits, 但无法定位具体服务器"] = " is in Blox Fruits, but the exact server cannot be located",
+        [" 在游戏中, 但拿不到服务器(对方关闭了『谁可以加入我』或接口无登录态)"] = " is in a game, but the server isn't available (the player may have 'Who can join me' off, or the API had no login token)",
+        [" 正在扫描服务器..."] = " scanning servers...",
+        [" 扫描中... 第 %d 页"] = " scanning... page %d",
+        [" 未找到(对方可能不在本游戏, 或服务器已满/已结束)"] = " not found (not in this game, or the server is full/ended)",
+        ["搜索成功"] = "Found",
+        ["请先搜索到有效服务器"] = "Search for a valid server first",
+        ["未知"] = "Unknown",
         ["请先选择目标玩家"] = "Select target player first",
         ["观战结束"] = "Spectate Ended",
         ["已恢复本地视角"] = "Camera restored",
@@ -724,9 +749,9 @@ if not availableThemesCheck[_G.Theme] then
 end
 WindUI:SetTheme(_G.Theme)
 local Window = WindUI:CreateWindow({
-    Title = L("人挤人中心"),
+    Title = "kiyo hub",
     Icon = "",
-    Author = "by kismile",
+    Author = "by kiyo",
     Folder = "WindUI",
     Size = UDim2.fromOffset(580, 460),
     Transparent = true,
@@ -735,7 +760,7 @@ local Window = WindUI:CreateWindow({
     HideSearchBar = false,
     SideBarWidth = 200,
     OpenButton = {
-        Title = "RJR",
+        Title = "kiyo hub",
         CornerRadius = UDim.new(1, 0),
         StrokeThickness = 3,
         Enabled = true,
@@ -753,7 +778,7 @@ local Tabs = {
     [L("主要功能")] = Window:Section({ Title = L("主要功能"), Opened = true }),
     [L("设置")] = Window:Section({ Title = L("设置"), Opened = true }),
 }
-local RJR = {
+local kiyo = {
     [L("公告")]     = Tabs[L("主要功能")]:Tab({ Title = L("公告"), Icon = "bell" }),
     [L("主要功能")] = Tabs[L("主要功能")]:Tab({ Title = L("主要功能"), Icon = "zap" }),
     [L("杀戮光环")] = Tabs[L("主要功能")]:Tab({ Title = L("杀戮光环"), Icon = "sword" }),
@@ -845,7 +870,7 @@ task.spawn(function()
         task.wait()
     end
 end)
-RJR[L("杀戮光环")]:Dropdown({
+kiyo[L("杀戮光环")]:Dropdown({
     Title = L("快速攻击模式"),
     Values = {"模式1", "模式2(部分账号失效用)"},
     Value = _G.FastAttackMode,
@@ -854,7 +879,7 @@ RJR[L("杀戮光环")]:Dropdown({
         SaveConfiguration()
     end
 })
-RJR[L("杀戮光环")]:Toggle({
+kiyo[L("杀戮光环")]:Toggle({
     Title = L("快速攻击攻击怪物"),
     Value = _G.FastAttackMobs,
     Callback = function(v)
@@ -862,7 +887,7 @@ RJR[L("杀戮光环")]:Toggle({
         SaveConfiguration()
     end
 })
-RJR[L("杀戮光环")]:Toggle({
+kiyo[L("杀戮光环")]:Toggle({
     Title = L("快速攻击攻击玩家"),
     Value = _G.FastAttackPlayers,
     Callback = function(v)
@@ -1113,7 +1138,7 @@ task.spawn(function()
         end
     end)
 end)
-RJR[L("杀戮光环")]:Toggle({
+kiyo[L("杀戮光环")]:Toggle({
     Title = L("枪械m1攻击怪物"),
     Value = _G.GunM1Mobs,
     Callback = function(v)
@@ -1121,7 +1146,7 @@ RJR[L("杀戮光环")]:Toggle({
         SaveConfiguration()
     end
 })
-RJR[L("杀戮光环")]:Toggle({
+kiyo[L("杀戮光环")]:Toggle({
     Title = L("枪械m1攻击玩家"),
     Value = _G.GunM1Players,
     Callback = function(v)
@@ -1219,7 +1244,7 @@ do
     if _G.FruitM1 then
         SetFruitM1Enabled(true)
     end
-    RJR[L("杀戮光环")]:Toggle({
+    kiyo[L("杀戮光环")]:Toggle({
         Title = L("果实m1"),
         Value = _G.FruitM1,
         Callback = function(vatt)
@@ -1253,7 +1278,7 @@ do
     if _G.VoidFruitM1 then
         SetVoidFruitM1Enabled(true)
     end
-    RJR[L("杀戮光环")]:Toggle({
+    kiyo[L("杀戮光环")]:Toggle({
         Title = L("虚空果实m1"),
         Value = _G.VoidFruitM1,
         Callback = function(vatt)
@@ -1301,7 +1326,7 @@ do
     if _G.InfRange then
         SetInfRangeEnabled(true)
     end
-    RJR[L("杀戮光环")]:Toggle({
+    kiyo[L("杀戮光环")]:Toggle({
         Title = L("无限范围"),
         Value = _G.InfRange,
         Callback = function(vatt)
@@ -1476,7 +1501,7 @@ local function StopAutoFlee()
     RestoreFleeState()
 end
 if _G.AutoFlee then StartAutoFlee() end
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("自动武装色"),
     Value = _G.AutoHaki,
     Callback = function(v)
@@ -1484,7 +1509,7 @@ RJR[L("主要功能")]:Toggle({
         SaveConfiguration()
     end
 })
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("自动见闻色"),
     Value = _G.AutoKen,
     Callback = function(v)
@@ -1515,7 +1540,7 @@ do
         end
     end)
 end
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("无限能量"),
     Desc = L("能量条始终保持满值"),
     Value = _G.InfiniteEnergy,
@@ -1524,7 +1549,7 @@ RJR[L("主要功能")]:Toggle({
         SaveConfiguration()
     end
 })
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("自动 V3"),
     Value = _G.AutoV3,
     Callback = function(v)
@@ -1532,7 +1557,7 @@ RJR[L("主要功能")]:Toggle({
         SaveConfiguration()
     end
 })
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("自动 V4"),
     Value = _G.AutoV4,
     Callback = function(v)
@@ -1540,7 +1565,7 @@ RJR[L("主要功能")]:Toggle({
         SaveConfiguration()
     end
 })
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("自动逃跑"),
     Value = _G.AutoFlee,
     Callback = function(v)
@@ -1549,7 +1574,7 @@ RJR[L("主要功能")]:Toggle({
         SaveConfiguration()
     end
 })
-RJR[L("主要功能")]:Slider({
+kiyo[L("主要功能")]:Slider({
     Title = L("逃跑血量阈值(%)"),
     Value = {
         Min = 1,
@@ -2086,7 +2111,7 @@ task.spawn(function()
     end
 end)
 
-RJR[L("主要功能")]:Input({
+kiyo[L("主要功能")]:Input({
     Title = L("移动速度"),
     Value = tostring(_G.translateSpeed),
     Placeholder = "1 - 2000",
@@ -2105,7 +2130,7 @@ RJR[L("主要功能")]:Input({
     end
 })
 
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("加速开关"),
     Value = _G.translateAccel,
     Callback = function(state)
@@ -2119,7 +2144,7 @@ RJR[L("主要功能")]:Toggle({
     end
 })
 
-RJR[L("主要功能")]:Input({
+kiyo[L("主要功能")]:Input({
     Title = L("跳跃高度"),
     Value = tostring(_G.jumpHeight),
     Placeholder = "50 - 500",
@@ -2135,7 +2160,7 @@ RJR[L("主要功能")]:Input({
     end
 })
 
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("高跳开启"),
     Value = _G.jumpEnabled,
     Callback = function(state)
@@ -2263,7 +2288,7 @@ LocalPlayer.CharacterAdded:Connect(function()
         Skyjump.StartLoop()
     end
 end)
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("无限跳跃"),
     Value = _G.InfiniteJump,
     Callback = function(v)
@@ -2337,7 +2362,7 @@ function Noclip.Stop()
 end
 end
 if _G.Noclip then Noclip.Start() end
-RJR[L("主要功能")]:Toggle({
+kiyo[L("主要功能")]:Toggle({
     Title = L("穿墙"),
     Value = _G.Noclip,
     Callback = function(v)
@@ -2629,7 +2654,7 @@ do
     function FlyBuildPanel()
         if FlyPanel then return end
         local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-        local existing = PlayerGui:FindFirstChild("RJRFly")
+        local existing = PlayerGui:FindFirstChild("kiyoFly")
         if existing then existing:Destroy() end
 
         local m = Instance.new("ScreenGui")
@@ -2646,7 +2671,7 @@ do
         local h2 = Instance.new("TextButton")
         local br = Instance.new("TextButton")
 
-        m.Name = "RJRFly"
+        m.Name = "kiyoFly"
         m.Parent = PlayerGui
         m.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         m.ResetOnSpawn = false
@@ -2720,7 +2745,7 @@ do
         t.Position = UDim2.new(0.469327301, 0, 0, 0)
         t.Size = UDim2.new(0, 100, 0, 28)
         t.Font = Enum.Font.SourceSans
-        t.Text = "RJR FLY"
+        t.Text = "kiyo FLY"
         t.TextColor3 = Color3.fromRGB(0, 0, 0)
         t.TextScaled = true
         t.TextSize = 14
@@ -2876,7 +2901,7 @@ do
         end
     end)
 
-    FlyToggleWidget = RJR[L("主要功能")]:Toggle({
+    FlyToggleWidget = kiyo[L("主要功能")]:Toggle({
         Title = L("飞行"),
         Icon = "wind",
         Value = _G.Fly,
@@ -2889,7 +2914,7 @@ do
     if _G.Fly then
         FlyShowPanel()
     end
-    RJR[L("主要功能")]:Toggle({
+    kiyo[L("主要功能")]:Toggle({
         Title = L("自动开飞行"),
         Desc = L("每次执行脚本时自动开启飞行并把速度设为 230；关闭后沿用上次存档的状态"),
         Value = _G.AutoFlyOnLaunch,
@@ -2899,7 +2924,7 @@ do
         end
     })
 end
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("ESP 开关"),
     Value = _G.ESPEnabled,
     Callback = function(state)
@@ -2908,7 +2933,7 @@ RJR["ESP"]:Toggle({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("显示玩家名字"),
     Value = _G.ESP_Name,
     Callback = function(v)
@@ -2916,7 +2941,7 @@ RJR["ESP"]:Toggle({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("显示玩家等级"),
     Value = _G.ESP_Level,
     Callback = function(v)
@@ -2924,7 +2949,7 @@ RJR["ESP"]:Toggle({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("显示玩家赏金"),
     Value = _G.ESP_Bounty,
     Callback = function(v)
@@ -2932,7 +2957,7 @@ RJR["ESP"]:Toggle({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("显示恶魔果实"),
     Value = _G.ESP_Fruit,
     Callback = function(v)
@@ -2940,7 +2965,7 @@ RJR["ESP"]:Toggle({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("显示距离"),
     Value = _G.ESP_Distance,
     Callback = function(v)
@@ -2948,7 +2973,7 @@ RJR["ESP"]:Toggle({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("显示血量"),
     Value = _G.ESP_HP,
     Callback = function(v)
@@ -2956,7 +2981,7 @@ RJR["ESP"]:Toggle({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("高亮显示玩家"),
     Value = _G.ESP_Highlight,
     Callback = function(v)
@@ -2971,7 +2996,7 @@ local function SaveHexColor(key, color)
         math.floor(color.B * 255 + 0.5))
     SaveConfiguration()
 end
-RJR["ESP"]:Colorpicker({
+kiyo["ESP"]:Colorpicker({
     Title = L("高亮颜色"),
     Default = hexToColor3(_G.ESP_HighlightColor),
     Transparency = 0,
@@ -2979,8 +3004,8 @@ RJR["ESP"]:Colorpicker({
         SaveHexColor("ESP_HighlightColor", color)
     end
 })
-RJR["ESP"]:Divider()
-RJR["ESP"]:Dropdown({
+kiyo["ESP"]:Divider()
+kiyo["ESP"]:Dropdown({
     Title = L("ESP 排版"),
     Values = {"经典", "血条样式"},
     Value = NormalizeLayout(_G.ESP_Layout),
@@ -2989,7 +3014,7 @@ RJR["ESP"]:Dropdown({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Toggle({
+kiyo["ESP"]:Toggle({
     Title = L("显示玩家头像"),
     Value = _G.ESP_Avatar,
     Callback = function(v)
@@ -2997,7 +3022,7 @@ RJR["ESP"]:Toggle({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Dropdown({
+kiyo["ESP"]:Dropdown({
     Title = L("头像位置"),
     Values = {"左边", "右边"},
     Value = _G.ESP_AvatarSide,
@@ -3006,49 +3031,49 @@ RJR["ESP"]:Dropdown({
         SaveConfiguration()
     end
 })
-RJR["ESP"]:Colorpicker({
+kiyo["ESP"]:Colorpicker({
     Title = L("名字颜色"),
     Default = hexToColor3(_G.ESP_NameColor),
     Callback = function(color)
         SaveHexColor("ESP_NameColor", color)
     end
 })
-RJR["ESP"]:Colorpicker({
+kiyo["ESP"]:Colorpicker({
     Title = L("等级颜色"),
     Default = hexToColor3(_G.ESP_LevelColor),
     Callback = function(color)
         SaveHexColor("ESP_LevelColor", color)
     end
 })
-RJR["ESP"]:Colorpicker({
+kiyo["ESP"]:Colorpicker({
     Title = L("赏金颜色"),
     Default = hexToColor3(_G.ESP_BountyColor),
     Callback = function(color)
         SaveHexColor("ESP_BountyColor", color)
     end
 })
-RJR["ESP"]:Colorpicker({
+kiyo["ESP"]:Colorpicker({
     Title = L("果实颜色"),
     Default = hexToColor3(_G.ESP_FruitColor),
     Callback = function(color)
         SaveHexColor("ESP_FruitColor", color)
     end
 })
-RJR["ESP"]:Colorpicker({
+kiyo["ESP"]:Colorpicker({
     Title = L("距离颜色"),
     Default = hexToColor3(_G.ESP_DistanceColor),
     Callback = function(color)
         SaveHexColor("ESP_DistanceColor", color)
     end
 })
-RJR["ESP"]:Colorpicker({
+kiyo["ESP"]:Colorpicker({
     Title = L("血量颜色"),
     Default = hexToColor3(_G.ESP_HPColor),
     Callback = function(color)
         SaveHexColor("ESP_HPColor", color)
     end
 })
-RJR["ESP"]:Slider({
+kiyo["ESP"]:Slider({
     Title = L("ESP 字体大小"),
     Value = {
         Min = 8,
@@ -3487,7 +3512,7 @@ end
 
 if _G.BringMobs then StartBringMobs() end
 
-RJR[L("杂项")]:Slider({
+kiyo[L("杂项")]:Slider({
     Title = L("视角缩放距离"),
     Value = {
         Min = 1,
@@ -3501,7 +3526,7 @@ RJR[L("杂项")]:Slider({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("冲刺无冷却"),
     Value = _G.DodgeNoCooldown,
     Callback = function(v)
@@ -3511,7 +3536,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("冲刺距离修改开关"),
     Value = _G.DashLengthEnabled,
     Callback = function(state)
@@ -3521,7 +3546,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Slider({
+kiyo[L("杂项")]:Slider({
     Title = L("冲刺距离"),
     Value = {
         Min = 20,
@@ -3535,7 +3560,7 @@ RJR[L("杂项")]:Slider({
     end
 })
 
-RJR[L("杂项")]:Button({
+kiyo[L("杂项")]:Button({
     Title = L("减画质"),
     Icon = "monitor",
     Callback = function()
@@ -3543,7 +3568,7 @@ RJR[L("杂项")]:Button({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("移除岩浆 (需重进恢复)"),
     Value = _G.RemoveLava,
     Callback = function(v)
@@ -3553,7 +3578,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("移除雾 (需重进恢复)"),
     Value = _G.RemoveFog,
     Callback = function(v)
@@ -3563,7 +3588,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("移除玩家动作 (僵直)"),
     Value = _G.RemoveAnim,
     Callback = function(v)
@@ -3573,7 +3598,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("移除鬼船 (保留传送点)"),
     Value = _G.RemoveGhostShip,
     Callback = function(v)
@@ -3583,7 +3608,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("水上行走"),
     Value = _G.WalkOnWater,
     Callback = function(v)
@@ -3593,7 +3618,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("解帧数限制 (仅电脑)"),
     Value = false,
     Callback = function(v)
@@ -3603,7 +3628,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("旋转"),
     Value = _G.spinEnabled,
     Callback = function(v)
@@ -3613,7 +3638,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Slider({
+kiyo[L("杂项")]:Slider({
     Title = L("旋转速度"),
     Value = {
         Min = 1,
@@ -3626,7 +3651,7 @@ RJR[L("杂项")]:Slider({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("反移动(释放技能不移动)"),
     Value = _G.NoMove,
     Callback = function(v)
@@ -3636,7 +3661,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("杂项")]:Toggle({
+kiyo[L("杂项")]:Toggle({
     Title = L("聚怪"),
     Value = _G.BringMobs or false,
     Callback = function(v)
@@ -3646,7 +3671,7 @@ RJR[L("杂项")]:Toggle({
     end
 })
 
-RJR[L("商店")]:Button({
+kiyo[L("商店")]:Button({
     Title = L("重置数据"),
     Icon = "refresh-cw",
     Callback = function()
@@ -3658,7 +3683,7 @@ RJR[L("商店")]:Button({
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer(unpack(args))
     end
 })
-RJR[L("商店")]:Button({
+kiyo[L("商店")]:Button({
     Title = L("重置种族"),
     Icon = "shuffle",
     Callback = function()
@@ -3670,7 +3695,7 @@ RJR[L("商店")]:Button({
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer(unpack(args))
     end
 })
-RJR[L("商店")]:Button({
+kiyo[L("商店")]:Button({
     Title = L("切换海盗"),
     Icon = "anchor",
     Callback = function()
@@ -3681,7 +3706,7 @@ RJR[L("商店")]:Button({
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer(unpack(args))
     end
 })
-RJR[L("商店")]:Button({
+kiyo[L("商店")]:Button({
     Title = L("切换海军"),
     Icon = "shield",
     Callback = function()
@@ -3692,7 +3717,7 @@ RJR[L("商店")]:Button({
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer(unpack(args))
     end
 })
-RJR[L("商店")]:Button({
+kiyo[L("商店")]:Button({
     Title = L("更换吸血鬼"),
     Icon = "moon",
     Callback = function()
@@ -3700,7 +3725,7 @@ RJR[L("商店")]:Button({
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer(unpack(args))
     end
 })
-RJR[L("商店")]:Button({
+kiyo[L("商店")]:Button({
     Title = L("更换机器人"),
     Icon = "cpu",
     Callback = function()
@@ -3709,26 +3734,12 @@ RJR[L("商店")]:Button({
     end
 })
 
-RJR[L("公告")]:Paragraph({
-    Title = L("DC 服务器"),
-    Desc = "https://discord.gg/862SZpM7Qk",
-    Buttons = {{
-        Title = L("点击复制 DC 链接"),
-        Callback = function()
-            setclipboard("https://discord.gg/862SZpM7Qk")
-            WindUI:Notify({ Title = L("复制成功"), Content = L("已复制 DC 链接"), Duration = 2 })
-        end
-    }}
+kiyo[L("公告")]:Paragraph({
+    Title = "kiyo hub best better",
+    Desc = "robloxsb202509 king",
 })
 
-RJR[L("公告")]:Divider()
-
-RJR[L("公告")]:Paragraph({
-    Title = "声明",
-    Desc = "此脚本完全免费开源 禁止拿去圈钱",
-})
-
-RJR[L("服务器")]:Button({
+kiyo[L("服务器")]:Button({
     Title = L("重进服务器"),
     Callback = function()
         local args = {
@@ -4061,7 +4072,7 @@ local function RefreshManualHopList(notify)
     end
 end
 
-RJR[L("服务器")]:Dropdown({
+kiyo[L("服务器")]:Dropdown({
     Title = L("选择服务器区域"),
     Desc = L("跳服时搜索的服务器区域"),
     Values = {"Oregon", "Florida", "Texas", "California", "Hong Kong", "Germany", "Brazil", "Singapore"},
@@ -4073,7 +4084,7 @@ RJR[L("服务器")]:Dropdown({
     end
 })
 
-RJR[L("服务器")]:Dropdown({
+kiyo[L("服务器")]:Dropdown({
     Title = L("选择人数"),
     Desc = L("跳服时过滤人数范围"),
     Values = {"1-12", "3-12", "5-12", "7-12", "9-12"},
@@ -4085,7 +4096,7 @@ RJR[L("服务器")]:Dropdown({
     end
 })
 
-RJR[L("服务器")]:Dropdown({
+kiyo[L("服务器")]:Dropdown({
     Title = L("选择赏金"),
     Desc = L("跳服时过滤赏金范围"),
     Values = {"大于3m", "大于5m", "大于10m", "大于15m", "大于25m", "大于35m", "大于50m", "大于150m"},
@@ -4097,7 +4108,7 @@ RJR[L("服务器")]:Dropdown({
     end
 })
 
-RJR[L("服务器")]:Button({
+kiyo[L("服务器")]:Button({
     Title = L("跳服"),
     Icon = "wind",
     Callback = function()
@@ -4180,7 +4191,7 @@ RJR[L("服务器")]:Button({
     end
 })
 
-RJR[L("服务器")]:Dropdown({
+kiyo[L("服务器")]:Dropdown({
     Title = L("手动进服赏金范围"),
     Desc = L("自动列出该赏金范围内的服务器"),
     Values = {"100-200m", "50-100m", "200-300m", "大于100m", "大于200m"},
@@ -4192,7 +4203,7 @@ RJR[L("服务器")]:Dropdown({
     end
 })
 
-ManualHopDropdown = RJR[L("服务器")]:Dropdown({
+ManualHopDropdown = kiyo[L("服务器")]:Dropdown({
     Title = L("选择服务器"),
     Desc = L("按赏金从高到低排列，选中后点下面按钮进入"),
     Values = {L("（点刷新获取服务器列表）")},
@@ -4204,7 +4215,7 @@ ManualHopDropdown = RJR[L("服务器")]:Dropdown({
     end
 })
 
-RJR[L("服务器")]:Button({
+kiyo[L("服务器")]:Button({
     Title = L("刷新服务器列表"),
     Icon = "refresh-cw",
     Callback = function()
@@ -4212,7 +4223,7 @@ RJR[L("服务器")]:Button({
     end
 })
 
-RJR[L("服务器")]:Button({
+kiyo[L("服务器")]:Button({
     Title = L("进入所选服务器"),
     Icon = "log-in",
     Callback = function()
@@ -4231,7 +4242,7 @@ RJR[L("服务器")]:Button({
     end
 })
 
-RJR[L("服务器")]:Toggle({
+kiyo[L("服务器")]:Toggle({
     Title = L("自动刷新服务器列表"),
     Desc = L("开启后每 45 秒自动重新扫描一次"),
     Value = _G.ManualHopAuto,
@@ -4251,7 +4262,7 @@ task.spawn(function()
     end
 end)
 
-RJR[L("服务器")]:Paragraph({
+kiyo[L("服务器")]:Paragraph({
     Title = L("服务器id"),
     Desc = game.JobId,
     Buttons = {{
@@ -4263,7 +4274,7 @@ RJR[L("服务器")]:Paragraph({
     }}
 })
 
-RJR[L("服务器")]:Input({
+kiyo[L("服务器")]:Input({
     Title = L("输入服务器id"),
     Value = _G.JobId,
     Callback = function(value)
@@ -4272,7 +4283,7 @@ RJR[L("服务器")]:Input({
     end
 })
 
-RJR[L("服务器")]:Button({
+kiyo[L("服务器")]:Button({
     Title = L("加入服务器 id"),
     Callback = function()
         if not _G.JobId or _G.JobId == "" then
@@ -4289,6 +4300,288 @@ RJR[L("服务器")]:Button({
     end
 })
 
+do
+-- ============================ 搜索对方所在服务器 ============================
+-- 用户名 -> userId -> 当前所在服务器 jobId, 并从赏金列表读出该服赏金
+local function HttpPostJson(url, bodyTable)
+    local ok, body = pcall(function() return HttpService:JSONEncode(bodyTable) end)
+    if not ok then return nil end
+    local req = (typeof(request) == "function" and request)
+        or (typeof(http_request) == "function" and http_request) or nil
+    if not req then return nil end
+    local ok2, res = pcall(function()
+        return req({
+            Url = url,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = body,
+        })
+    end)
+    if not ok2 or type(res) ~= "table" then return nil end
+    local raw = res.Body or res.body
+    if type(raw) ~= "string" then return nil end
+    local ok3, data = pcall(function() return HttpService:JSONDecode(raw) end)
+    if ok3 then return data end
+    return nil
+end
+
+-- 直连优先(执行器 request 可能自带登录态, 才会返回 gameId), 失败再走代理
+local USERNAME_URLS = {
+    "https://users.roblox.com/v1/usernames/users",
+    "https://users.roproxy.com/v1/usernames/users",
+}
+local PRESENCE_URLS = {
+    "https://presence.roblox.com/v1/presence/users",
+    "https://presence.roproxy.com/v1/presence/users",
+}
+
+local function HttpPostJsonAny(urls, bodyTable)
+    for _, url in ipairs(urls) do
+        local data = HttpPostJson(url, bodyTable)
+        if data then return data end
+    end
+    return nil
+end
+
+local function ResolveRobloxUser(name)
+    local data = HttpPostJsonAny(USERNAME_URLS, {
+        usernames = { name },
+        excludeBannedUsers = true,
+    })
+    local u = data and data.data and data.data[1]
+    if u then return tonumber(u.id), tostring(u.displayName or u.name) end
+    return nil, nil
+end
+
+-- 依次尝试直连/代理, 优先返回带 gameId(jobId) 的结果
+local function GetRobloxPresence(userId)
+    local fallback
+    for _, url in ipairs(PRESENCE_URLS) do
+        local data = HttpPostJson(url, { userIds = { userId } })
+        local p = data and data.userPresences and data.userPresences[1]
+        if p then
+            if p.gameId and tostring(p.gameId) ~= "" then return p end
+            fallback = fallback or p
+        end
+    end
+    return fallback
+end
+
+-- ===== 扫描全服 + 头像匹配 (不受对方"谁可以加入我"权限影响) =====
+local SCAN_PAGE_LIMIT = tonumber(_G.SearchScanPages) or 150   -- 最多扫描页数(每页100服)
+
+local function HttpGetJson(url)
+    local req = (typeof(request) == "function" and request)
+        or (typeof(http_request) == "function" and http_request) or nil
+    if not req then return nil end
+    local ok, res = pcall(function() return req({ Url = url, Method = "GET" }) end)
+    if not ok or type(res) ~= "table" then return nil end
+    local raw = res.Body or res.body
+    if type(raw) ~= "string" then return nil end
+    local ok2, data = pcall(function() return HttpService:JSONDecode(raw) end)
+    if ok2 then return data end
+    return nil
+end
+
+-- 直连优先(执行器可能自带登录态), 失败再走代理
+local GAMES_HOSTS = { "https://games.roblox.com", "https://games.roproxy.com" }
+local THUMB_HOSTS = { "https://thumbnails.roblox.com", "https://thumbnails.roproxy.com" }
+
+-- 取目标玩家的头像缩略图 URL(用于比对)
+local function GetTargetHeadshot(userId)
+    local path = "/v1/users/avatar-headshot?userIds=" .. tostring(userId) .. "&format=Png&size=150x150"
+    for _, host in ipairs(THUMB_HOSTS) do
+        local d = HttpGetJson(host .. path)
+        local u = d and d.data and d.data[1]
+        if u and u.imageUrl then return u.imageUrl end
+    end
+    return nil
+end
+
+-- 取一页服务器列表: data[] = { id=jobId, playerTokens={...} }, nextPageCursor
+local function GetServersPage(placeId, cursor)
+    local path = "/v1/games/" .. tostring(placeId) .. "/servers/Public?limit=100"
+    if cursor and cursor ~= "" then path = path .. "&cursor=" .. cursor end
+    local last
+    for _, host in ipairs(GAMES_HOSTS) do
+        local d = HttpGetJson(host .. path)
+        if d and type(d.data) == "table" then return d end
+        last = d or last
+    end
+    return last
+end
+
+-- 把一批 playerToken 换成头像 URL
+local function BatchHeadshots(tokens)
+    if #tokens == 0 then return nil end
+    local thumbs = {}
+    for _, t in ipairs(tokens) do
+        table.insert(thumbs, {
+            requestId = "0:" .. t .. ":AvatarHeadshot:150x150:png:regular",
+            type = "AvatarHeadShot", targetId = 0, token = t, format = "png", size = "150x150",
+        })
+    end
+    for _, host in ipairs(THUMB_HOSTS) do
+        local resp = HttpPostJson(host .. "/v1/batch", { thumbnails = thumbs })
+        if resp and type(resp.data) == "table" then return resp end
+    end
+    return nil
+end
+
+-- 扫描所有公开服务器, 返回目标所在 jobId(找不到返回 nil)
+local function ScanForPlayerServer(placeId, targetThumb, onProgress)
+    if not targetThumb then return nil end
+    local cursor = nil
+    local page = 0
+    repeat
+        local data = GetServersPage(placeId, cursor)
+        if not data or type(data.data) ~= "table" then break end
+        page = page + 1
+
+        local tokens, tokenToJob = {}, {}
+        for _, srv in ipairs(data.data) do
+            local job = tostring(srv.id or "")
+            for _, t in ipairs(srv.playerTokens or {}) do
+                if job ~= "" and not tokenToJob[t] then
+                    tokenToJob[t] = job
+                    table.insert(tokens, t)
+                end
+            end
+        end
+
+        for i = 1, #tokens, 100 do
+            local chunk = {}
+            for j = i, math.min(i + 99, #tokens) do chunk[#chunk + 1] = tokens[j] end
+            local resp = BatchHeadshots(chunk)
+            local list = resp and resp.data
+            if type(list) == "table" then
+                for _, item in ipairs(list) do
+                    if item.imageUrl and item.imageUrl == targetThumb then
+                        local token = item.requestId and item.requestId:match("^0:([^:]+):")
+                        local job = token and tokenToJob[token]
+                        if job then print("[扫描] 命中! job=" .. job); return job end
+                    end
+                end
+            end
+            task.wait(0.05)
+        end
+
+        print(string.format("[扫描] 第%d页 %d服 %d个token", page, #data.data, #tokens))
+
+        cursor = data.nextPageCursor
+        if onProgress then onProgress(page) end
+        task.wait(0.05)
+    until (not cursor or cursor == "") or page >= SCAN_PAGE_LIMIT
+    return nil
+end
+
+local SearchResultPara
+local function SetSearchText(text)
+    if SearchResultPara and SearchResultPara.SetDesc then
+        pcall(function() SearchResultPara:SetDesc(text) end)
+    end
+end
+
+kiyo[L("服务器")]:Input({
+    Title = L("搜索用户名"),
+    Desc = L("查询对方当前所在的 Blox Fruits 服务器"),
+    Value = _G.SearchUsername or "",
+    Callback = function(value)
+        _G.SearchUsername = value
+        SaveConfiguration()
+    end
+})
+
+kiyo[L("服务器")]:Button({
+    Title = L("搜索所在服务器"),
+    Icon = "search",
+    Callback = function()
+        local name = tostring(_G.SearchUsername or ""):match("^%s*(.-)%s*$")
+        if name == "" then
+            WindUI:Notify({ Title = L("操作失败"), Content = L("请先输入用户名"), Duration = 2 })
+            return
+        end
+        SetSearchText(L("搜索中..."))
+        task.spawn(function()
+            local userId, displayName = ResolveRobloxUser(name)
+            if not userId then
+                SetSearchText(L("找不到该用户(检查用户名是否正确)"))
+                _G.SearchFoundJob = ""
+                return
+            end
+
+            local pres = GetRobloxPresence(userId)
+            local job = (pres and tonumber(pres.userPresenceType) == 2 and tostring(pres.gameId or "")) or ""
+            local lastLoc = (pres and tostring(pres.lastLocation or "")) or ""
+            local place = (pres and tonumber(pres.rootPlaceId or pres.placeId)) or 0
+            local universe = (pres and tonumber(pres.universeId)) or 0
+            local isBF = (universe == game.GameId) or (place == game.PlaceId)
+                or (string.find(string.lower(lastLoc), "blox fruit", 1, true) ~= nil)
+
+            -- presence 拿不到(对方关了"谁可以加入我"等) → 扫描全服 + 头像匹配, 不受该权限影响
+            if job == "" then
+                local thumb = GetTargetHeadshot(userId)
+                if thumb then
+                    SetSearchText(displayName .. L(" 正在扫描服务器..."))
+                    job = ScanForPlayerServer(game.PlaceId, thumb, function(page)
+                        SetSearchText(displayName .. string.format(L(" 扫描中... 第 %d 页"), page))
+                    end) or ""
+                end
+                isBF = true
+            end
+
+            if job == "" then
+                SetSearchText(displayName .. L(" 未找到(对方可能不在本游戏, 或服务器已满/已结束)"))
+                _G.SearchFoundJob = ""
+                return
+            end
+            _G.SearchFoundJob = job
+            _G.JobId = job   -- 同步到「输入服务器id」框, 方便手动进
+            pcall(function() setclipboard(job) end)   -- 服务器代码直接复制到剪贴板
+            SaveConfiguration()
+            local servers = GetServerList()
+            local info = servers and servers[job]
+            local bountyTxt = (info and FormatNumber(info.Bounty)) or L("未知")
+            local countTxt = (info and tostring(info.Count)) or "?"
+            local regionTxt = (info and tostring(info.Region)) or L("未知")
+            SetSearchText(table.concat({
+                displayName,
+                (isBF and "Blox Fruits" or (lastLoc ~= "" and lastLoc or L("未知"))),
+                L("服务器") .. ": " .. job,
+                L("赏金: ") .. bountyTxt,
+                L("人数: ") .. countTxt,
+                L("地区: ") .. regionTxt,
+            }, "\n"))
+            WindUI:Notify({ Title = L("搜索成功"), Content = displayName .. " → " .. tostring(job):sub(1, 8), Duration = 4 })
+        end)
+    end
+})
+
+SearchResultPara = kiyo[L("服务器")]:Paragraph({
+    Title = L("搜索结果"),
+    Desc = L("输入用户名后点上方按钮"),
+})
+
+kiyo[L("服务器")]:Button({
+    Title = L("加入对方服务器"),
+    Icon = "log-in",
+    Callback = function()
+        local job = _G.SearchFoundJob
+        if not job or job == "" then
+            WindUI:Notify({ Title = L("操作失败"), Content = L("请先搜索到有效服务器"), Duration = 2 })
+            return
+        end
+        local ok = JoinServerJob(job)
+        WindUI:Notify({
+            Title = L("加入对方服务器"),
+            Content = ok and (L("正在进入: ") .. tostring(job):sub(1, 8)) or L("进入失败"),
+            Icon = "wind",
+            Duration = 4
+        })
+    end
+})
+end
+
 local currentThemeName = WindUI:GetCurrentTheme()
 local availableThemes = WindUI:GetThemes()
 local themeList = {}
@@ -4296,7 +4589,7 @@ for themeName, _ in pairs(availableThemes) do
     table.insert(themeList, themeName)
 end
 
-RJR[L("设置")]:Keybind({
+kiyo[L("设置")]:Keybind({
     Title = L("窗口切换键"),
     Desc = L("切换窗口显示状态"),
     Value = "G",
@@ -4309,7 +4602,7 @@ local RefreshLocalizedUI
 local RefreshDynamicLanguageUI
 local LanguageButton
 
-LanguageButton = RJR[L("设置")]:Button({
+LanguageButton = kiyo[L("设置")]:Button({
     Title = L("语言") .. " (" .. _G.Language .. ")",
     Icon = "globe",
     Callback = function()
@@ -4460,7 +4753,7 @@ do
         return false
     end
 
-    function RJR_IsPlayerInSafeZone(plr)
+    function kiyo_IsPlayerInSafeZone(plr)
         if not plr then return false end
 
         if attrSafeZone(plr) then return true end
@@ -4478,7 +4771,7 @@ do
     end
 
     -- 未开启 PvP 模式(打不到,传过去也没意义)
-    function RJR_IsPlayerPvpDisabled(plr)
+    function kiyo_IsPlayerPvpDisabled(plr)
         if not plr then return false end
         local ok, disabled = pcall(function() return plr:GetAttribute("PvpDisabled") end)
         return ok and disabled == true
@@ -4487,7 +4780,7 @@ do
     -- 盟友判定,和自瞄/自动攻击用的是同一套规则:
     --   ① 游戏「Allies」盟友面板里列出来的人
     --   ② 同阵营(都是海军 Marines)
-    function RJR_IsPlayerAlly(plr)
+    function kiyo_IsPlayerAlly(plr)
         if not plr or plr == LocalPlayer then return false end
 
         -- ① 游戏 Allies 面板
@@ -4514,11 +4807,11 @@ do
     end
 
     -- 传送目标统一过滤:命中任意一条即排除
-    function RJR_IsTargetExcluded(plr)
+    function kiyo_IsTargetExcluded(plr)
         if not plr then return false end
-        if _G.SafeZoneSkip and RJR_IsPlayerInSafeZone(plr) then return true end
-        if _G.NoPvpSkip and RJR_IsPlayerPvpDisabled(plr) then return true end
-        if _G.NoAllySkip and RJR_IsPlayerAlly(plr) then return true end
+        if _G.SafeZoneSkip and kiyo_IsPlayerInSafeZone(plr) then return true end
+        if _G.NoPvpSkip and kiyo_IsPlayerPvpDisabled(plr) then return true end
+        if _G.NoAllySkip and kiyo_IsPlayerAlly(plr) then return true end
         return false
     end
 
@@ -4622,7 +4915,7 @@ local function validateOffset(val)
     return math.clamp(num, -3000, 3000)
 end
 
-local PlayerDropdown = RJR[L("传送")]:Dropdown({
+local PlayerDropdown = kiyo[L("传送")]:Dropdown({
     Title = L("选择目标玩家"),
     Values = GetPlayerList(),
     Value = _G.SelectPly,
@@ -4636,7 +4929,7 @@ local PlayerDropdown = RJR[L("传送")]:Dropdown({
     end
 })
 
-RJR[L("传送")]:Button({
+kiyo[L("传送")]:Button({
     Title = L("刷新玩家列表"),
     Callback = function()
         local newPlayerList = GetPlayerList()
@@ -4658,7 +4951,7 @@ RJR[L("传送")]:Button({
 getgenv().Key = "1"
 getgenv().Key2 = "test"
 getgenv().test = "hello"
-RJR[L("传送")]:Toggle({
+kiyo[L("传送")]:Toggle({
     Title = L("观战玩家"),
     Value = _G.SpectatePlys,
     Callback = function(value)
@@ -4690,7 +4983,7 @@ RJR[L("传送")]:Toggle({
 
 local TeleportPlyConnection
 
-RJR[L("传送")]:Toggle({
+kiyo[L("传送")]:Toggle({
     Title = L("平滑传送至玩家"),
     Value = _G.TeleportPly,
     Callback = function(value)
@@ -4728,7 +5021,7 @@ RJR[L("传送")]:Toggle({
                 end
 
                 -- 目标被过滤(安全区 / 未开 PvP / 盟友):不传送过去
-                if RJR_IsTargetExcluded(TargetPlr) then
+                if kiyo_IsTargetExcluded(TargetPlr) then
                     return
                 end
 
@@ -4825,7 +5118,7 @@ local function ChaseStart(mode)
         if ChaseActive == "player" then
             local tPlr = Players:FindFirstChild(_G.SelectPly)
             -- 目标被过滤(安全区 / 未开 PvP / 盟友):停下等他,别一直贴上去白送
-            if tPlr and RJR_IsTargetExcluded(tPlr) then
+            if tPlr and kiyo_IsTargetExcluded(tPlr) then
                 StopTween()
                 return
             end
@@ -4841,7 +5134,7 @@ local function ChaseStart(mode)
                     local h = c and c:FindFirstChild("HumanoidRootPart")
                     local hum = c and c:FindFirstChildOfClass("Humanoid")
                     -- 排除被过滤的人(安全区 / 未开 PvP / 盟友),这样会自动顺位选下一个
-                    if h and hum and hum.Health > 0 and not RJR_IsTargetExcluded(p) then
+                    if h and hum and hum.Health > 0 and not kiyo_IsTargetExcluded(p) then
                         local d = (h.Position - myHRP.Position).Magnitude
                         if d < bestDist then bestDist, tH = d, h end
                     end
@@ -4884,7 +5177,7 @@ end
 ChaseAPI.Start = ChaseStart
 ChaseAPI.Stop = ChaseStop
 
-local Lock2Toggle = RJR[L("传送")]:Toggle({
+local Lock2Toggle = kiyo[L("传送")]:Toggle({
     Title = L("锁人2"),
     Value = _G.Lock2,
     Callback = function(value)
@@ -4906,7 +5199,7 @@ local Lock2Toggle = RJR[L("传送")]:Toggle({
     end
 })
 
-local NearestToggle = RJR[L("传送")]:Toggle({
+local NearestToggle = kiyo[L("传送")]:Toggle({
     Title = L("传送至最近玩家"),
     Value = _G.TweenNearest,
     Callback = function(value)
@@ -4923,7 +5216,7 @@ local NearestToggle = RJR[L("传送")]:Toggle({
     end
 })
 
-RJR[L("传送")]:Toggle({
+kiyo[L("传送")]:Toggle({
     Title = L("排除安全区的人"),
     Desc = L("目标躲进安全区时不传送过去；「传送至最近玩家」会自动跳过安全区的人"),
     Value = _G.SafeZoneSkip,
@@ -4933,7 +5226,7 @@ RJR[L("传送")]:Toggle({
     end
 })
 
-RJR[L("传送")]:Toggle({
+kiyo[L("传送")]:Toggle({
     Title = L("排除未开启PvP的人"),
     Desc = L("目标关闭了 PvP 模式时不传送过去；「传送至最近玩家」会自动跳过这类人"),
     Value = _G.NoPvpSkip,
@@ -4943,7 +5236,7 @@ RJR[L("传送")]:Toggle({
     end
 })
 
-RJR[L("传送")]:Toggle({
+kiyo[L("传送")]:Toggle({
     Title = L("排除盟友"),
     Desc = L("游戏「Allies」盟友面板里的人、以及同阵营(海军)都不传送过去；判定规则和自瞄一致"),
     Value = _G.NoAllySkip,
@@ -4965,7 +5258,7 @@ elseif _G.TweenNearest then
 end
 end
 
-RJR[L("传送")]:Slider({
+kiyo[L("传送")]:Slider({
     Title = L("统一传送速度"),
     Value = {
         Min = 100,
@@ -4978,10 +5271,10 @@ RJR[L("传送")]:Slider({
     end
 })
 
-RJR[L("传送")]:Divider()
+kiyo[L("传送")]:Divider()
 
 for name, pos in pairs(TeleportLocations) do
-    RJR[L("传送")]:Button({
+    kiyo[L("传送")]:Button({
         Title = L(name),
         Icon = "map",
         Callback = function()
@@ -4999,7 +5292,7 @@ for name, pos in pairs(TeleportLocations) do
     })
 end
 
-RJR[L("传送")]:Input({
+kiyo[L("传送")]:Input({
     Title = L("X轴偏移"),
     Value = tostring(_G.TeleportOffsetX),
     Placeholder = "-3000 - 3000",
@@ -5009,7 +5302,7 @@ RJR[L("传送")]:Input({
     end
 })
 
-RJR[L("传送")]:Input({
+kiyo[L("传送")]:Input({
     Title = L("Y轴偏移"),
     Value = tostring(_G.TeleportOffsetY),
     Placeholder = "-3000 - 3000",
@@ -5019,7 +5312,7 @@ RJR[L("传送")]:Input({
     end
 })
 
-RJR[L("传送")]:Input({
+kiyo[L("传送")]:Input({
     Title = L("Z轴偏移"),
     Value = tostring(_G.TeleportOffsetZ),
     Placeholder = "-3000 - 3000",
@@ -5029,7 +5322,7 @@ RJR[L("传送")]:Input({
     end
 })
 
-RJR[L("设置")]:Dropdown({
+kiyo[L("设置")]:Dropdown({
     Title = L("选择主题"),
     Values = themeList,
     Value = _G.Theme,
@@ -5039,7 +5332,7 @@ RJR[L("设置")]:Dropdown({
     end
 })
 
-RJR[L("设置")]:Button({
+kiyo[L("设置")]:Button({
     Title = L("保存配置"),
     Callback = function()
         SaveConfig(true)
@@ -5047,7 +5340,7 @@ RJR[L("设置")]:Button({
     end
 })
 
-RJR[L("设置")]:Button({
+kiyo[L("设置")]:Button({
     Title = L("加载配置"),
     Callback = function()
         LoadConfig()
@@ -5665,7 +5958,7 @@ end
 -- 排除开关沿用传送页的 安全区/未开PvP/盟友 三个开关
 local function FaceTPValid(player)
     if not FaceTPRoot(player) then return false end
-    return not RJR_IsTargetExcluded(player)
+    return not kiyo_IsTargetExcluded(player)
 end
 
 -- 目标优先级：H 快捷锁人 -> 传送页选中的玩家 -> 静默自瞄当前盯上的 -> 自动抓（鼠标最近/最近的玩家）
@@ -5828,9 +6121,9 @@ local function StopFaceTP()
     FaceTPStop()
 end
 
-RJR[L("绘制")]:Divider()
+kiyo[L("绘制")]:Divider()
 do
-local FOVSection = RJR[L("绘制")]:Section({ Title = L("自瞄范围设置") })
+local FOVSection = kiyo[L("绘制")]:Section({ Title = L("自瞄范围设置") })
 
 FOVSection:Toggle({
     Title = L("显示 FOV 范围"),
@@ -5875,9 +6168,9 @@ FOVSection:Colorpicker({
     end
 })
 
-RJR[L("绘制")]:Divider()
+kiyo[L("绘制")]:Divider()
 
-local AimSection = RJR[L("绘制")]:Section({ Title = L("自瞄设置") })
+local AimSection = kiyo[L("绘制")]:Section({ Title = L("自瞄设置") })
 
 AimSection:Toggle({
     Title = L("M1 R 自瞄"),
@@ -5949,9 +6242,9 @@ AimSection:Dropdown({
     Callback = function(v) _G.SilentAimPart = v; SaveConfiguration() end
 })
 
-RJR[L("绘制")]:Divider()
+kiyo[L("绘制")]:Divider()
 
-local SilentAimPlayerDropdown = RJR[L("绘制")]:Dropdown({
+local SilentAimPlayerDropdown = kiyo[L("绘制")]:Dropdown({
     Title = L("选择瞄准玩家"),
     Values = GetPlayerList(),
     Value = _G.SilentAimSelectedPlayer,
@@ -5961,7 +6254,7 @@ local SilentAimPlayerDropdown = RJR[L("绘制")]:Dropdown({
     end
 })
 
-RJR[L("绘制")]:Button({
+kiyo[L("绘制")]:Button({
     Title = L("刷新玩家列表"),
     Callback = function()
         local newPlayerList = GetPlayerList()
@@ -5980,7 +6273,7 @@ RJR[L("绘制")]:Button({
 })
 end
 
-RJR[L("绘制")]:Toggle({
+kiyo[L("绘制")]:Toggle({
     Title = L("快捷键锁人"),
     Value = _G.LockHotkey,
     Callback = function(v)
@@ -5994,7 +6287,7 @@ RJR[L("绘制")]:Toggle({
     end
 })
 
-RJR[L("绘制")]:Keybind({
+kiyo[L("绘制")]:Keybind({
     Title = L("锁人快捷键"),
     Value = _G.LockHotkeyKey or "H",
     Callback = function(v)
@@ -6006,7 +6299,7 @@ RJR[L("绘制")]:Keybind({
 
 if _G.LockHotkey then StartLockHotkey() end
 
-RJR[L("绘制")]:Toggle({
+kiyo[L("绘制")]:Toggle({
     Title = L("F 瞬移+技能"),
     Desc = L("按下快捷键瞬间贴到目标身前并自动放技能"),
     Value = _G.FaceTP,
@@ -6021,7 +6314,7 @@ RJR[L("绘制")]:Toggle({
     end
 })
 
-RJR[L("绘制")]:Keybind({
+kiyo[L("绘制")]:Keybind({
     Title = L("瞬移快捷键"),
     Value = _G.FaceTPKey or "F",
     Callback = function(v)
@@ -6030,7 +6323,7 @@ RJR[L("绘制")]:Keybind({
     end
 })
 
-RJR[L("绘制")]:Dropdown({
+kiyo[L("绘制")]:Dropdown({
     Title = L("瞬移技能键"),
     Values = {"Z", "X", "C", "V", "F"},
     Value = _G.FaceSkill or "X",
@@ -6040,7 +6333,7 @@ RJR[L("绘制")]:Dropdown({
     end
 })
 
-RJR[L("绘制")]:Slider({
+kiyo[L("绘制")]:Slider({
     Title = L("最大瞬移距离"),
     Value = {
         Min = 100,
@@ -6060,7 +6353,7 @@ print(string.format(
     tostring(_G.FaceTP), tostring(_G.FaceTPKey), tostring(_G.FaceSkill), tostring(_G.FaceMaxDistance)
 ))
 
-RJR[L("绘制")]:Divider()
+kiyo[L("绘制")]:Divider()
 
 do
     local autoSoruConn = nil
@@ -6130,7 +6423,7 @@ do
         autoSoruConn = nil
     end
 
-    RJR[L("绘制")]:Toggle({
+    kiyo[L("绘制")]:Toggle({
         Title = L("自动瞬步"),
         Desc = "",
         Value = _G.AutoSoru,
