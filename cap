@@ -1,76 +1,177 @@
--- 建立 ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CoordinatesGui"
-screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+--[[
+    移除玩家动作 (僵直)   —   提取自 rjr2
+    ------------------------------------------------------------------
+    · 停止角色 Animator 当前播放的所有动画
+    · 监听 AnimationPlayed, 持续停止新播放的动画(达到"僵直"效果)
+    · 换角色(重生)后自动重新应用
+    · 关闭时仅断开监听, 动画由游戏自然重播恢复
+    面板可拖动, 热键 F 开关。
+]]
 
--- 建立可拖曳框架
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0.25, 0, 0.15, 0)
-frame.Position = UDim2.new(0.4, 0, 0.8, 0)
-frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-frame.BorderColor3 = Color3.fromRGB(255, 255, 255)
-frame.BorderSizePixel = 2
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
+local Players     = game:GetService("Players")
+local UserInput   = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
--- 建立座標顯示 Label
-local label = Instance.new("TextLabel")
-label.Size = UDim2.new(1, 0, 0.6, 0)
-label.Position = UDim2.new(0, 0, 0, 0)
-label.BackgroundTransparency = 1
-label.TextColor3 = Color3.fromRGB(255, 255, 255)
-label.TextScaled = true
-label.Parent = frame
+local CFG = { Enabled = false }
 
--- 建立 Copy 按鈕
-local copyButton = Instance.new("TextButton")
-copyButton.Size = UDim2.new(0.5, 0, 0.3, 0)
-copyButton.Position = UDim2.new(0.25, 0, 0.65, 0)
-copyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-copyButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
-copyButton.BorderSizePixel = 2
-copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-copyButton.Text = "Copy"
-copyButton.TextScaled = true
-copyButton.Parent = frame
+-- ============================ 核心 ============================
+local removeAnimCharConn  = nil
+local removeAnimTrackConn = nil
 
--- 建立關閉按鈕
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 24, 0, 24)
-closeButton.Position = UDim2.new(1, -26, 0, 2)
-closeButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-closeButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.BorderSizePixel = 2
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.Text = "X"
-closeButton.TextScaled = true
-closeButton.Parent = frame
+local function DisableAnimForChar(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if not hum then return end
+    local animator = hum:WaitForChild("Animator", 5)
+    if not animator then return end
+    for _, t in pairs(animator:GetPlayingAnimationTracks()) do
+        pcall(function() t:Stop() end)
+    end
+    if removeAnimTrackConn then removeAnimTrackConn:Disconnect() end
+    removeAnimTrackConn = animator.AnimationPlayed:Connect(function(t)
+        pcall(function() t:Stop() end)
+    end)
+end
 
-closeButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
+local function StartRemoveAnim()
+    if LocalPlayer.Character then
+        DisableAnimForChar(LocalPlayer.Character)
+    end
+    if not removeAnimCharConn then
+        removeAnimCharConn = LocalPlayer.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            if CFG.Enabled then
+                DisableAnimForChar(char)
+            end
+        end)
+    end
+end
+
+local function StopRemoveAnim()
+    if removeAnimTrackConn then
+        removeAnimTrackConn:Disconnect()
+        removeAnimTrackConn = nil
+    end
+    if removeAnimCharConn then
+        removeAnimCharConn:Disconnect()
+        removeAnimCharConn = nil
+    end
+end
+
+local function SetEnabled(on)
+    CFG.Enabled = on
+    if on then StartRemoveAnim() else StopRemoveAnim() end
+end
+
+if CFG.Enabled then StartRemoveAnim() end
+
+-- ============================ UI ============================
+local ACCENT   = Color3.fromRGB(255, 224, 120)
+local TXT      = Color3.fromRGB(236, 240, 250)
+local TXT_SUB  = Color3.fromRGB(150, 158, 180)
+local CARD     = Color3.fromRGB(44, 49, 64)
+local PANEL_BG = Color3.fromRGB(26, 30, 42)
+local GREEN    = Color3.fromRGB(70, 200, 130)
+
+local parent = LocalPlayer:WaitForChild("PlayerGui")
+local old = parent:FindFirstChild("RemoveAnimGui")
+if old then old:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "RemoveAnimGui"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = parent
+
+local panel = Instance.new("Frame")
+panel.Size = UDim2.fromOffset(210, 108)
+panel.Position = UDim2.fromOffset(60, 140)
+panel.BackgroundColor3 = PANEL_BG
+panel.BorderSizePixel = 0
+panel.Active = true
+panel.Parent = gui
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 14)
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(60, 68, 90); stroke.Transparency = 0.3; stroke.Parent = panel
+
+local bar = Instance.new("Frame")
+bar.Size = UDim2.new(1, 0, 0, 4); bar.BackgroundColor3 = ACCENT
+bar.BorderSizePixel = 0; bar.Parent = panel
+Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 14)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -40, 0, 28); title.Position = UDim2.fromOffset(14, 8)
+title.BackgroundTransparency = 1; title.Font = Enum.Font.GothamBold; title.TextSize = 14
+title.TextColor3 = TXT; title.TextXAlignment = Enum.TextXAlignment.Left
+title.Text = "移除玩家动作"; title.Parent = panel
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(20, 20); close.Position = UDim2.new(1, -28, 0, 12)
+close.BackgroundColor3 = CARD; close.BorderSizePixel = 0; close.Text = "×"
+close.Font = Enum.Font.GothamBold; close.TextSize = 14; close.TextColor3 = TXT_SUB
+close.Parent = panel
+Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+close.MouseButton1Click:Connect(function() gui.Enabled = false end)
+
+-- 开关
+local track = Instance.new("TextButton")
+track.Size = UDim2.fromOffset(44, 22); track.Position = UDim2.fromOffset(14, 46)
+track.BackgroundColor3 = CFG.Enabled and GREEN or Color3.fromRGB(70, 76, 94)
+track.BorderSizePixel = 0; track.Text = ""; track.AutoButtonColor = false
+track.Parent = panel
+Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+local knob = Instance.new("Frame")
+knob.Size = UDim2.fromOffset(18, 18)
+knob.Position = CFG.Enabled and UDim2.new(1, -20, 0, 2) or UDim2.fromOffset(2, 2)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255); knob.BorderSizePixel = 0
+knob.Parent = track
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+local stateLabel = Instance.new("TextLabel")
+stateLabel.Size = UDim2.fromOffset(130, 20); stateLabel.Position = UDim2.fromOffset(66, 47)
+stateLabel.BackgroundTransparency = 1; stateLabel.Font = Enum.Font.GothamMedium
+stateLabel.TextSize = 12; stateLabel.TextColor3 = TXT; stateLabel.TextXAlignment = Enum.TextXAlignment.Left
+stateLabel.Text = CFG.Enabled and "已开启 (F)" or "已关闭 (F)"; stateLabel.Parent = panel
+
+local hint = Instance.new("TextLabel")
+hint.Size = UDim2.new(1, -28, 0, 16); hint.Position = UDim2.fromOffset(14, 80)
+hint.BackgroundTransparency = 1; hint.Font = Enum.Font.GothamMedium; hint.TextSize = 11
+hint.TextColor3 = TXT_SUB; hint.TextXAlignment = Enum.TextXAlignment.Left
+hint.Text = "关闭后动画由游戏自然重播恢复"; hint.Parent = panel
+
+local function refresh()
+    track.BackgroundColor3 = CFG.Enabled and GREEN or Color3.fromRGB(70, 76, 94)
+    knob.Position = CFG.Enabled and UDim2.new(1, -20, 0, 2) or UDim2.fromOffset(2, 2)
+    stateLabel.Text = CFG.Enabled and "已开启 (F)" or "已关闭 (F)"
+end
+
+track.MouseButton1Click:Connect(function()
+    SetEnabled(not CFG.Enabled)
+    refresh()
 end)
 
--- 更新座標
-local RunService = game:GetService("RunService")
-RunService.RenderStepped:Connect(function()
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local position = character.HumanoidRootPart.Position
-        label.Text = string.format("(%.0f, %.0f, %.0f)", position.X, position.Y, position.Z)
+-- 热键 F
+UserInput.InputBegan:Connect(function(i, gp)
+    if gp then return end
+    if i.KeyCode == Enum.KeyCode.F then
+        SetEnabled(not CFG.Enabled)
+        refresh()
     end
 end)
 
--- Copy 按鈕功能
-copyButton.MouseButton1Click:Connect(function()
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local pos = character.HumanoidRootPart.Position
-        local textToCopy = string.format("(%.0f, %.0f, %.0f)", pos.X, pos.Y, pos.Z)
-        if setclipboard then
-            setclipboard(textToCopy)
-        end
+-- 拖动
+local drag, dragStart, startPos
+title.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        drag = true; dragStart = i.Position; startPos = panel.Position
     end
+end)
+UserInput.InputChanged:Connect(function(i)
+    if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
+        local d = i.Position - dragStart
+        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+                                   startPos.Y.Scale, startPos.Y.Offset + d.Y)
+    end
+end)
+UserInput.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end
 end)
