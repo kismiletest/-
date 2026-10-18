@@ -1,0 +1,76 @@
+-- LocalScript: FPS + Ping Monitor
+-- Place in StarterPlayerScripts
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Create simple UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PerfMonitor"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 80)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundTransparency = 0.4
+frame.Parent = screenGui
+
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.Size = UDim2.new(1, -10, 0, 30)
+fpsLabel.Position = UDim2.new(0, 5, 0, 5)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.TextScaled = true
+fpsLabel.Font = Enum.Font.SourceSansBold
+fpsLabel.Text = "FPS: ..."
+fpsLabel.Parent = frame
+
+local pingLabel = fpsLabel:Clone()
+pingLabel.Position = UDim2.new(0, 5, 0, 40)
+pingLabel.Text = "Ping: ..."
+pingLabel.Parent = frame
+
+-- FPS calculation
+local lastTime = tick()
+local frames = 0
+local fps = 0
+
+RunService.RenderStepped:Connect(function()
+    frames = frames + 1
+    local now = tick()
+    if now - lastTime >= 1 then
+        fps = math.floor(frames / (now - lastTime) + 0.5)
+        frames = 0
+        lastTime = now
+        fpsLabel.Text = "FPS: " .. tostring(fps)
+        -- color-coding
+        if fps >= 50 then
+            fpsLabel.TextColor3 = Color3.fromRGB(0, 200, 0)
+        elseif fps >= 30 then
+            fpsLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+        else
+            fpsLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+        end
+    end
+end)
+
+-- Ping / Round-trip time
+local function updatePing()
+    local matchStats = LocalPlayer:GetNetworkPing() -- Roblox 2024+ has GetNetworkPing; fallback below if nil
+    if matchStats then
+        pingLabel.Text = "Ping: " .. tostring(math.floor(matchStats * 1000)) .. " ms"
+    else
+        -- Fallback: use os.clock measurement (approx)
+        local start = tick()
+        game:GetService("ReplicatedStorage"):GetPropertyChangedSignal("Changed"):Wait() -- harmless wait to yield
+        local elapsed = tick() - start
+        pingLabel.Text = "Ping: " .. tostring(math.floor(elapsed * 1000)) .. " ms"
+    end
+end
+
+-- update ping every 2 seconds
+while true do
+    pcall(updatePing)
+    wait(2)
+end
