@@ -430,6 +430,90 @@ task.delay(1, function()
     ApplyReduceGraphics()
 end)
 
+-- ==================== FFlag 优化(每次执行强制开启) ====================
+;(function()
+    local Lighting = game:GetService("Lighting")
+    local FLAGS = {
+        { "DFIntTaskSchedulerTargetFps", "240" },
+        { "FFlagDisablePostFx",          "True" },
+        { "FIntFRMMaxGrassDistance",     "0" },
+        { "FIntFRMMinGrassDistance",     "0" },
+        { "DebugFRMQualityLevelOverride","1" },
+        { "TextureQualityOverride",      "0" },
+    }
+
+    local originals = {}
+    local savedLighting = {}
+    local savedQuality = nil
+    local savedFps = nil
+
+    local function ApplyFFlags()
+        local setter = setfflag or set_fflag
+        if type(setter) ~= "function" then return 0 end
+
+        savedLighting.GlobalShadows = Lighting.GlobalShadows
+        savedLighting.FogEnd = Lighting.FogEnd
+        pcall(function() savedQuality = settings().Rendering.QualityLevel end)
+        if type(getfpscap) == "function" then
+            local ok, v = pcall(getfpscap)
+            if ok then savedFps = v end
+        end
+
+        originals = {}
+        local getter = getfflag or get_fflag
+        if type(getter) == "function" then
+            for _, pair in ipairs(FLAGS) do
+                local ok, v = pcall(getter, pair[1])
+                if ok and v ~= nil then originals[pair[1]] = v end
+            end
+        end
+
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 9e9
+        pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+        if type(setfpscap) == "function" then pcall(setfpscap, 240) end
+
+        local applied = 0
+        for _, pair in ipairs(FLAGS) do
+            local ok, result = pcall(setter, pair[1], tostring(pair[2]))
+            if ok and result ~= false then applied = applied + 1 end
+        end
+        return applied
+    end
+
+    local function RestoreFFlags()
+        local setter = setfflag or set_fflag
+        if type(setter) == "function" then
+            for name, value in pairs(originals) do
+                pcall(setter, name, tostring(value))
+            end
+        end
+        originals = {}
+        if savedLighting.GlobalShadows ~= nil then
+            Lighting.GlobalShadows = savedLighting.GlobalShadows
+        end
+        if savedLighting.FogEnd ~= nil then
+            Lighting.FogEnd = savedLighting.FogEnd
+        end
+        if savedQuality ~= nil then
+            pcall(function() settings().Rendering.QualityLevel = savedQuality end)
+        end
+        if savedFps ~= nil and type(setfpscap) == "function" then
+            pcall(setfpscap, savedFps)
+        end
+    end
+
+    _G.kiyoFFlagApply = ApplyFFlags
+    _G.kiyoFFlagRestore = RestoreFFlags
+
+    -- 每次执行脚本强制开启
+    _G.FFlagOptimize = true
+    task.spawn(function()
+        task.wait(0.5)
+        pcall(ApplyFFlags)
+    end)
+end)()
+
 task.spawn(function()
     local lastRaw = nil
     while task.wait(1) do
@@ -518,9 +602,14 @@ local Translations = {
         ["冲刺距离修改开关"] = "Dash Length Toggle",
         ["冲刺距离"] = "Dash Length",
         ["减画质"] = "Reduce Graphics",
+        ["FFlag 优化"] = "FFlag Optimize",
         ["移除岩浆 (需重进恢复)"] = "Remove Lava (Rejoin to restore)",
         ["移除雾 (需重进恢复)"] = "Remove Fog (Rejoin to restore)",
         ["移除玩家动作 (僵直)"] = "Remove Player Anim (Stun)",
+        ["天气效果"] = "Weather Effects",
+        ["天气类型"] = "Weather Type",
+        ["天气颜色"] = "Weather Color",
+        ["天气密度"] = "Weather Density",
         ["移除鬼船 (保留传送点)"] = "Remove Ghost Ship",
         ["水上行走"] = "Walk on Water",
         ["解帧数限制 (仅电脑)"] = "Unlock FPS (PC only)",
@@ -562,14 +651,6 @@ local Translations = {
         ["X轴偏移"] = "X Offset",
         ["Y轴偏移"] = "Y Offset",
         ["Z轴偏移"] = "Z Offset",
-        ["豪宅"] = "Mansion",
-        ["天鹅房间"] = "Swan Room",
-        ["鬼船"] = "Ship Inside",
-        ["僵尸岛"] = "Ship Outside",
-        ["海洋城堡"] = "castle of the sea",
-        ["海龟豪宅"] = "Turtle Mansion",
-        ["司法"] = "Justice",
-        ["九头蛇"] = "Hydra",
         ["自瞄范围设置"] = "Aimbot Range Settings",
         ["显示 FOV 范围"] = "Show FOV Range",
         ["FOV 位置"] = "FOV Position",
@@ -629,7 +710,8 @@ local Translations = {
         ["传送开启"] = "Teleport Started",
         ["传送关闭"] = "Teleport Stopped",
         ["已停止传送目标玩家"] = "Stopped teleporting to target",
-        ["快捷传送点"] = "Quick TP Point",
+        ["坐标传送"] = "Coordinate TP",
+        ["传送至 (-371, 74, 324)"] = "TP to (-371, 74, 324)",
         ["环绕锁人"] = "Orbit Lock",
         ["公告"] = "Announcement",
         ["DC 服务器"] = "DC Server",
@@ -796,6 +878,7 @@ local RegisterAttack = Net:WaitForChild("RE/RegisterAttack")
 local RegisterHit = Net:WaitForChild("RE/RegisterHit")
 local RemoteSeed = Net:FindFirstChild("seed")
 local State = { FoundRemote = nil, FoundRemoteId = nil, LastAttack = 0 }
+
 task.spawn(function()
     local folders = { ReplicatedStorage:FindFirstChild("Util"), ReplicatedStorage:FindFirstChild("Common"), ReplicatedStorage:FindFirstChild("Remotes"), ReplicatedStorage:FindFirstChild("Assets"), ReplicatedStorage:FindFirstChild("FX") }
     local function checkChild(child)
@@ -867,7 +950,7 @@ task.spawn(function()
             continue
         end
         pcall(PerformAttack, _G.FastAttackMode ~= "模式1")
-        task.wait()
+        task.wait(0)   -- 攻击间隔 0
     end
 end)
 kiyo[L("杀戮光环")]:Dropdown({
@@ -895,6 +978,7 @@ kiyo[L("杀戮光环")]:Toggle({
         SaveConfiguration()
     end
 })
+
 task.spawn(function()
     local Players = game:GetService("Players")
     local RepStorage = game:GetService("ReplicatedStorage")
@@ -3569,6 +3653,19 @@ kiyo[L("杂项")]:Button({
 })
 
 kiyo[L("杂项")]:Toggle({
+    Title = L("FFlag 优化"),
+    Value = true,
+    Callback = function(v)
+        _G.FFlagOptimize = v
+        if v then
+            if _G.kiyoFFlagApply then pcall(_G.kiyoFFlagApply) end
+        else
+            if _G.kiyoFFlagRestore then pcall(_G.kiyoFFlagRestore) end
+        end
+    end
+})
+
+kiyo[L("杂项")]:Toggle({
     Title = L("移除岩浆 (需重进恢复)"),
     Value = _G.RemoveLava,
     Callback = function(v)
@@ -3670,6 +3767,142 @@ kiyo[L("杂项")]:Toggle({
         SaveConfiguration()
     end
 })
+
+-- ==================== 天气效果 ====================
+;(function()
+    local weatherTypes = {
+        ["rain"] = {
+            ["Speed"] = NumberRange.new(60, 60),
+            ["LockedToPart"] = true,
+            ["Rate"] = 600,
+            ["Texture"] = "rbxassetid://1822883048",
+            ["EmissionDirection"] = Enum.NormalId.Bottom,
+            ["Transparency"] = NumberSequence.new{ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.25, 0.7842668294906616), NumberSequenceKeypoint.new(0.75, 0.7842668294906616), NumberSequenceKeypoint.new(1, 1) },
+            ["Lifetime"] = NumberRange.new(0.8, 0.8),
+            ["LightEmission"] = 0.05,
+            ["LightInfluence"] = 0.9,
+            ["Orientation"] = Enum.ParticleOrientation.FacingCameraWorldUp,
+            ["Size"] = NumberSequence.new{ NumberSequenceKeypoint.new(0, 10), NumberSequenceKeypoint.new(1, 10) }
+        },
+        ["snow"] = {
+            ["Transparency"] = NumberSequence.new{ NumberSequenceKeypoint.new(0, 0.7374999523162842), NumberSequenceKeypoint.new(0.973, 0.768750011920929), NumberSequenceKeypoint.new(1, 1) },
+            ["Texture"] = "rbxassetid://99851851",
+            ["SpreadAngle"] = Vector2.new(50, 50),
+            ["Speed"] = NumberRange.new(30, 30),
+            ["LightEmission"] = 0.5,
+            ["Rate"] = 1000,
+            ["EmissionDirection"] = Enum.NormalId.Bottom,
+            ["Size"] = NumberSequence.new{ NumberSequenceKeypoint.new(0, 0.33096909523010254), NumberSequenceKeypoint.new(0.551, 0.40189146995544434), NumberSequenceKeypoint.new(1, 0.33096909523010254) }
+        },
+        ["light rain"] = {
+            ["LockedToPart"] = true,
+            ["Rate"] = 500,
+            ["Squash"] = NumberSequence.new{ NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 3) },
+            ["LightInfluence"] = 0.3,
+            ["Transparency"] = NumberSequence.new{ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.435, 0), NumberSequenceKeypoint.new(1, 0) },
+            ["Texture"] = "rbxasset://textures/particles/sparkles_main.dds",
+            ["Speed"] = NumberRange.new(30, 50),
+            ["Lifetime"] = NumberRange.new(9, 9),
+            ["LightEmission"] = 0.5,
+            ["Brightness"] = 2,
+            ["EmissionDirection"] = Enum.NormalId.Bottom,
+            ["Orientation"] = Enum.ParticleOrientation.FacingCameraWorldUp,
+            ["Size"] = NumberSequence.new{ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 0.2) }
+        }
+    }
+    local weatherNames = { "light rain", "rain", "snow" }
+
+    local weatherEnabled = false
+    local weatherPart = nil
+    local weatherParticle = nil
+    local weatherType = "rain"
+    local weatherColor = Color3.new(1, 1, 1)
+    local weatherRate = 1000
+
+    local function destroyWeather()
+        if weatherPart then
+            pcall(function() weatherPart:Destroy() end)
+            weatherPart = nil
+            weatherParticle = nil
+        end
+    end
+
+    local function buildWeather()
+        destroyWeather()
+        weatherPart = Instance.new("Part")
+        weatherPart.Size = Vector3.new(40, 40, 85)
+        weatherPart.CanCollide = false
+        weatherPart.Massless = true
+        weatherPart.CastShadow = false
+        weatherPart.Transparency = 1
+        weatherPart.Anchored = true
+        weatherPart.Name = "kiyoWeather"
+        weatherPart.Parent = workspace
+
+        local data = weatherTypes[weatherType] or weatherTypes["rain"]
+        weatherParticle = Instance.new("ParticleEmitter")
+        for prop, val in pairs(data) do
+            pcall(function() weatherParticle[prop] = val end)
+        end
+        weatherParticle.Color = ColorSequence.new(weatherColor)
+        weatherParticle.Rate = weatherRate
+        weatherParticle.Parent = weatherPart
+    end
+
+    -- 跟随相机
+    task.spawn(function()
+        while true do
+            task.wait()
+            if weatherEnabled and weatherPart then
+                pcall(function()
+                    weatherPart.CFrame = workspace.CurrentCamera.CFrame + Vector3.new(0, 20, 0)
+                end)
+            end
+        end
+    end)
+
+    kiyo[L("杂项")]:Toggle({
+        Title = L("天气效果"),
+        Value = false,
+        Callback = function(v)
+            weatherEnabled = v
+            if v then buildWeather() else destroyWeather() end
+        end,
+    })
+
+    kiyo[L("杂项")]:Dropdown({
+        Title = L("天气类型"),
+        Values = weatherNames,
+        Value = weatherType,
+        Callback = function(v)
+            weatherType = v
+            if weatherEnabled then buildWeather() end
+        end,
+    })
+
+    kiyo[L("杂项")]:Colorpicker({
+        Title = L("天气颜色"),
+        Default = weatherColor,
+        Transparency = 0,
+        Callback = function(color)
+            weatherColor = color
+            if weatherParticle then
+                pcall(function() weatherParticle.Color = ColorSequence.new(weatherColor) end)
+            end
+        end,
+    })
+
+    kiyo[L("杂项")]:Slider({
+        Title = L("天气密度"),
+        Value = { Min = 0, Max = 100, Default = 100 },
+        Callback = function(v)
+            weatherRate = 1000 * (v / 100)
+            if weatherParticle then
+                pcall(function() weatherParticle.Rate = weatherRate end)
+            end
+        end,
+    })
+end)()
 
 kiyo[L("商店")]:Button({
     Title = L("重置数据"),
@@ -5051,34 +5284,6 @@ kiyo[L("传送")]:Toggle({
     end
 })
 
-local function requestEntrance(pos)
-    local args = {
-        [1] = "requestEntrance",
-        [2] = pos
-    }
-    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer(unpack(args))
-end
-
-local World2 = game.PlaceId == 4442272183 or game.PlaceId == 79091703265657
-local World3 = game.PlaceId == 7449423635 or game.PlaceId == 100117331123089
-
-local TeleportLocations = {}
-if World2 then
-    TeleportLocations = {
-        ["豪宅"] = Vector3.new(-390, 332, 673),
-        ["天鹅房间"] = Vector3.new(2285, 15, 905),
-        ["鬼船"] = Vector3.new(923, 126, 32852),
-        ["僵尸岛"] = Vector3.new(-6509, 83, -133),
-    }
-elseif World3 then
-    TeleportLocations = {
-        ["海洋城堡"] = Vector3.new(-12463.6, 376.26, -7566.08),
-        ["海龟豪宅"] = Vector3.new(-5060.41, 316.43, -3192.30),
-        ["司法"] = Vector3.new(-5096.48, 316.43, -3177.91),
-        ["九头蛇"] = Vector3.new(-5027.03, 316.43, -3206.07),
-    }
-end
-
 local ChaseAPI = { Start = nil, Stop = nil, HotkeyTarget = nil }
 
 do
@@ -5273,24 +5478,27 @@ kiyo[L("传送")]:Slider({
 
 kiyo[L("传送")]:Divider()
 
-for name, pos in pairs(TeleportLocations) do
-    kiyo[L("传送")]:Button({
-        Title = L(name),
-        Icon = "map",
-        Callback = function()
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                requestEntrance(pos)
-                WindUI:Notify({
-                    Title = L("快捷传送点"),
-                    Content = L("已设置为 ") .. name,
-                    Duration = 2
-                })
-            end
+-- 指定坐标传送
+kiyo[L("传送")]:Button({
+    Title = L("传送至 (-371, 74, 324)"),
+    Icon = "map",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hrp and hum and hum.Health > 0 then
+            StopTween()
+            hrp.AssemblyLinearVelocity  = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            pcall(function() hrp.CFrame = CFrame.new(-371, 74, 324) end)
+            WindUI:Notify({
+                Title = L("坐标传送"),
+                Content = "(-371, 74, 324)",
+                Duration = 2
+            })
         end
-    })
-end
+    end
+})
 
 kiyo[L("传送")]:Input({
     Title = L("X轴偏移"),
