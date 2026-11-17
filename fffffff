@@ -1,0 +1,95 @@
+#Requires AutoHotkey v2.0
+#SingleInstance Force
+
+global TARGET_FPS := "240"
+
+global FLAGS := Map(
+    "DFIntTaskSchedulerTargetFps", TARGET_FPS,
+    "FFlagDisablePostFx",          "True",
+    "FIntFRMMaxGrassDistance",     "0",
+    "FIntFRMMinGrassDistance",     "0",
+    "DebugFRMQualityLevelOverride","1",
+    "TextureQualityOverride",      "0"
+)
+
+global ROBLOX_VERSIONS := A_LocalAppData "\Roblox\Versions"
+global BACKUP_NAME     := "ClientAppSettings.backup.json"
+
+BuildJson() {
+    json := "{`n"
+    total := FLAGS.Count
+    i := 0
+    for name, value in FLAGS {
+        i++
+        json .= '    "' name '": "' value '"'
+        if (i < total)
+            json .= ","
+        json .= "`n"
+    }
+    json .= "}`n"
+    return json
+}
+
+ApplyFlags() {
+    if !DirExist(ROBLOX_VERSIONS) {
+        MsgBox("找不到 Roblox 目录：`n" ROBLOX_VERSIONS, "FFlag")
+        return
+    }
+
+    json := BuildJson()
+    count := 0
+
+    Loop Files, ROBLOX_VERSIONS "\*\ClientSettings", "D" {
+        dir    := A_LoopFileFullPath
+        file   := dir "\ClientAppSettings.json"
+        backup := dir "\" BACKUP_NAME
+
+        if FileExist(file) && !FileExist(backup)
+            FileCopy(file, backup)
+
+        try FileSetAttrib("-R", file)
+        try FileDelete(file)
+
+        try {
+            FileAppend(json, file)
+            count++
+        }
+    }
+
+    if (count = 0)
+        MsgBox("没有找到 ClientSettings 文件夹，请确认已安装 Roblox。", "FFlag")
+    else
+        MsgBox("已写入 " count " 个 Roblox 版本的 FFlag。`n重启 Roblox 后生效。", "FFlag")
+}
+
+RestoreFlags() {
+    if !DirExist(ROBLOX_VERSIONS)
+        return
+
+    count := 0
+
+    Loop Files, ROBLOX_VERSIONS "\*\ClientSettings", "D" {
+        dir    := A_LoopFileFullPath
+        file   := dir "\ClientAppSettings.json"
+        backup := dir "\" BACKUP_NAME
+
+        if FileExist(backup) {
+            try FileSetAttrib("-R", file)
+            try FileDelete(file)
+            FileCopy(backup, file)
+            FileDelete(backup)
+            count++
+        } else if FileExist(file) {
+            try FileSetAttrib("-R", file)
+            try FileDelete(file)
+            count++
+        }
+    }
+
+    MsgBox("已还原 " count " 个版本。`n重启 Roblox 后生效。", "FFlag")
+}
+
+F9::ApplyFlags()
+F10::RestoreFlags()
+
+TrayTip("FFlag 工具已加载：F9 应用 / F10 还原", "FFlag", 1)
