@@ -1,95 +1,126 @@
-#Requires AutoHotkey v2.0
-#SingleInstance Force
+Players = game:GetService("Players")
+TweenService = game:GetService("TweenService")
+RunService = game:GetService("RunService")
+RS = game:GetService("ReplicatedStorage")
+HttpService = game:GetService("HttpService")
+Workspace = game:GetService("Workspace")
+VirtualUser = game:GetService("VirtualUser")
+VirtualInputManager = game:GetService("VirtualInputManager")
+Lighting = game:GetService("Lighting")
+CollectionService = game:GetService("CollectionService")
+TeleportService = game:GetService("TeleportService")
+UserInputService = game:GetService("UserInputService")
 
-global TARGET_FPS := "240"
+LocalPlayer = Players.LocalPlayer
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-global FLAGS := Map(
-    "DFIntTaskSchedulerTargetFps", TARGET_FPS,
-    "FFlagDisablePostFx",          "True",
-    "FIntFRMMaxGrassDistance",     "0",
-    "FIntFRMMinGrassDistance",     "0",
-    "DebugFRMQualityLevelOverride","1",
-    "TextureQualityOverride",      "0"
-)
+if playerGui:FindFirstChild("CustomTeleportGui") then
+    playerGui.CustomTeleportGui:Destroy()
+end
 
-global ROBLOX_VERSIONS := A_LocalAppData "\Roblox\Versions"
-global BACKUP_NAME     := "ClientAppSettings.backup.json"
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomTeleportGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = playerGui
 
-BuildJson() {
-    json := "{`n"
-    total := FLAGS.Count
-    i := 0
-    for name, value in FLAGS {
-        i++
-        json .= '    "' name '": "' value '"'
-        if (i < total)
-            json .= ","
-        json .= "`n"
-    }
-    json .= "}`n"
-    return json
-}
+local Button = Instance.new("TextButton")
+Button.Name = "CircleButton"
+Button.Size = UDim2.new(0, 60, 0, 60)
+Button.Position = UDim2.new(0.1, 0, 0.1, 0)
+Button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+Button.Text = "TPkill"
+Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+Button.TextSize = 18
+Button.Font = Enum.Font.SourceSansBold
+Button.Parent = ScreenGui
 
-ApplyFlags() {
-    if !DirExist(ROBLOX_VERSIONS) {
-        MsgBox("找不到 Roblox 目录：`n" ROBLOX_VERSIONS, "FFlag")
-        return
-    }
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(1, 0)
+UICorner.Parent = Button
 
-    json := BuildJson()
-    count := 0
+local dragging, dragInput, dragStart, startPos
 
-    Loop Files, ROBLOX_VERSIONS "\*\ClientSettings", "D" {
-        dir    := A_LoopFileFullPath
-        file   := dir "\ClientAppSettings.json"
-        backup := dir "\" BACKUP_NAME
+Button.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Button.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
 
-        if FileExist(file) && !FileExist(backup)
-            FileCopy(file, backup)
+Button.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
 
-        try FileSetAttrib("-R", file)
-        try FileDelete(file)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        Button.Position = UDim2.new(
+            startPos.X.Scale, 
+            startPos.X.Offset + delta.X, 
+            startPos.Y.Scale, 
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
 
-        try {
-            FileAppend(json, file)
-            count++
-        }
-    }
+local function TeleportAbove()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local myRoot = char:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+    
+    local targetCFrame = myRoot.CFrame + Vector3.new(9e909, 9e909, 9e909)
+    
+    pcall(function()
+        myRoot.CFrame = targetCFrame
+        myRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        myRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    end)
+end
 
-    if (count = 0)
-        MsgBox("没有找到 ClientSettings 文件夹，请确认已安装 Roblox。", "FFlag")
+local function ExecuteAction()
+    task.spawn(function()
+        for i = 5, 20 do
+            TeleportAbove()
+            task.wait(0)
+        end
+    end)
+end
+
+local toggled = false
+local debounce = false
+
+Button.MouseButton1Click:Connect(function()
+    toggled = not toggled
+    if toggled then
+        Button.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     else
-        MsgBox("已写入 " count " 个 Roblox 版本的 FFlag。`n重启 Roblox 后生效。", "FFlag")
-}
+        Button.BackgroundColor3 = Color3.fromRGB(0, 170, 255) 
+    end
+end)
 
-RestoreFlags() {
-    if !DirExist(ROBLOX_VERSIONS)
-        return
-
-    count := 0
-
-    Loop Files, ROBLOX_VERSIONS "\*\ClientSettings", "D" {
-        dir    := A_LoopFileFullPath
-        file   := dir "\ClientAppSettings.json"
-        backup := dir "\" BACKUP_NAME
-
-        if FileExist(backup) {
-            try FileSetAttrib("-R", file)
-            try FileDelete(file)
-            FileCopy(backup, file)
-            FileDelete(backup)
-            count++
-        } else if FileExist(file) {
-            try FileSetAttrib("-R", file)
-            try FileDelete(file)
-            count++
-        }
-    }
-
-    MsgBox("已还原 " count " 个版本。`n重启 Roblox 后生效。", "FFlag")
-}
-
-F9::ApplyFlags()
-F10::RestoreFlags()
-
-TrayTip("FFlag 工具已加载：F9 应用 / F10 还原", "FFlag", 1)
+RunService.Heartbeat:Connect(function()
+    if not toggled then return end
+    if debounce then return end
+    
+    if UserInputService:IsKeyDown(Enum.KeyCode.Z) or
+       UserInputService:IsKeyDown(Enum.KeyCode.F) then
+        
+        debounce = true
+        task.wait(0.6)
+        ExecuteAction()
+        
+        task.delay(0.1, function()
+            debounce = false
+        end)
+    end
+end)
