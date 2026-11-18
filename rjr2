@@ -711,7 +711,7 @@ local Translations = {
         ["传送关闭"] = "Teleport Stopped",
         ["已停止传送目标玩家"] = "Stopped teleporting to target",
         ["坐标传送"] = "Coordinate TP",
-        ["传送至 (-371, 74, 324)"] = "TP to (-371, 74, 324)",
+        ["传送至 (-420, 76, 343)"] = "TP to (-420, 76, 343)",
         ["环绕锁人"] = "Orbit Lock",
         ["公告"] = "Announcement",
         ["DC 服务器"] = "DC Server",
@@ -5480,7 +5480,7 @@ kiyo[L("传送")]:Divider()
 
 -- 指定坐标传送
 kiyo[L("传送")]:Button({
-    Title = L("传送至 (-371, 74, 324)"),
+    Title = L("传送至 (-420, 76, 343)"),
     Icon = "map",
     Callback = function()
         local char = LocalPlayer.Character
@@ -5490,10 +5490,10 @@ kiyo[L("传送")]:Button({
             StopTween()
             hrp.AssemblyLinearVelocity  = Vector3.zero
             hrp.AssemblyAngularVelocity = Vector3.zero
-            pcall(function() hrp.CFrame = CFrame.new(-371, 74, 324) end)
+            pcall(function() hrp.CFrame = CFrame.new(-420, 76, 343) end)
             WindUI:Notify({
                 Title = L("坐标传送"),
-                Content = "(-371, 74, 324)",
+                Content = "(-420, 76, 343)",
                 Duration = 2
             })
         end
